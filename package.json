@@ -1,0 +1,44 @@
+{
+  "name": "vite-react-mcp",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Vite plugin for React MCP",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "pnpm -r run start",
+    "build": "npx shx rm -rf dist && tsc",
+    "build:src": "npx shx rm -rf dist && tsc --project tsconfig.json --outDir dist --rootDir src",
+    "playground": "pnpm --filter user-profile-app run start",
+    "format": "pnpm biome format --write",
+    "lint": "pnpm biome lint --write",
+    "check": "pnpm biome check --write"
+  },
+  "keywords": [
+    "vite",
+    "react",
+    "mcp",
+    "devtools"
+  ],
+  "author": {
+    "name": "jazelly",
+    "email": "xzha4350@gmail.com"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@10.6.5",
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "typescript": "catalog:",
+    "bippy": "0.3.8",
+    "vite": "catalog:"
+  },
+  "dependencies": {
+    "@types/react-reconciler": "catalog:",
+    "@modelcontextprotocol/sdk": "1.7.0",
+    "birpc": "catalog:",
+    "vite-dev-rpc": "catalog:",
+    "vite-hot-client": "catalog:",
+    "zod": "^3.22.4",
+    "zod-to-json-schema": "^3.23.5"
+  }
+}

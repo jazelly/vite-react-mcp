@@ -1,0 +1,30 @@
+packages:
+  # Include the root package
+  - '.'
+  # Include all packages in playground directory
+  - 'playground/*'
+  # Include all packages in src directory
+  - 'src/*' 
+
+catalog:
+  # React ecosystem
+  react: ^18.3.0
+  react-dom: ^18.3.0
+  '@types/react-reconciler': 0.26.7
+  'bippy': ^0.3.8
+  # Material UI
+  '@mui/material': ^5.14.0
+  '@mui/icons-material': ^5.14.0
+  '@emotion/react': ^11.11.0
+  '@emotion/styled': ^11.11.0
+  # Testing
+  '@testing-library/react': ^13.4.0
+  '@testing-library/jest-dom': ^5.16.5
+  '@testing-library/user-event': ^13.5.0
+  # Build tools
+  typescript: ^5.8.2
+  react-scripts: ^5.0.1
+  vite: ^6.2.1
+  vite-dev-rpc: ^1.0.7
+  vite-hot-client: ^2.0.4
+  birpc: ^2.2.0
