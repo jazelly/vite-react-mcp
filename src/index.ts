@@ -16,7 +16,7 @@ const viteReactMcpResourceSymbol = '?__vite-react-mcp-resource';
 const viteReactMcpImportee = 'virtual:vite-react-mcp';
 const resolvedViteReactMcp = `\0${viteReactMcpImportee}`;
 
-function ViteReactMCP(): Plugin {
+function ReactMCP(): Plugin {
   return {
     name: 'vite-react-mcp',
     enforce: 'pre',
@@ -57,4 +57,4 @@ function ViteReactMCP(): Plugin {
   };
 }
 
-export default ViteReactMCP;
+export default ReactMCP;
