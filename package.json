@@ -3,7 +3,11 @@
   "type": "module",
   "version": "0.1.0",
   "description": "Vite plugin for React MCP",
-  "main": "dist/src/index.js",
+  "main": "dist/index.js",
+  "workspaces": [
+    "packages/*",
+    "playground/*"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "pnpm -r run start",
@@ -32,7 +36,8 @@
     "@modelcontextprotocol/inspector": "catalog:",
     "typescript": "catalog:",
     "bippy": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "shx": "0.4.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.7.0",

@@ -6,7 +6,7 @@ A Vite plugin that creates an MCP server to help LLMs to interact with your Reac
 
 1. `highlight-component`
 
-`highlight-component`: Highligh a component (input: `componentName`).
+`highlight-component`: Highlight a component by the given `componentName`.
 
 ![highligh-component](./playground/demo/demo1.gif)
 

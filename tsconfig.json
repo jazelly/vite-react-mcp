@@ -5,6 +5,7 @@
     "lib": ["esnext", "dom"],
     "module": "esnext",
     "moduleResolution": "bundler",
+    "declaration": true,
     "resolveJsonModule": true,
     "allowJs": true,
     "strict": true,

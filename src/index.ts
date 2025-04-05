@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizePath, type ViteDevServer } from 'vite';
 import type { Plugin } from 'vite';
-import { initMcpServer, instrumentViteDevServer } from './mcp';
+import { initMcpServer, instrumentViteDevServer } from './mcp/index.js';
 
 function getViteReactMcpPath() {
   const pluginPath = normalizePath(
@@ -25,8 +25,9 @@ function ReactMCP(): Plugin {
     configureServer(viteDevServer: ViteDevServer) {
       const mcpServer = initMcpServer(viteDevServer);
       instrumentViteDevServer(viteDevServer, mcpServer);
-
-      console.info('vite dev server port', viteDevServer.config.server.port);
+      setTimeout(() => {
+        console.info('Vite React MCP server is running on port ', viteDevServer.config.server.port);
+      }, 1000);
     },
 
     async resolveId(importee) {

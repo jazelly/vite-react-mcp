@@ -1,6 +1,5 @@
 import type { ViteDevServer } from 'vite';
 import { z } from 'zod';
-import { version } from '../../package.json';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
@@ -14,7 +13,7 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
   const server = new Server(
     {
       name: 'vite-react-mcp',
-      version,
+      version: '0.1.1',
     },
     {
       capabilities: {
