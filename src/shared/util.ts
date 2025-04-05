@@ -2,6 +2,7 @@ import { target } from './const';
 import type { ReactDevtools } from '../types/react';
 import type { FiberRoot } from 'react-reconciler';
 import type { Fiber } from 'react-reconciler';
+import { InvalidFiberRootError } from './errors';
 
 export const getRDTHook: () => ReactDevtools = () => {
   if (!target.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
@@ -116,4 +117,20 @@ export const findComponentsInFiber = (
   }
 
   return results;
+};
+
+/**
+ * Get all self-defined components from the fiber tree
+ * @param fiber
+ * @returns { Fiber[] }
+ */
+export const getAllSelfDefinedComponents = (root: FiberRoot) => {
+  if (!root || !root.current) {
+    throw new InvalidFiberRootError('getAllSelfDefinedComponents is called with an invalid Fiber Root');
+  }
+  const fiberBase = root.current;
+  const components = [];
+  if (fiberBase.type) {
+    components.push(fiberBase.type);
+  }
 };

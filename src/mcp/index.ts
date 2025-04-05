@@ -68,8 +68,8 @@ export function initMcpServer(
 export function instrumentViteDevServer(viteDevServer: ViteDevServer, mcpServer: Server) {
   const transports = new Map<string, SSEServerTransport>();
 
-  viteDevServer.middlewares.use(`sse`, async (req, res) => {
-    const transport = new SSEServerTransport(`/messages`, res)
+  viteDevServer.middlewares.use('/sse', async (_req, res) => {
+    const transport = new SSEServerTransport('/messages', res)
     transports.set(transport.sessionId, transport)
     res.on('close', () => {
       transports.delete(transport.sessionId)

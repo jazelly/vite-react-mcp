@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizePath, ViteDevServer } from 'vite';
+import { normalizePath, type ViteDevServer } from 'vite';
 import type { Plugin } from 'vite';
 import { initMcpServer, instrumentViteDevServer } from './mcp';
 
@@ -29,7 +29,7 @@ function ViteReactMCP(): Plugin {
       if (importee === viteReactMcpImportee) {
         return resolvedViteReactMcp
       }
-      else if (importee.startsWith(`${viteReactMcpImportee}:`)) {
+      if (importee.startsWith(`${viteReactMcpImportee}:`)) {
         const resolved = importee.replace(`${viteReactMcpImportee}:`, `${viteReactMcpPath}/`)
         return `${resolved}${viteReactMcpResourceSymbol}`
       }

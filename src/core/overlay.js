@@ -3,7 +3,7 @@ import { target } from '../shared/const';
 import { highlightReactComponent } from './component-highlighter';
 
 const init = () => {
-  if (target.hasOwnProperty(__VITE_REACT_MCP_TOOLS__)) {
+  if (target.hasOwn(__VITE_REACT_MCP_TOOLS__)) {
     return;
   }
 

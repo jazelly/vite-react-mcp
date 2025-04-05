@@ -1,4 +1,4 @@
-import { Fiber } from 'react-reconciler';
+import type { Fiber } from 'react-reconciler';
 import { target } from '../../shared/const';
 import { findComponentsInFiber, getFiberNodes, getNearestFiberWithStateNode } from '../../shared/util';
 

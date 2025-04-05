@@ -47,7 +47,7 @@ export type BundleType =
 // The subset of a Thenable required by things thrown by Suspense.
 // This doesn't require a value to be passed to either handler.
 export interface Wakeable {
-  then(onFulfill: () => unknown, onReject: () => unknown): void | Wakeable;
+  then(onFulfill: () => unknown, onReject: () => unknown): undefined | Wakeable;
 }
 
 export type DevToolsProfilingHooks = {
@@ -160,7 +160,7 @@ export interface ReactRenderer {
   // Only injected by React v17.0.3+ in DEV mode
   setErrorHandler?: (shouldError?: (fiber: Object) => boolean | undefined) => void,
   // Intentionally opaque type to avoid coupling DevTools to different Fast Refresh versions.
-  scheduleRefresh?: Function,
+  scheduleRefresh?: () => void,
   // 18.0+
   injectProfilingHooks?: (profilingHooks: DevToolsProfilingHooks) => void,
   getLaneLabelMap?: () => Map<Lane, string> | null,

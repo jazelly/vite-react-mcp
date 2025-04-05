@@ -32,7 +32,10 @@
           "level": "warn",
           "fix": "unsafe"
         },
-        "noExplicitAny": "warn"
+        "noExplicitAny": "off"
+      },
+      "complexity": {
+        "noBannedTypes": "off"
       },
       "correctness": {
         "noUnusedFunctionParameters": {
@@ -54,7 +57,7 @@
         "noUnusedVariables": {
           "level": "warn",
           "fix": "unsafe"
-        },
+        }
       }
     }
   }
