@@ -27,17 +27,15 @@
   "license": "MIT",
   "packageManager": "pnpm@10.6.5",
   "devDependencies": {
+    "@types/react-reconciler": "catalog:",
     "@biomejs/biome": "1.9.4",
+    "@modelcontextprotocol/inspector": "catalog:",
     "typescript": "catalog:",
-    "bippy": "0.3.8",
+    "bippy": "catalog:",
     "vite": "catalog:"
   },
   "dependencies": {
-    "@types/react-reconciler": "catalog:",
     "@modelcontextprotocol/sdk": "1.7.0",
-    "birpc": "catalog:",
-    "vite-dev-rpc": "catalog:",
-    "vite-hot-client": "catalog:",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.23.5"
   }

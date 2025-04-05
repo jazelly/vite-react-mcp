@@ -1,17 +1,22 @@
 import type { Fiber } from 'react-reconciler';
 import { target } from '../../shared/const';
-import { findComponentsInFiber, getFiberNodes, getNearestFiberWithStateNode } from '../../shared/util';
+import {
+  findComponentsInFiber,
+  getFiberNodes,
+  getNearestFiberWithStateNode,
+} from '../../shared/util';
 
-export const highlightReactComponent = (componentName: string, options: {
-  debugMode?: boolean;
-} = {}) => {
+export const highlightReactComponent = (
+  componentName: string,
+  options: {
+    debugMode?: boolean;
+  } = {},
+) => {
   const highlightColor = '#ff5757';
   const highlightThickness = '2px';
   const highlightDuration = 3000;
 
-  const {
-    debugMode = false,
-  } = options;
+  const { debugMode = false } = options;
 
   // Apply highlighting to DOM nodes
   const highlightNodes = (nodes) => {
@@ -26,7 +31,7 @@ export const highlightReactComponent = (componentName: string, options: {
     const styleId = `highlight-style-${Date.now()}`;
     const styleElement = document.createElement('style');
     styleElement.id = styleId;
-    
+
     const keyframesRule = `
       @keyframes highlight-pulse-${styleId} {
         0% { 
@@ -43,7 +48,6 @@ export const highlightReactComponent = (componentName: string, options: {
         }
       }
     `;
-    
 
     styleElement.textContent = `
       ${keyframesRule}
@@ -72,14 +76,14 @@ export const highlightReactComponent = (componentName: string, options: {
         box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
       }
     `;
-    
+
     document.head.appendChild(styleElement);
 
     // Apply highlight to each node and add tooltip
     const highlightedNodes = nodes.map((node, index) => {
       // Add the highlight class
       node.classList.add(`highlight-component-${styleId}`);
-      
+
       // Create a tooltip element
       const tooltip = document.createElement('div');
       tooltip.className = `highlight-tooltip-${styleId}`;
@@ -97,31 +101,37 @@ export const highlightReactComponent = (componentName: string, options: {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       `;
       tooltip.textContent = `${componentName} #${index + 1}`;
-      
+
       // Store the original position
       const originalPosition = target.getComputedStyle(node).position;
       if (originalPosition === 'static') {
         node.style.position = 'relative';
       }
-      
+
       // Add tooltip to node
       node.appendChild(tooltip);
-      
-      return { 
-        node, 
+
+      return {
+        node,
         styleId,
         tooltip,
-        originalPosition
+        originalPosition,
       };
     });
 
     if (debugMode) {
-      console.debug(`[DEBUG] Highlighted ${highlightedNodes.length} instances of "${componentName}":`, nodes);
-      
+      console.debug(
+        `[DEBUG] Highlighted ${highlightedNodes.length} instances of "${componentName}":`,
+        nodes,
+      );
+
       // Log component props if we have fiber nodes
       highlightedNodes.forEach((item, idx) => {
         if (item.fiber) {
-          console.debug(`${componentName} #${idx + 1} props:`, item.fiber.memoizedProps);
+          console.debug(
+            `${componentName} #${idx + 1} props:`,
+            item.fiber.memoizedProps,
+          );
         }
       });
     }
@@ -132,25 +142,27 @@ export const highlightReactComponent = (componentName: string, options: {
       if (document.getElementById(styleId)) {
         document.getElementById(styleId).remove();
       }
-      
+
       // Remove highlight class and tooltip from each node
       for (const { node, tooltip, originalPosition } of highlightedNodes) {
         // Remove highlight class
         node.classList.remove(`highlight-component-${styleId}`);
-        
+
         // Remove tooltip
         if (tooltip && tooltip.parentNode === node) {
           node.removeChild(tooltip);
         }
-        
+
         // Restore original position if we changed it
         if (originalPosition === 'static') {
           node.style.position = '';
         }
       }
-      
+
       if (debugMode && highlightedNodes.length > 0) {
-        console.debug(`Removed highlights from ${highlightedNodes.length} "${componentName}" instances`);
+        console.debug(
+          `Removed highlights from ${highlightedNodes.length} "${componentName}" instances`,
+        );
       }
     }, highlightDuration);
 
@@ -173,9 +185,9 @@ export const highlightReactComponent = (componentName: string, options: {
       }
     }
   }
-  
+
   if (fiberResults.length > 0) {
-    foundNodes = fiberResults.map(result => result.domNode);
+    foundNodes = fiberResults.map((result) => result.domNode);
   }
 
   return highlightNodes(foundNodes);

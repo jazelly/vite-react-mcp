@@ -6,6 +6,7 @@ import { InvalidFiberRootError } from './errors';
 
 export const getRDTHook: () => ReactDevtools = () => {
   if (!target.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+    console.error('React DevTools is not installed');
     throw new Error('React DevTools is not installed');
   }
   return target.__REACT_DEVTOOLS_GLOBAL_HOOK__;
@@ -126,7 +127,9 @@ export const findComponentsInFiber = (
  */
 export const getAllSelfDefinedComponents = (root: FiberRoot) => {
   if (!root || !root.current) {
-    throw new InvalidFiberRootError('getAllSelfDefinedComponents is called with an invalid Fiber Root');
+    throw new InvalidFiberRootError(
+      'getAllSelfDefinedComponents is called with an invalid Fiber Root',
+    );
   }
   const fiberBase = root.current;
   const components = [];

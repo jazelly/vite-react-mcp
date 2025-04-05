@@ -35,12 +35,12 @@ export type ReactComponentInfo = {
   readonly key?: null | string;
   readonly owner?: null | ReactComponentInfo;
   readonly stack?: null | ReactStackTrace;
-  readonly props?: null | {[name: string]: unknown};
+  readonly props?: null | { [name: string]: unknown };
 };
 
 export type HostInstance = object;
 
-export type BundleType = 
+export type BundleType =
   | 0 // PROD
   | 1; // DEV
 
@@ -52,118 +52,119 @@ export interface Wakeable {
 
 export type DevToolsProfilingHooks = {
   // Scheduling methods:
-  markRenderScheduled: (lane: Lane) => void,
-  markStateUpdateScheduled: (fiber: Fiber, lane: Lane) => void,
-  markForceUpdateScheduled: (fiber: Fiber, lane: Lane) => void,
+  markRenderScheduled: (lane: Lane) => void;
+  markStateUpdateScheduled: (fiber: Fiber, lane: Lane) => void;
+  markForceUpdateScheduled: (fiber: Fiber, lane: Lane) => void;
 
   // Work loop level methods:
-  markRenderStarted: (lanes: Lanes) => void,
-  markRenderYielded: () => void,
-  markRenderStopped: () => void,
-  markCommitStarted: (lanes: Lanes) => void,
-  markCommitStopped: () => void,
-  markLayoutEffectsStarted: (lanes: Lanes) => void,
-  markLayoutEffectsStopped: () => void,
-  markPassiveEffectsStarted: (lanes: Lanes) => void,
-  markPassiveEffectsStopped: () => void,
+  markRenderStarted: (lanes: Lanes) => void;
+  markRenderYielded: () => void;
+  markRenderStopped: () => void;
+  markCommitStarted: (lanes: Lanes) => void;
+  markCommitStopped: () => void;
+  markLayoutEffectsStarted: (lanes: Lanes) => void;
+  markLayoutEffectsStopped: () => void;
+  markPassiveEffectsStarted: (lanes: Lanes) => void;
+  markPassiveEffectsStopped: () => void;
 
   // Fiber level methods:
-  markComponentRenderStarted: (fiber: Fiber) => void,
-  markComponentRenderStopped: () => void,
+  markComponentRenderStarted: (fiber: Fiber) => void;
+  markComponentRenderStopped: () => void;
   markComponentErrored: (
     fiber: Fiber,
     thrownValue: unknown,
     lanes: Lanes,
-  ) => void,
+  ) => void;
   markComponentSuspended: (
     fiber: Fiber,
     wakeable: Wakeable,
     lanes: Lanes,
-  ) => void,
-  markComponentLayoutEffectMountStarted: (fiber: Fiber) => void,
-  markComponentLayoutEffectMountStopped: () => void,
-  markComponentLayoutEffectUnmountStarted: (fiber: Fiber) => void,
-  markComponentLayoutEffectUnmountStopped: () => void,
-  markComponentPassiveEffectMountStarted: (fiber: Fiber) => void,
-  markComponentPassiveEffectMountStopped: () => void,
-  markComponentPassiveEffectUnmountStarted: (fiber: Fiber) => void,
-  markComponentPassiveEffectUnmountStopped: () => void,
+  ) => void;
+  markComponentLayoutEffectMountStarted: (fiber: Fiber) => void;
+  markComponentLayoutEffectMountStopped: () => void;
+  markComponentLayoutEffectUnmountStarted: (fiber: Fiber) => void;
+  markComponentLayoutEffectUnmountStopped: () => void;
+  markComponentPassiveEffectMountStarted: (fiber: Fiber) => void;
+  markComponentPassiveEffectMountStopped: () => void;
+  markComponentPassiveEffectUnmountStarted: (fiber: Fiber) => void;
+  markComponentPassiveEffectUnmountStopped: () => void;
 };
 
 type Dispatcher = any;
-export type LegacyDispatcherRef = {current: null | Dispatcher};
+export type LegacyDispatcherRef = { current: null | Dispatcher };
 type SharedInternalsSubset = {
-  H: null | Dispatcher,
+  H: null | Dispatcher;
 };
 export type CurrentDispatcherRef = SharedInternalsSubset;
 
 export interface ReactRenderer {
-  version: string,
-  rendererPackageName: string,
-  bundleType: BundleType,
+  version: string;
+  rendererPackageName: string;
+  bundleType: BundleType;
   // 16.0+ - To be removed in future versions.
-  findFiberByHostInstance?: (hostInstance: HostInstance) => Fiber | null,
+  findFiberByHostInstance?: (hostInstance: HostInstance) => Fiber | null;
   // 16.9+
   overrideHookState?: (
     fiber?: object,
     id?: number,
     path?: Array<string | number>,
     value?: any,
-  ) => void,
+  ) => void;
   // 17+
   overrideHookStateDeletePath?: (
     fiber?: object,
     id?: number,
     path?: Array<string | number>,
-  ) => void,
+  ) => void;
   // 17+
   overrideHookStateRenamePath?: (
     fiber: Object,
     id: number,
     oldPath: Array<string | number>,
     newPath: Array<string | number>,
-  ) => void,
+  ) => void;
   // 16.7+
   overrideProps?: (
     fiber?: object,
     path?: Array<string | number>,
     value?: any,
-  ) => void,
+  ) => void;
   // 17+
   overridePropsDeletePath?: (
     fiber?: object,
     path?: Array<string | number>,
-  ) => void,
+  ) => void;
   // 17+
   overridePropsRenamePath?: (
     fiber?: object,
     oldPath?: Array<string | number>,
     newPath?: Array<string | number>,
-  ) => void,
+  ) => void;
   // 16.9+
-  scheduleUpdate?: (fiber?: object) => void,
-  setSuspenseHandler?: (shouldSuspend: (fiber?: object) => boolean) => void,
+  scheduleUpdate?: (fiber?: object) => void;
+  setSuspenseHandler?: (shouldSuspend: (fiber?: object) => boolean) => void;
   // Only injected by React v16.8+ in order to support hooks inspection.
-  currentDispatcherRef?: LegacyDispatcherRef | CurrentDispatcherRef,
+  currentDispatcherRef?: LegacyDispatcherRef | CurrentDispatcherRef;
   // Only injected by React v16.9+ in DEV mode.
   // Enables DevTools to append owners-only component stack to error messages.
-  getCurrentFiber?: (() => Fiber | null) | null,
+  getCurrentFiber?: (() => Fiber | null) | null;
   // Only injected by React Flight Clients in DEV mode.
   // Enables DevTools to append owners-only component stack to error messages from Server Components.
-  getCurrentComponentInfo?: () => ReactComponentInfo | null,
+  getCurrentComponentInfo?: () => ReactComponentInfo | null;
   // 17.0.2+
-  reconcilerVersion?: string,
+  reconcilerVersion?: string;
   // Uniquely identifies React DOM v15.
-  ComponentTree?: any,
+  ComponentTree?: any;
   // Present for React DOM v12 (possibly earlier) through v15.
-  Mount?: any,
+  Mount?: any;
   // Only injected by React v17.0.3+ in DEV mode
-  setErrorHandler?: (shouldError?: (fiber: Object) => boolean | undefined) => void,
+  setErrorHandler?: (
+    shouldError?: (fiber: Object) => boolean | undefined,
+  ) => void;
   // Intentionally opaque type to avoid coupling DevTools to different Fast Refresh versions.
-  scheduleRefresh?: () => void,
+  scheduleRefresh?: () => void;
   // 18.0+
-  injectProfilingHooks?: (profilingHooks: DevToolsProfilingHooks) => void,
-  getLaneLabelMap?: () => Map<Lane, string> | null,
+  injectProfilingHooks?: (profilingHooks: DevToolsProfilingHooks) => void;
+  getLaneLabelMap?: () => Map<Lane, string> | null;
   // Other renderer methods
 }
-

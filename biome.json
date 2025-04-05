@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "include": ["src/**/*.ts", "src/**/*.js", "playground/**/*.ts", "playground/**/*.tsx", "*.ts", "*.tsx"],
+    "include": [
+      "src/**/*.ts",
+      "src/**/*.js",
+      "playground/**/*.ts",
+      "playground/**/*.tsx",
+      "*.ts",
+      "*.tsx"
+    ],
     "ignore": ["node_modules", "dist", "coverage", "css-to-tailwind.ts"]
   },
   "formatter": {
@@ -20,7 +27,8 @@
   "javascript": {
     "formatter": {
       "quoteStyle": "single",
-      "trailingCommas": "all"
+      "trailingCommas": "all",
+      "semicolons": "always"
     }
   },
   "linter": {
