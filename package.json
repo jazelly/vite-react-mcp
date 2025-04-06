@@ -1,7 +1,7 @@
 {
   "name": "vite-react-mcp",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vite plugin for React MCP",
   "main": "dist/index.js",
   "workspaces": [
@@ -33,9 +33,7 @@
   "devDependencies": {
     "@types/react-reconciler": "catalog:",
     "@biomejs/biome": "1.9.4",
-    "@modelcontextprotocol/inspector": "catalog:",
     "typescript": "catalog:",
-    "bippy": "catalog:",
     "vite": "catalog:",
     "shx": "0.4.0"
   },

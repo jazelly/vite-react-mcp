@@ -31,8 +31,10 @@
     ]
   },
   "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite-react-mcp": "workspace:*",
+    "vite-react-mcp": "catalog:",
     "vite": "^6.2.3"
   }
 }
