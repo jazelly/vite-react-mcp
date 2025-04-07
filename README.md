@@ -4,11 +4,16 @@ A Vite plugin that creates an MCP server to help LLMs to interact with your Reac
 
 ## Features
 
-1. `highlight-component`
-
-`highlight-component`: Highlight a component by the given `componentName`.
+- `highlight-component`
+  - description: Highlight React component based on the component name.
+  - params: 
+    - `componentName`: string
 
 ![highligh-component](./playground/demo/demo1.gif)
+
+- `get-component-tree`
+  - description: Get a tree-like representation of the component tree of the current page.
+
 
 ## Getting Started
 
@@ -16,7 +21,6 @@ A Vite plugin that creates an MCP server to help LLMs to interact with your Reac
 
 ```bash
 pnpm install vite-react-mcp -D
-
 ```
 
 ### Usage

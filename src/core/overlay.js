@@ -37,6 +37,18 @@ const setupMcpToolsHandler = () => {
         deserializedData.componentName,
       );
     });
+
+    import.meta.hot.on('get-component-tree', (data) => {
+      let deserializedData;
+      try {
+        deserializedData = JSON.parse(data);
+      } catch (_error) {
+        throw new Error(`Data is not deserializable: ${data}`);
+      }
+
+      const componentTreeRoot = target.__VITE_REACT_MCP_TOOLS__.getComponentTree(deserializedData);
+      import.meta.hot.send('get-component-tree-response', JSON.stringify(componentTreeRoot));
+    });
   }
 };
 

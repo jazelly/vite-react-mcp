@@ -3,17 +3,19 @@ import { z } from 'zod';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
+  CallToolResult,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import zodToJsonSchema from 'zod-to-json-schema';
-import { HighlightComponentSchema } from './schema.js';
+import { GetComponentTreeSchema, HighlightComponentSchema } from './schema.js';
+import { getVersionString, waitForEvent } from '../shared/node_util.js';
 
 export function initMcpServer(viteDevServer: ViteDevServer): Server {
   const server = new Server(
     {
       name: 'vite-react-mcp',
-      version: '0.1.1',
+      version: getVersionString(),
     },
     {
       capabilities: {
@@ -30,11 +32,16 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
           description: 'Highlight React component based on the component name.',
           inputSchema: zodToJsonSchema(HighlightComponentSchema),
         },
+        {
+          name: 'get-component-tree',
+          description: 'Get a tree-like representation of the component tree of the current page.',
+          inputSchema: zodToJsonSchema(GetComponentTreeSchema),
+        },
       ],
     };
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
     try {
       switch (request.params.name) {
         case 'highlight-component': {
@@ -46,6 +53,20 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
           });
           return {
             content: [{ type: 'text', text: 'Highlighting component...' }],
+          };
+        }
+
+        case 'get-component-tree': {
+          const args = GetComponentTreeSchema.parse(request.params.arguments);
+          viteDevServer.ws.send({
+            type: 'custom', 
+            event: 'get-component-tree',
+            data: JSON.stringify(args),
+          });
+
+          const response = await waitForEvent<string>(viteDevServer, 'get-component-tree-response');
+          return {
+            content: [{ type: 'text', text: response.data }],
           };
         }
 
