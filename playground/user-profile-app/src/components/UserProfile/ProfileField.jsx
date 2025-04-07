@@ -34,6 +34,6 @@ const ProfileField = ({
   );
 };
 
-ProfileField.displayName = 'ProfileField';
+ProfileField.displayName = 'ProfileField$$mcp';
 
 export default ProfileField; 

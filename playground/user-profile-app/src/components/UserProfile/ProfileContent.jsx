@@ -129,6 +129,6 @@ const ProfileContent = ({
   );
 };
 
-ProfileContent.displayName = 'ProfileContent';
+ProfileContent.displayName = 'ProfileContent$$mcp';
 
 export default ProfileContent; 

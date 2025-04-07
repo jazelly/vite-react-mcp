@@ -2,16 +2,20 @@ import type { Fiber } from 'react-reconciler';
 import { target } from '../../shared/const';
 import {
   findComponentsInFiber,
-  getFiberNodes,
+  getFiberRoots,
   getNearestFiberWithStateNode,
 } from '../../shared/util';
+import { InvalidInputError } from '../../shared/errors';
 
-export const highlightReactComponent = (
+export const highlightComponent= (
   componentName: string,
   options: {
     debugMode?: boolean;
   } = {},
 ) => {
+  if (!componentName) {
+    throw new InvalidInputError('No component name provided');
+  }
   const highlightColor = '#ff5757';
   const highlightThickness = '2px';
   const highlightDuration = 3000;
@@ -170,7 +174,7 @@ export const highlightReactComponent = (
   };
 
   let foundNodes = [];
-  const roots = getFiberNodes();
+  const roots = getFiberRoots();
   if (debugMode) {
     console.debug('[DEBUG] roots:', roots);
   }

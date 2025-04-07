@@ -26,7 +26,10 @@ function ReactMCP(): Plugin {
       const mcpServer = initMcpServer(viteDevServer);
       instrumentViteDevServer(viteDevServer, mcpServer);
       setTimeout(() => {
-        console.info('Vite React MCP server is running on port ', viteDevServer.config.server.port);
+        console.info(
+          'Vite React MCP server is running on port',
+          viteDevServer.config.server.port,
+        );
       }, 1000);
     },
 

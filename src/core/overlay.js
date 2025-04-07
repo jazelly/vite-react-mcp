@@ -1,6 +1,7 @@
 import { __VITE_REACT_MCP_TOOLS__ } from '../shared/const';
 import { target } from '../shared/const';
-import { highlightReactComponent } from './component-highlighter';
+import { highlightComponent } from './tools/component_highlighter';
+import { getComponentTree } from './tools/component_viewer';
 
 const init = () => {
   if (Object.hasOwn(target, __VITE_REACT_MCP_TOOLS__)) {
@@ -9,7 +10,8 @@ const init = () => {
 
   Object.defineProperty(target, __VITE_REACT_MCP_TOOLS__, {
     value: {
-      highlightReactComponent: highlightReactComponent,
+      highlightComponent: highlightComponent,
+      getComponentTree: getComponentTree,
     },
     writable: false,
     configurable: true,

@@ -16,7 +16,8 @@
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-router-dom": "catalog:"
   },
   "browserslist": {
     "production": [

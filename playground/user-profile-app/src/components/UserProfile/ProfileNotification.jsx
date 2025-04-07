@@ -19,6 +19,6 @@ const ProfileNotification = ({
   );
 };
 
-ProfileNotification.displayName = 'ProfileNotification';
+ProfileNotification.displayName = 'ProfileNotification$$mcp';
 
 export default ProfileNotification; 
