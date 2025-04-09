@@ -8,8 +8,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import zodToJsonSchema from 'zod-to-json-schema';
-import { GetComponentTreeSchema, HighlightComponentSchema } from './schema.js';
+import { GetComponentStatesSchema, GetComponentTreeSchema, HighlightComponentSchema } from './schema.js';
 import { getVersionString, waitForEvent } from '../shared/node_util.js';
+import { HookNode } from '../types/internal.js';
 
 export function initMcpServer(viteDevServer: ViteDevServer): Server {
   const server = new Server(
@@ -34,9 +35,15 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
         },
         {
           name: 'get-component-tree',
-          description: 'Get a tree-like representation of the component tree of the current page.',
+          description: 'Get the React component tree of the current page in markdown tree syntax format.',
           inputSchema: zodToJsonSchema(GetComponentTreeSchema),
         },
+        {
+          name: 'get-component-states',
+          description: 'Get the React component states in JSON structure format. ' +
+                       'The JSON structure is a map, where key is the corresponding fibers and values are states',
+          inputSchema: zodToJsonSchema(GetComponentStatesSchema),
+        }
       ],
     };
   });
@@ -67,6 +74,20 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
           const response = await waitForEvent<string>(viteDevServer, 'get-component-tree-response');
           return {
             content: [{ type: 'text', text: response.data }],
+          };
+        }
+
+        case 'get-component-states': {
+          const args = GetComponentStatesSchema.parse(request.params.arguments);
+          viteDevServer.ws.send({
+            type: 'custom',
+            event: 'get-component-states',
+            data: JSON.stringify(args),
+          });
+
+          const response = await waitForEvent<string>(viteDevServer, 'get-component-states-response');
+            return {
+              content: [{ type: 'text', text: response.data }],
           };
         }
 

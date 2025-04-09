@@ -19,6 +19,12 @@ export class ComponentNotFoundError extends Error {
   }
 }
 
+export class FiberNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FiberNotFoundError';
+  }
+}
 export class InvalidInputError extends Error {
   constructor(message: string) {
     super(message);

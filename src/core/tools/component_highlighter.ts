@@ -6,6 +6,7 @@ import {
   getNearestFiberWithStateNode,
 } from '../../shared/util';
 import { InvalidInputError } from '../../shared/errors';
+import { getDOMNodesByComponentName } from './util';
 
 export const highlightComponent= (
   componentName: string,
@@ -173,26 +174,7 @@ export const highlightComponent= (
     return highlightedNodes;
   };
 
-  let foundNodes = [];
-  const roots = getFiberRoots();
-  if (debugMode) {
-    console.debug('[DEBUG] roots:', roots);
-  }
-  const fiberResults: { fiber: Fiber; domNode: HTMLElement }[] = [];
-
-  for (const root of roots) {
-    const fibers = findComponentsInFiber(root, componentName);
-    for (const fiber of fibers) {
-      const fiberWithStateNode = getNearestFiberWithStateNode(fiber);
-      if (fiberWithStateNode?.stateNode) {
-        fiberResults.push({ fiber, domNode: fiberWithStateNode.stateNode });
-      }
-    }
-  }
-
-  if (fiberResults.length > 0) {
-    foundNodes = fiberResults.map((result) => result.domNode);
-  }
+  const foundNodes = getDOMNodesByComponentName(componentName);
 
   return highlightNodes(foundNodes);
 };

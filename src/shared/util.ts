@@ -21,19 +21,18 @@ import {
   DEPRECATED_ASYNC_MODE_SYMBOL_STRING,
   SCOPE_SYMBOL_STRING,
 } from './const';
-import type { ReactDevtools } from '../types/react';
-import type { FiberRoot } from 'react-reconciler';
+import type { ReactDevtools, FiberRoot, MemoizedState } from '../types/react';
 import type { Fiber } from 'react-reconciler';
-import { InvalidFiberRootError } from './errors';
 import { ReactTypeOfWork } from './const';
-
+import { HookNode } from '../types/internal';
 let rdtHook: ReactDevtools | null = null;
 
 export const getRDTHook: () => ReactDevtools = () => {
-  if (!rdtHook && !target.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+  if (rdtHook) return rdtHook;
+  if (!target.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
     throw new Error('React DevTools is not installed');
   }
-  rdtHook ??= target.__REACT_DEVTOOLS_GLOBAL_HOOK__;
+  rdtHook = target.__REACT_DEVTOOLS_GLOBAL_HOOK__;
   return rdtHook;
 };
 
@@ -65,7 +64,7 @@ export const getNearestFiberWithStateNode = (
   level?: number,
 ): Fiber | null => {
   // search down but in a bfs manner to find a fiber with stateNode
-  const current = fiber.current ?? fiber;
+  const current = 'current' in fiber ? fiber.current : fiber;
   if (current.stateNode) {
     return current.stateNode;
   }
@@ -111,12 +110,10 @@ export const findComponentsInFiber = (
   results: Fiber[] = [],
 ) => {
   if (!fiber) return results;
-
-  const fiberBase = fiber.current ?? fiber;
-
+  const fiberBase = 'current' in fiber ? fiber.current : fiber;
   const name = getDisplayNameForFiber(fiberBase);
   if (name && name.includes(componentName)) {
-    results.push(fiber);
+    results.push(fiberBase);
   }
 
   if (fiberBase.child) {
@@ -127,24 +124,6 @@ export const findComponentsInFiber = (
   }
 
   return results;
-};
-
-/**
- * Get all self-defined components from the fiber tree
- * @param fiber
- * @returns { Fiber[] }
- */
-export const getAllSelfDefinedComponents = (root: FiberRoot) => {
-  if (!root || !root.current) {
-    throw new InvalidFiberRootError(
-      'getAllSelfDefinedComponents is called with an invalid Fiber Root',
-    );
-  }
-  const fiberBase = root.current;
-  const components = [];
-  if (fiberBase.type) {
-    components.push(fiberBase.type);
-  }
 };
 
 export function getTypeSymbol(type: any): symbol | string | number {
@@ -360,3 +339,31 @@ export function getDisplayNameForFiber(
       }
   }
 }
+
+export const getCurrentStates = (fiber: Fiber): HookNode[] | null => {
+  if (!fiber) return null;
+  const states: HookNode[] = [];
+  let state = fiber.memoizedState;
+  while (state) {
+    states.push({
+      memoizedState: state.memoizedState,
+      baseState: state.baseState,
+    });
+    state = state.next;
+  }
+  return states;
+};
+
+export const getPrevStates = (fiber: Fiber): HookNode[] | null => {
+  if (!fiber.alternate) return null;
+  const states: HookNode[] = [];
+  let state = fiber.alternate.memoizedState;
+  while (state) {
+    states.push({
+      memoizedState: state.memoizedState,
+      baseState: state.baseState,
+    });
+    state = state.next;
+  }
+  return states;
+};

@@ -1,7 +1,46 @@
 // A mapping of React flow types to TypeScript types needed by this package
 // https://github.com/facebook/react/tree/main/packages/react-devtools-shared/src/backend/types.js
 
-import type { Fiber, Lane, Lanes, FiberRoot } from 'react-reconciler';
+import type { Fiber, Lane, Lanes } from 'react-reconciler';
+
+export interface FiberRoot {
+  callbackNode: null | object;
+  callbackPriority: number;
+  containerInfo: HTMLElement; // div#root in this case
+  context: object;
+  current: Fiber;
+  effectDuration: number;
+  entangledLanes: number;
+  entanglements: number[];
+  eventTimes: number[];
+  expirationTimes: number[];
+  expiredLanes: number;
+  finishedLanes: number;
+  finishedWork: null | Fiber;
+  identifierPrefix: string;
+  memoizedUpdaters: Set<unknown>;
+  mutableReadLanes: number;
+  mutableSourceEagerHydrationData: null | any[];
+  onRecoverableError: (error: Error) => void;
+  passiveEffectDuration: number;
+  pendingChildren: null | any;
+  pendingContext: null | object;
+  pendingLanes: number;
+  pendingUpdatersLaneMap: Set<unknown>[];
+  pingCache: null | Map<unknown, unknown>;
+  pingedLanes: number;
+  suspendedLanes: number;
+  tag: number;
+  timeoutHandle: number;
+  _debugRootType: string;
+}
+
+export interface MemoizedState {
+  memoizedState: unknown;
+  next: MemoizedState | null;
+  [key: string]: unknown;
+}
+
 
 export type ReactCallSite = [
   string, // function name
