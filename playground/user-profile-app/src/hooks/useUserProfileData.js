@@ -25,15 +25,15 @@ export const useUserProfileData = (userId) => {
     // Ensure profileData exists before trying to access it
     if (profileData) {
       setTempData({ ...profileData });
-      setEditMode(prev => !prev);
+      setEditMode((prev) => !prev);
     }
   }, [profileData]); // Depend on profileData
 
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
-    setTempData(prev => ({
+    setTempData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   }, []); // No dependencies needed
 
@@ -47,7 +47,7 @@ export const useUserProfileData = (userId) => {
         return true; // Indicate success
       } else {
         // Handle potential update failure (e.g., show an error)
-        console.error("Failed to update user");
+        console.error('Failed to update user');
         return false; // Indicate failure
       }
     }
@@ -72,4 +72,4 @@ export const useUserProfileData = (userId) => {
     handleSave,
     handleCancel,
   };
-}; 
+};

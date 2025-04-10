@@ -41,7 +41,6 @@ export interface MemoizedState {
   [key: string]: unknown;
 }
 
-
 export type ReactCallSite = [
   string, // function name
   string, // file name TODO: model nested eval locations as nested arrays

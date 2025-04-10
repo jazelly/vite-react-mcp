@@ -1,8 +1,14 @@
+import * as bippy from 'bippy';
 import { __VITE_REACT_MCP_TOOLS__ } from '../shared/const';
 import { target } from '../shared/const';
+import { fiberRoots, store } from '../shared/store';
 import { highlightComponent } from './tools/component_highlighter';
 import { getComponentTree } from './tools/component_viewer';
 import { getComponentStates } from './tools/component_state_viewer';
+import {
+  collectUnnecessaryRender,
+  queryWastedRender,
+} from './tools/track_wasted_render';
 
 const init = () => {
   if (Object.hasOwn(target, __VITE_REACT_MCP_TOOLS__)) {
@@ -14,6 +20,7 @@ const init = () => {
       highlightComponent: highlightComponent,
       getComponentTree: getComponentTree,
       getComponentStates: getComponentStates,
+      getUnnecessaryRenderedComponents: queryWastedRender,
     },
     writable: false,
     configurable: true,
@@ -21,6 +28,31 @@ const init = () => {
 };
 
 init();
+
+bippy.instrument({
+  name: 'vite-react-mcp',
+  // TODO: frameify onCommitFiberRoot
+  // every onCommit should record an auto increment id
+  // and time. We then can query, between [start, end]
+  // what happened, in junction with states changes
+  // ALL of these are to answer the question:
+  // hey, this component was waste rendered, so what happened?
+  onCommitFiberRoot: (_renderId, root) => {
+    if (fiberRoots.has(_renderId)) {
+      fiberRoots.get(_renderId).add(root);
+    } else {
+      fiberRoots.set(_renderId, new Set([root]));
+    }
+
+    bippy.traverseRenderedFibers(root.current || root, (fiber, phase) => {
+      if (phase === 'update') {
+        collectUnnecessaryRender(fiber);
+      }
+    });
+
+    store.currentCommitFrameId += 1;
+  },
+});
 
 const setupMcpToolsHandler = () => {
   if (import.meta.hot) {
@@ -48,8 +80,12 @@ const setupMcpToolsHandler = () => {
         throw new Error(`Data is not deserializable: ${data}`);
       }
 
-      const componentTreeRoot = target.__VITE_REACT_MCP_TOOLS__.getComponentTree(deserializedData);
-      import.meta.hot.send('get-component-tree-response', JSON.stringify(componentTreeRoot));
+      const componentTreeRoot =
+        target.__VITE_REACT_MCP_TOOLS__.getComponentTree(deserializedData);
+      import.meta.hot.send(
+        'get-component-tree-response',
+        JSON.stringify(componentTreeRoot),
+      );
     });
 
     import.meta.hot.on('get-component-states', (data) => {
@@ -61,13 +97,19 @@ const setupMcpToolsHandler = () => {
       }
       if (typeof deserializedData?.componentName !== 'string') {
         console.debug('get-component-states ws handler', deserializedData);
-        throw new Error('Invalid data sent from ViteDevServer: missing componentName');
+        throw new Error(
+          'Invalid data sent from ViteDevServer: missing componentName',
+        );
       }
 
-      const componentStatesResult = target.__VITE_REACT_MCP_TOOLS__.getComponentStates(
-        deserializedData.componentName,
+      const componentStatesResult =
+        target.__VITE_REACT_MCP_TOOLS__.getComponentStates(
+          deserializedData.componentName,
+        );
+      import.meta.hot.send(
+        'get-component-states-response',
+        JSON.stringify(componentStatesResult),
       );
-      import.meta.hot.send('get-component-states-response', JSON.stringify(componentStatesResult));
     });
   }
 };

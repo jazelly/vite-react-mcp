@@ -2,13 +2,13 @@ import type { Fiber } from 'react-reconciler';
 import { target } from '../../shared/const';
 import {
   findComponentsInFiber,
-  getFiberRoots,
+  getAllFiberRoots,
   getNearestFiberWithStateNode,
 } from '../../shared/util';
 import { InvalidInputError } from '../../shared/errors';
 import { getDOMNodesByComponentName } from './util';
 
-export const highlightComponent= (
+export const highlightComponent = (
   componentName: string,
   options: {
     debugMode?: boolean;

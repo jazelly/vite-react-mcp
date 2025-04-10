@@ -30,15 +30,22 @@
   },
   "license": "MIT",
   "packageManager": "pnpm@10.6.5",
+  "peerDependencies": {
+    "@babel/preset-react": "^7.26.3"
+  },
   "devDependencies": {
-    "@types/react-reconciler": "catalog:",
+    "@babel/core": "^7.26.10",
+    "@babel/types": "^7.27.0",
     "@biomejs/biome": "1.9.4",
+    "@rollup/pluginutils": "^5.1.4",
+    "@types/react-reconciler": "catalog:",
+    "shx": "0.4.0",
     "typescript": "catalog:",
-    "vite": "catalog:",
-    "shx": "0.4.0"
+    "vite": "catalog:"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.7.0",
+    "bippy": "catalog:",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.23.5"
   }

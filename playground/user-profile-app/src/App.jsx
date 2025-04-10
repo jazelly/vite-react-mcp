@@ -17,7 +17,7 @@ const theme = createTheme({
   },
 });
 
-function App() {
+const App = function () {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -38,3 +38,4 @@ function App() {
 }
 
 export default App;
+// For babel test

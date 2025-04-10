@@ -20,33 +20,57 @@ import {
   SERVER_CONTEXT_SYMBOL_STRING,
   DEPRECATED_ASYNC_MODE_SYMBOL_STRING,
   SCOPE_SYMBOL_STRING,
+  MutationMask,
+  Cloned,
+  PerformedWork,
+  REACT_ELEMENT_TYPE,
 } from './const';
 import type { ReactDevtools, FiberRoot, MemoizedState } from '../types/react';
 import type { Fiber } from 'react-reconciler';
 import { ReactTypeOfWork } from './const';
-import { HookNode } from '../types/internal';
-let rdtHook: ReactDevtools | null = null;
+import { HookNode, PropNode } from '../types/internal';
+import type { ReactDevToolsGlobalHook } from 'bippy';
+import { fiberRoots } from './store';
 
-export const getRDTHook: () => ReactDevtools = () => {
+let rdtHook: ReactDevToolsGlobalHook | ReactDevtools | null = null;
+export let usingRealHook = false;
+
+export const getRDTHook: () => ReactDevToolsGlobalHook | ReactDevtools = () => {
   if (rdtHook) return rdtHook;
   if (!target.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
     throw new Error('React DevTools is not installed');
   }
+
   rdtHook = target.__REACT_DEVTOOLS_GLOBAL_HOOK__;
+  if ('getFiberRoots' in rdtHook) {
+    usingRealHook = true;
+  }
   return rdtHook;
+};
+
+export const getFiberRoots = (rendererId: number) => {
+  const hook = getRDTHook();
+  if (usingRealHook) {
+    return (hook as ReactDevtools).getFiberRoots(rendererId);
+  }
+
+  if (!fiberRoots.has(rendererId)) {
+    fiberRoots.set(rendererId, new Set());
+  }
+  return fiberRoots.get(rendererId);
 };
 
 /**
  * Get React Fiber nodes optimistically
  * @returns { Fiber[] }
  */
-export const getFiberRoots = () => {
+export const getAllFiberRoots = () => {
   const hook = getRDTHook();
   let roots = [];
   if (hook.renderers.size > 0) {
     const rendererIds = Array.from(hook.renderers.keys());
     for (const rendererId of rendererIds) {
-      const rootsSet = hook.getFiberRoots(rendererId);
+      const rootsSet = getFiberRoots(rendererId);
       roots = roots.concat([...rootsSet]);
     }
   }
@@ -357,7 +381,7 @@ export const getCurrentStates = (fiber: Fiber): HookNode[] | null => {
 export const getPrevStates = (fiber: Fiber): HookNode[] | null => {
   if (!fiber.alternate) return null;
   const states: HookNode[] = [];
-  let state = fiber.alternate.memoizedState;
+  let state = fiber.alternate?.memoizedState;
   while (state) {
     states.push({
       memoizedState: state.memoizedState,
@@ -366,4 +390,30 @@ export const getPrevStates = (fiber: Fiber): HookNode[] | null => {
     state = state.next;
   }
   return states;
+};
+
+export const getCurrentProps = (fiber: Fiber): PropNode[] | null => {
+  if (!fiber) return null;
+  const props: PropNode[] = [];
+  let prop = fiber.memoizedProps;
+  while (prop) {
+    props.push(prop);
+    prop = prop.next;
+  }
+  return props;
+};
+
+export const getPrevProps = (fiber: Fiber): PropNode[] | null => {
+  if (!fiber.alternate) return null;
+  const props: PropNode[] = [];
+  let prop = fiber.alternate?.memoizedProps;
+  while (prop) {
+    props.push(prop);
+    prop = prop.next;
+  }
+  return props;
+};
+
+export const isReactElement = (thing: unknown): boolean => {
+  return !!thing && (thing as any).$$typeof === REACT_ELEMENT_TYPE;
 };

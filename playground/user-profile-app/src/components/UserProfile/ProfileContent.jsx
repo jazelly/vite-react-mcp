@@ -4,16 +4,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ProfileField from './ProfileField';
+import { useProfile } from '../../context/ProfileContext';
 
-const ProfileContent = ({
-  profileData,
-  tempData,
-  editMode,
-  handleInputChange,
-  handleEditToggle,
-  handleSave,
-  handleCancel
-}) => {
+const ProfileContent = () => {
+  const { profileData, editMode, handleEditToggle, handleSave, handleCancel } = useProfile();
+
+  if (!profileData) {
+    return <Box sx={{ p: 4, textAlign: 'center' }}>Loading...</Box>;
+  }
+
   return (
     <>
     <CardContent>
@@ -22,9 +21,7 @@ const ProfileContent = ({
           <ProfileField 
             label="First Name"
             name="firstName"
-            value={editMode ? tempData.firstName : profileData.firstName}
             editMode={editMode}
-            onChange={handleInputChange}
           />
         </Grid>
         
@@ -32,9 +29,7 @@ const ProfileContent = ({
           <ProfileField 
             label="Last Name"
             name="lastName"
-            value={editMode ? tempData.lastName : profileData.lastName}
             editMode={editMode}
-            onChange={handleInputChange}
           />
         </Grid>
         
@@ -42,9 +37,7 @@ const ProfileContent = ({
           <ProfileField 
             label="Email"
             name="email"
-            value={editMode ? tempData.email : profileData.email}
             editMode={editMode}
-            onChange={handleInputChange}
           />
         </Grid>
         
@@ -52,9 +45,7 @@ const ProfileContent = ({
           <ProfileField 
             label="Phone"
             name="phone"
-            value={editMode ? tempData.phone : profileData.phone}
             editMode={editMode}
-            onChange={handleInputChange}
           />
         </Grid>
         
@@ -62,9 +53,7 @@ const ProfileContent = ({
           <ProfileField 
             label="Location"
             name="location"
-            value={editMode ? tempData.location : profileData.location}
             editMode={editMode}
-            onChange={handleInputChange}
           />
         </Grid>
 
@@ -72,9 +61,7 @@ const ProfileContent = ({
           <ProfileField 
             label="Occupation"
             name="occupation"
-            value={editMode ? tempData.occupation : profileData.occupation}
             editMode={editMode}
-            onChange={handleInputChange}
           />
         </Grid>
         
@@ -82,9 +69,7 @@ const ProfileContent = ({
           <ProfileField 
             label="Bio"
             name="bio"
-            value={editMode ? tempData.bio : profileData.bio}
             editMode={editMode}
-            onChange={handleInputChange}
             multiline={true}
             rows={4}
           />

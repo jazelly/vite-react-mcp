@@ -1,23 +1,24 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Box, Typography, TextField } from '@mui/material';
-
-const ProfileField = ({ 
+import { useProfile } from '../../context/ProfileContext';
+const ProfileField = memo(({ 
   label, 
   name, 
-  value, 
-  editMode, 
-  onChange, 
+  editMode,
   multiline = false,
   rows = 1
 }) => {
+  const { tempData, profileData, handleInputChange } = useProfile();
+  const value = editMode ? tempData[name] : profileData[name];
   if (editMode) {
     return (
       <TextField
+        data-ext-id={`profile-field-${name}`}
         fullWidth
         label={label}
         name={name}
         value={value}
-        onChange={onChange}
+        onChange={handleInputChange}
         margin="normal"
         variant="outlined"
         multiline={multiline}
@@ -32,7 +33,7 @@ const ProfileField = ({
       <Typography variant="body1">{value}</Typography>
     </Box>
   );
-};
+});
 
 ProfileField.displayName = 'ProfileField$$mcp';
 

@@ -19,6 +19,14 @@
     "react-dom": "catalog:",
     "react-router-dom": "catalog:"
   },
+  "devDependencies": {
+    "@babel/preset-react": "^7.26.3",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.2.3",
+    "vite-react-mcp": "catalog:"
+  },
   "browserslist": {
     "production": [
       ">0.2%",
@@ -30,12 +38,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "devDependencies": {
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite-react-mcp": "catalog:",
-    "vite": "^6.2.3"
   }
 }

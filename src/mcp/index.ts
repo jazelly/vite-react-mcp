@@ -8,7 +8,11 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import zodToJsonSchema from 'zod-to-json-schema';
-import { GetComponentStatesSchema, GetComponentTreeSchema, HighlightComponentSchema } from './schema.js';
+import {
+  GetComponentStatesSchema,
+  GetComponentTreeSchema,
+  HighlightComponentSchema,
+} from './schema.js';
 import { getVersionString, waitForEvent } from '../shared/node_util.js';
 import { HookNode } from '../types/internal.js';
 
@@ -35,72 +39,87 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
         },
         {
           name: 'get-component-tree',
-          description: 'Get the React component tree of the current page in markdown tree syntax format.',
+          description:
+            'Get the React component tree of the current page in markdown tree syntax format.',
           inputSchema: zodToJsonSchema(GetComponentTreeSchema),
         },
         {
           name: 'get-component-states',
-          description: 'Get the React component states in JSON structure format. ' +
-                       'The JSON structure is a map, where key is the corresponding fibers and values are states',
+          description:
+            'Get the React component states in JSON structure format. ' +
+            'The JSON structure is a map, where key is the corresponding fibers and values are states',
           inputSchema: zodToJsonSchema(GetComponentStatesSchema),
-        }
+        },
       ],
     };
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
-    try {
-      switch (request.params.name) {
-        case 'highlight-component': {
-          const args = HighlightComponentSchema.parse(request.params.arguments);
-          viteDevServer.ws.send({
-            type: 'custom',
-            event: 'highlight-component',
-            data: JSON.stringify(args),
-          });
-          return {
-            content: [{ type: 'text', text: 'Highlighting component...' }],
-          };
-        }
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    async (request): Promise<CallToolResult> => {
+      try {
+        switch (request.params.name) {
+          case 'highlight-component': {
+            const args = HighlightComponentSchema.parse(
+              request.params.arguments,
+            );
+            viteDevServer.ws.send({
+              type: 'custom',
+              event: 'highlight-component',
+              data: JSON.stringify(args),
+            });
+            return {
+              content: [{ type: 'text', text: 'Highlighting component...' }],
+            };
+          }
 
-        case 'get-component-tree': {
-          const args = GetComponentTreeSchema.parse(request.params.arguments);
-          viteDevServer.ws.send({
-            type: 'custom', 
-            event: 'get-component-tree',
-            data: JSON.stringify(args),
-          });
+          case 'get-component-tree': {
+            const args = GetComponentTreeSchema.parse(request.params.arguments);
+            viteDevServer.ws.send({
+              type: 'custom',
+              event: 'get-component-tree',
+              data: JSON.stringify(args),
+            });
 
-          const response = await waitForEvent<string>(viteDevServer, 'get-component-tree-response');
-          return {
-            content: [{ type: 'text', text: response.data }],
-          };
-        }
-
-        case 'get-component-states': {
-          const args = GetComponentStatesSchema.parse(request.params.arguments);
-          viteDevServer.ws.send({
-            type: 'custom',
-            event: 'get-component-states',
-            data: JSON.stringify(args),
-          });
-
-          const response = await waitForEvent<string>(viteDevServer, 'get-component-states-response');
+            const response = await waitForEvent<string>(
+              viteDevServer,
+              'get-component-tree-response',
+            );
             return {
               content: [{ type: 'text', text: response.data }],
-          };
-        }
+            };
+          }
 
-        default:
-          throw new Error(`Unknown tool: ${request.params.name}`);
+          case 'get-component-states': {
+            const args = GetComponentStatesSchema.parse(
+              request.params.arguments,
+            );
+            viteDevServer.ws.send({
+              type: 'custom',
+              event: 'get-component-states',
+              data: JSON.stringify(args),
+            });
+
+            const response = await waitForEvent<string>(
+              viteDevServer,
+              'get-component-states-response',
+            );
+            return {
+              content: [{ type: 'text', text: response.data }],
+            };
+          }
+
+          default:
+            throw new Error(`Unknown tool: ${request.params.name}`);
+        }
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          throw new Error(`Invalid input: ${JSON.stringify(error.errors)}`);
+        }
+        throw error;
       }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new Error(`Invalid input: ${JSON.stringify(error.errors)}`);
-      }
-      throw error;
-    }
-  });
+    },
+  );
 
   return server;
 }

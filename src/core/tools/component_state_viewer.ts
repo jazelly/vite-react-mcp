@@ -1,12 +1,21 @@
-import { Fiber } from "react-reconciler";
-import { getRDTHook, getDisplayNameForFiber, findComponentsInFiber, getCurrentStates, getPrevStates } from "../../shared/util";
-import { getDOMNodesByComponentName, getFibersByComponentName } from "./util";
-import { MemoizedState } from "../../types/react";
-import { FiberNotFoundError } from "../../shared/errors";
-import { HookNode } from "../../types/internal";
+import { Fiber } from 'react-reconciler';
+import {
+  getRDTHook,
+  getDisplayNameForFiber,
+  findComponentsInFiber,
+  getCurrentStates,
+  getPrevStates,
+} from '../../shared/util';
+import { getDOMNodesByComponentName, getFibersByComponentName } from './util';
+import { MemoizedState } from '../../types/react';
+import { FiberNotFoundError } from '../../shared/errors';
+import { HookNode } from '../../types/internal';
 
 // Function to traverse the Fiber tree and find instances by component name
-const findFiberInstancesByName = (startNode: Fiber | null, componentName: string): Fiber[] => {
+const findFiberInstancesByName = (
+  startNode: Fiber | null,
+  componentName: string,
+): Fiber[] => {
   const instances: Fiber[] = [];
   if (!startNode) return instances;
 
@@ -41,22 +50,32 @@ const findFiberInstancesByName = (startNode: Fiber | null, componentName: string
   return instances;
 };
 
-
-export const getComponentStates = (componentName: string): Map<string, {
-  currentStates: HookNode[] | null,
-  prevStates: HookNode[] | null,
-}> => {
-  console.log(`[vite-react-mcp] Attempting to get state for component: ${componentName}`);
+export const getComponentStates = (
+  componentName: string,
+): Map<
+  string,
+  {
+    currentStates: HookNode[] | null;
+    prevStates: HookNode[] | null;
+  }
+> => {
+  console.log(
+    `[vite-react-mcp] Attempting to get state for component: ${componentName}`,
+  );
 
   const fibers = getFibersByComponentName(componentName);
 
-  if (fibers.length === 0) throw new FiberNotFoundError(`No fibers found for component: ${componentName}`);
+  if (fibers.length === 0)
+    throw new FiberNotFoundError(
+      `No fibers found for component: ${componentName}`,
+    );
 
   const stateMap = new Map<
-    string, {
-        currentStates: HookNode[] | null,
-        prevStates: HookNode[] | null,
-      }
+    string,
+    {
+      currentStates: HookNode[] | null;
+      prevStates: HookNode[] | null;
+    }
   >();
 
   let id = 1;
@@ -80,11 +99,12 @@ export const getComponentStates = (componentName: string): Map<string, {
   return stateMap;
 };
 
-
 export const filterReportableStates = (states: HookNode[]): HookNode[] => {
   return states.filter((state) => {
     try {
-      return JSON.stringify(state.memoizedState) === JSON.stringify(state.baseState);
+      return (
+        JSON.stringify(state.memoizedState) === JSON.stringify(state.baseState)
+      );
     } catch (error) {
       return false;
     }

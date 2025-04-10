@@ -10,15 +10,13 @@ let packageVersion;
 
 /**
  * Read package.json and get the version string
- * @param packageVersion 
- * @returns 
+ * @param packageVersion
+ * @returns
  */
 export function getVersionString() {
   try {
     packageVersion ??= JSON.parse(
-      readFileSync(
-        resolve(__dirname, '..', '..', 'package.json'),
-      ).toString(),
+      readFileSync(resolve(__dirname, '..', '..', 'package.json')).toString(),
     ).version;
   } catch (error) {
     console.error('Error reading package.json', error);
@@ -35,7 +33,11 @@ export function getVersionString() {
  * @param timeout The timeout for the promise
  * @returns A Promise that resolves with the next event data
  */
-export function waitForEvent<T>(server: ViteDevServer, eventName: string, timeout = 10000): Promise<{ data: T }> {
+export function waitForEvent<T>(
+  server: ViteDevServer,
+  eventName: string,
+  timeout = 10000,
+): Promise<{ data: T }> {
   return new Promise<{ data: T }>((resolve, reject) => {
     // Create a timeout to reject the promise if no response is received
     const timeoutId = setTimeout(() => {
@@ -48,7 +50,7 @@ export function waitForEvent<T>(server: ViteDevServer, eventName: string, timeou
       server.ws.off(eventName, handler);
       resolve({ data });
     };
-    
+
     // Register the event handler
     server.ws.on(eventName, handler);
   });

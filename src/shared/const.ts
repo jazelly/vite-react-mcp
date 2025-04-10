@@ -9,11 +9,6 @@ export const target = (
 ) as typeof globalThis;
 
 // https://github.com/facebook/react/blob/main/packages/react-devtools-shared/src/backend/shared/ReactSymbols.js
-// This list should be kept updated to reflect additions to 'shared/ReactSymbols'.
-// DevTools can't import symbols from 'shared/ReactSymbols' directly for two reasons:
-// 1. DevTools requires symbols which may have been deleted in more recent versions (e.g. concurrent mode)
-// 2. DevTools must support both Symbol and numeric forms of each symbol;
-//    Since e.g. standalone DevTools runs in a separate process, it can't rely on its own ES capabilities.
 export const CONCURRENT_MODE_NUMBER = 0xeacf;
 export const CONCURRENT_MODE_SYMBOL_STRING = 'Symbol(react.concurrent_mode)';
 
@@ -74,6 +69,10 @@ export const REACT_MEMO_CACHE_SENTINEL: symbol = Symbol.for(
   'react.memo_cache_sentinel',
 );
 
+export const REACT_ELEMENT_TYPE =
+  (typeof Symbol != 'undefined' && Symbol.for && Symbol.for('react.element')) ||
+  LEGACY_ELEMENT_NUMBER;
+
 // https://github.com/facebook/react/blob/main/packages/react-devtools-shared/src/backend/fiber/renderer.js
 export const ReactTypeOfWork = {
   CacheComponent: 24, // Experimental
@@ -109,3 +108,22 @@ export const ReactTypeOfWork = {
   ViewTransitionComponent: 30, // Experimental
   ActivityComponent: 31,
 };
+
+// https://github.com/facebook/react/blob/main/packages/react-reconciler/src/ReactFiberFlags.js
+export const PerformedWork = 0b1;
+export const Placement = 0b10;
+export const Hydrating = 0b1000000000000;
+export const Update = 0b100;
+export const Cloned = 0b1000;
+export const ChildDeletion = 0b10000;
+export const ContentReset = 0b100000;
+export const Snapshot = 0b10000000000;
+export const Visibility = 0b10000000000000;
+export const MutationMask =
+  Placement |
+  Update |
+  ChildDeletion |
+  ContentReset |
+  Hydrating |
+  Visibility |
+  Snapshot;

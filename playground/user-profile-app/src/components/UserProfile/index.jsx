@@ -6,17 +6,15 @@ import ProfileHeader from './ProfileHeader';
 import ProfileContent from './ProfileContent';
 import ProfileNotification from './ProfileNotification';
 import { useUserProfileData } from '../../hooks/useUserProfileData';
-
+import { ProfileProvider } from '../../context/ProfileContext';
 const UserProfile = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
   const {
     profileData,
-    tempData,
     editMode,
     isLoading,
     handleEditToggle,
-    handleInputChange,
     handleSave: handleSaveFromHook,
     handleCancel,
   } = useUserProfileData(userId);
@@ -68,16 +66,9 @@ const UserProfile = () => {
           onSave={handleSave}
           onCancel={handleCancel}
         />
-        
-        <ProfileContent 
-          profileData={profileData}
-          tempData={tempData}
-          editMode={editMode}
-          handleInputChange={handleInputChange}
-          handleEditToggle={handleEditToggle}
-          handleSave={handleSave}
-          handleCancel={handleCancel}
-        />
+        <ProfileProvider userId={userId}>
+          <ProfileContent />
+        </ProfileProvider>
       </Paper>
       
       <ProfileNotification 
@@ -89,6 +80,6 @@ const UserProfile = () => {
 };
 
 // Specifically use a uniquely-suffixed displayName to distinguish from MUI components
-UserProfile.displayName = 'UserProfile$$mcp';
+UserProfile.displayName = 'UserProfile';
 
 export default UserProfile;
