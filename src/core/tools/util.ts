@@ -116,11 +116,76 @@ export function generateASCIIComponentTree(tree: ComponentTreeNode): string {
   return result.join('\n');
 }
 
-// Traverse Fiber with actions
-export function traverseFiber(fiber: Fiber, action: (fiber: Fiber) => void) {
-  if (!fiber) return;
+export const flashStateNode = (
+  stateNode: HTMLElement | null,
+  duration: number = 4000,
+  color: string = '#9b59b6', // Purple color
+) => {
+  if (!(stateNode instanceof HTMLElement)) {
+    return;
+  }
 
-  action(fiber);
-  traverseFiber(fiber.child, action);
-  traverseFiber(fiber.sibling, action);
-}
+  const styleId = `flash-style-${Date.now()}`;
+  const styleElement = document.createElement('style');
+  styleElement.id = styleId;
+  const highlightThickness = '3px'; // Increased thickness
+
+  const keyframesRule = `
+    @keyframes flash-pulse-${styleId} {
+      0% {
+        background-color: rgba(155, 89, 182, 0.2) !important; /* Slightly darker base */
+        box-shadow: 0 0 0 ${highlightThickness} ${color}60; /* Less transparent shadow */
+      }
+      50% {
+        background-color: rgba(155, 89, 182, 0.5) !important; /* More intense background */
+        box-shadow: 0 0 0 calc(${highlightThickness} + 1px) ${color}; /* Thicker, solid shadow */
+      }
+      100% {
+        background-color: rgba(155, 89, 182, 0.2) !important; /* Back to base */
+        box-shadow: 0 0 0 ${highlightThickness} ${color}60; /* Back to less transparent shadow */
+      }
+    }
+  `;
+
+  styleElement.textContent = `
+    ${keyframesRule}
+    .flash-element-${styleId} {
+      background-color: rgba(155, 89, 182, 0.2) !important; /* Base purple */
+      outline: ${highlightThickness} solid ${color} !important;
+      outline-offset: -1px !important;
+      position: relative !important; /* Ensure position is relative for potential absolute children if any */
+      z-index: 9998 !important; /* Lower than highlighter */
+      animation: flash-pulse-${styleId} 0.8s infinite !important; /* Faster animation */
+      transition: outline 0.1s ease-in-out, background-color 0.1s ease-in-out; /* Smooth transitions */
+    }
+  `;
+
+  document.head.appendChild(styleElement);
+
+  // Store the original position if it's static
+  const originalPosition = window.getComputedStyle(stateNode).position;
+  const needsPositionReset = originalPosition === 'static';
+  if (needsPositionReset) {
+    stateNode.style.position = 'relative';
+  }
+
+  // Apply the flash class
+  stateNode.classList.add(`flash-element-${styleId}`);
+
+  // Set timeout to remove the flash effect
+  setTimeout(() => {
+    // Remove style element
+    const style = document.getElementById(styleId);
+    if (style) {
+      style.remove();
+    }
+
+    // Remove flash class
+    stateNode.classList.remove(`flash-element-${styleId}`);
+
+    // Restore original position if we changed it
+    if (needsPositionReset) {
+      stateNode.style.position = ''; // Reset to default (or its original value before 'relative')
+    }
+  }, duration);
+};

@@ -10,10 +10,7 @@ import { store } from '../../shared/store';
  * @param prevResult The previous result of the component tree
  * @returns The component tree
  */
-const buildComponentTree = (
-  fiber: Fiber,
-  prevResult: ComponentTreeNode,
-) => {
+const buildComponentTree = (fiber: Fiber, prevResult: ComponentTreeNode) => {
   let fiberBase = fiber;
   while (fiberBase) {
     const componentName = getDisplayNameForFiber(fiberBase);
@@ -36,12 +33,13 @@ const buildComponentTree = (
 const trimComponentTree = (
   oldTreeNode: ComponentTreeNode,
   trimTreeNode: ComponentTreeNode,
-  { selfOnly }: { selfOnly: boolean, debugMode?: boolean },
+  { selfOnly }: { selfOnly: boolean; debugMode?: boolean },
 ) => {
   let nextAttachNode = trimTreeNode;
   if (
     !selfOnly ||
-    (oldTreeNode.name === 'createRoot()' || window.__REACT_COMPONENTS__.includes(oldTreeNode.name))
+    oldTreeNode.name === 'createRoot()' ||
+    window.__REACT_COMPONENTS__.includes(oldTreeNode.name)
   ) {
     nextAttachNode = {
       name: oldTreeNode.name,

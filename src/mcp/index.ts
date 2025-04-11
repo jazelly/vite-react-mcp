@@ -11,6 +11,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import {
   GetComponentStatesSchema,
   GetComponentTreeSchema,
+  GetUnnecessaryRerendersSchema,
   HighlightComponentSchema,
 } from './schema.js';
 import { getVersionString, waitForEvent } from '../shared/node_util.js';
@@ -49,6 +50,12 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
             'Get the React component states in JSON structure format. ' +
             'The JSON structure is a map, where key is the corresponding fibers and values are states',
           inputSchema: zodToJsonSchema(GetComponentStatesSchema),
+        },
+        {
+          name: 'get-unnecessary-rerenders',
+          description:
+            'Get the wasted re-rendered components in the last N seconds',
+          inputSchema: zodToJsonSchema(GetUnnecessaryRerendersSchema),
         },
       ],
     };
@@ -109,6 +116,25 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
             };
           }
 
+          case 'get-unnecessary-rerenders': {
+            const args = GetUnnecessaryRerendersSchema.parse(
+              request.params.arguments,
+            );
+
+            viteDevServer.ws.send({
+              type: 'custom',
+              event: 'get-unnecessary-rerenders',
+              data: JSON.stringify(args),
+            });
+
+            const response = await waitForEvent<string>(
+              viteDevServer,
+              'get-unnecessary-rerenders-response',
+            );
+            return {
+              content: [{ type: 'text', text: response.data }],
+            };
+          }
           default:
             throw new Error(`Unknown tool: ${request.params.name}`);
         }

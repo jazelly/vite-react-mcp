@@ -45,6 +45,11 @@ bippy.instrument({
     }
 
     bippy.traverseRenderedFibers(root.current || root, (fiber, phase) => {
+      // noop
+      // just to warm up fiberIdMap
+    });
+
+    bippy.traverseRenderedFibers(root.current || root, (fiber, phase) => {
       if (phase === 'update') {
         collectUnnecessaryRender(fiber);
       }
@@ -109,6 +114,46 @@ const setupMcpToolsHandler = () => {
       import.meta.hot.send(
         'get-component-states-response',
         JSON.stringify(componentStatesResult),
+      );
+    });
+
+    import.meta.hot.on('get-unnecessary-rerenders', (data) => {
+      let deserializedData;
+      try {
+        deserializedData = JSON.parse(data);
+      } catch (_error) {
+        throw new Error(`Data is not deserializable: ${data}`);
+      }
+
+      if (typeof deserializedData?.timeframe !== 'number') {
+        console.debug('get-unnecessary-rerenders ws handler', deserializedData);
+        throw new Error(
+          'Invalid data sent from ViteDevServer: missing timeframe',
+        );
+      }
+
+      const wastedRenders =
+        target.__VITE_REACT_MCP_TOOLS__.getUnnecessaryRenderedComponents(
+          Date.now() - deserializedData.timeframe * 1000,
+          Date.now(),
+          {
+            allComponents: deserializedData.allComponents,
+          },
+        );
+
+      let response;
+
+      try {
+        response = JSON.stringify(wastedRenders);
+      } catch (_error) {
+        console.error('Error serializing wasted renders', _error);
+        response = JSON.stringify({ error: _error.message });
+      }
+
+      console.log('wastedRenders', wastedRenders);
+      import.meta.hot.send(
+        'get-unnecessary-rerenders-response',
+        JSON.stringify(wastedRenders),
       );
     });
   }

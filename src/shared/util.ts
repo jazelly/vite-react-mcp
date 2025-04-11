@@ -175,15 +175,19 @@ export function resolveFiberType(type: any): Fiber['type'] {
 }
 
 // Mirror https://github.com/facebook/react/blob/7c21bf72ace77094fd1910cc350a548287ef8350/packages/shared/getComponentName.js#L27-L37
+// Modified to have the option without wrapperName
 export function getWrappedDisplayName(
   outerType: unknown,
   innerType: any,
-  wrapperName: string,
+  wrapperName?: string,
   fallbackName?: string,
 ): string {
   const displayName = (outerType as any)?.displayName;
   return (
-    displayName || `${wrapperName}(${getDisplayName(innerType, fallbackName)})`
+    displayName ||
+    (wrapperName
+      ? `${wrapperName}(${getDisplayName(innerType, fallbackName)})`
+      : getDisplayName(innerType, fallbackName))
   );
 }
 
@@ -257,7 +261,7 @@ export function getDisplayNameForFiber(
       return getWrappedDisplayName(
         elementType,
         resolvedType,
-        'ForwardRef',
+        null,
         'Anonymous',
       );
     case ReactTypeOfWork.HostRoot:
@@ -286,7 +290,7 @@ export function getDisplayNameForFiber(
       return getWrappedDisplayName(
         elementType,
         resolvedType,
-        'Memo',
+        null,
         'Anonymous',
       );
     case ReactTypeOfWork.SuspenseComponent:

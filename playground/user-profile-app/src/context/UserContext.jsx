@@ -64,6 +64,7 @@ export const UserProvider = ({ children }) => {
     setUsers(users.map(user => 
       user.id === userId ? { ...user, ...updatedData } : user
     ));
+    return true;
   };
 
   const getUserById = (userId) => {

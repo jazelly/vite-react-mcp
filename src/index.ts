@@ -26,7 +26,10 @@ const resolvedViteReactMcp = `\0${viteReactMcpImportee}`;
  * @param {string} configPath Path to config file
  * @returns {Object} Object with include and exclude arrays
  */
-function readProjectConfig(configPath: string): { include: string[], exclude: string[] } {
+function readProjectConfig(configPath: string): {
+  include: string[];
+  exclude: string[];
+} {
   try {
     if (fs.existsSync(configPath)) {
       const configContent = fs.readFileSync(configPath, 'utf8');
@@ -68,7 +71,6 @@ function readProjectConfig(configPath: string): { include: string[], exclude: st
     exclude: ['**/node_modules/**'],
   };
 }
-
 
 function ReactMCP(): Plugin {
   const configPatterns = readProjectConfig('tsconfig.json');
@@ -174,7 +176,7 @@ function ReactMCP(): Plugin {
     transformIndexHtml() {
       // Convert the Set to an Array for serialization
       const componentsArray = Array.from(store.SELF_REACT_COMPONENTS);
-      
+
       // Create the script to register components to window
       const registerComponentsScript = `
         window.__REACT_COMPONENTS__ = ${JSON.stringify(componentsArray)};

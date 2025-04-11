@@ -22,6 +22,7 @@ export interface WastedRenderFiberInfo {
   reason?: string;
   collectedAt: number;
   commitId: number;
+  stateNode: HTMLElement | null;
 }
 
 export interface BaseChange {
