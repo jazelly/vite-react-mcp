@@ -2,6 +2,7 @@ import { Fiber, FiberRoot } from 'react-reconciler';
 import { FiberRootsNotFoundError } from '../../shared/errors';
 import { getAllFiberRoots, getDisplayNameForFiber } from '../../shared/util';
 import { ComponentTreeNode } from '../../types/internal';
+import { store } from '../../shared/store';
 
 /**
  * Recursively build a component tree with name from a fiber tree
@@ -10,11 +11,10 @@ import { ComponentTreeNode } from '../../types/internal';
  * @returns The component tree
  */
 const buildComponentTree = (
-  fiber: FiberRoot | Fiber,
+  fiber: Fiber,
   prevResult: ComponentTreeNode,
 ) => {
-  if (!fiber && !fiber?.current) return null;
-  let fiberBase = fiber.current ?? fiber;
+  let fiberBase = fiber;
   while (fiberBase) {
     const componentName = getDisplayNameForFiber(fiberBase);
     const nodeResult = {
@@ -36,12 +36,12 @@ const buildComponentTree = (
 const trimComponentTree = (
   oldTreeNode: ComponentTreeNode,
   trimTreeNode: ComponentTreeNode,
-  { matchId }: { matchId: string },
+  { selfOnly }: { selfOnly: boolean, debugMode?: boolean },
 ) => {
   let nextAttachNode = trimTreeNode;
   if (
-    oldTreeNode.name === 'createRoot()' ||
-    oldTreeNode.name?.includes(matchId)
+    !selfOnly ||
+    (oldTreeNode.name === 'createRoot()' || window.__REACT_COMPONENTS__.includes(oldTreeNode.name))
   ) {
     nextAttachNode = {
       name: oldTreeNode.name,
@@ -51,7 +51,7 @@ const trimComponentTree = (
   }
 
   for (const child of oldTreeNode.children) {
-    trimComponentTree(child, nextAttachNode, { matchId });
+    trimComponentTree(child, nextAttachNode, { selfOnly });
   }
 };
 
@@ -60,12 +60,12 @@ const trimComponentTree = (
  * @param matchId An identifier to filter the component tree. Only components' name containing this id will be included
  */
 export const getComponentTree = (options?: {
-  matchId?: string;
+  selfOnly: boolean;
   debugMode?: boolean;
 }): string => {
   if (!options) {
     options = {
-      matchId: '',
+      selfOnly: false,
       debugMode: false,
     };
   }
@@ -76,24 +76,27 @@ export const getComponentTree = (options?: {
     throw new FiberRootsNotFoundError('No React fiber roots found');
   }
 
+  if (options.debugMode) {
+    console.debug('getComponentTree - roots', roots);
+  }
+
   const result: ComponentTreeNode = {
     name: '__BASE__',
     children: [],
   };
-  roots.forEach((root) => buildComponentTree(root, result));
+  roots.forEach((root) => buildComponentTree(root.current, result));
 
   const trimmedResult = {
     name: '__BASE__',
     children: [],
   };
 
-  // clean up matchId
-  // heuristic here is if matchId does not contain any English letter, then it is a match all
-  if (!/[a-zA-Z]/.test(options.matchId)) {
-    options.matchId = '';
+  if (options.debugMode) {
+    console.debug('getComponentTree - ComponentTreeNode result', result);
   }
+
   result.children.forEach((child) =>
-    trimComponentTree(child, trimmedResult, { matchId: options.matchId }),
+    trimComponentTree(child, trimmedResult, options),
   );
 
   // there will always a be a root node under __BASE__

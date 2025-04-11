@@ -45,6 +45,4 @@ const UserRow = ({ user, onClick }) => {
   );
 };
 
-UserRow.displayName = 'UserRow$$mcp';
-
 export default UserRow;

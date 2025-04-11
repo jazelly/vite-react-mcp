@@ -7,6 +7,6 @@ export const wastedRenderFiberInfo: Map<string, WastedRenderFiberInfo> =
 export const fiberRoots: Map<number, Set<FiberRoot>> = new Map();
 
 export const store = {
-  REACT_COMPONENT_NAME_SUFFIX: '$$mcp',
+  SELF_REACT_COMPONENTS: new Set<string>(),
   currentCommitFrameId: 0,
 };

@@ -1,6 +1,6 @@
 # vite-react-mcp
 
-A Vite plugin that creates an MCP server to help LLMs to interact with your React project better
+A Vite plugin that creates an MCP server to help LLMs to understand your React App context
 
 ## Features
 
@@ -13,6 +13,8 @@ A Vite plugin that creates an MCP server to help LLMs to interact with your Reac
 
 - `get-component-tree`
   - description: Get a tree-like representation of the component tree of the current page.
+  - params:
+    - `selfOnly`: boolean if true, return the components related to your self defined components only
 
 
 ## Getting Started

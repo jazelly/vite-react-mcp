@@ -69,6 +69,5 @@ const UserList = () => {
   );
 };
 
-UserList.displayName = 'UserList$$mcp';
 
 export default UserList;

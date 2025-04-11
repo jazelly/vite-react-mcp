@@ -5,10 +5,11 @@ export const HighlightComponentSchema = z.object({
 });
 
 export const GetComponentTreeSchema = z.object({
-  matchId: z
-    .string()
+  selfOnly: z
+    .boolean()
+    .default(false)
     .describe(
-      'An identifier to filter the components that should be included in the component tree',
+      'Whether to return your self defined components only',
     ),
 });
 

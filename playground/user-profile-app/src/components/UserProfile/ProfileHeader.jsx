@@ -68,6 +68,6 @@ const ProfileHeader = ({
   );
 };
 
-ProfileHeader.displayName = 'ProfileHeader$$mcp';
+ProfileHeader.displayName = 'ProfileHeader';
 
 export default ProfileHeader; 

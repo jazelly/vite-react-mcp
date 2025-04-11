@@ -23,6 +23,5 @@ const UserSearch = ({ searchTerm, handleSearchChange }) => {
   );
 };
 
-UserSearch.displayName = 'UserSearch$$mcp';
 
 export default UserSearch;

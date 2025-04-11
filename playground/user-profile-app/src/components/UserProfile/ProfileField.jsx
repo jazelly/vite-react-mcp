@@ -35,6 +35,4 @@ const ProfileField = memo(({
   );
 });
 
-ProfileField.displayName = 'ProfileField$$mcp';
-
 export default ProfileField; 

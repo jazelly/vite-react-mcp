@@ -1,136 +1,103 @@
 import * as babel from '@babel/core';
 import { PluginItem } from '@babel/core';
 import { PluginObj } from '@babel/core';
+import { store } from './shared/store';
 
-export function addDisplayNamePropertyToClassDeclaration(
-  path: babel.NodePath<babel.types.ClassDeclaration>,
-  t: typeof babel.types,
-  suffix: string,
-  componentName: string,
-) {
-  if (!t.isClassDeclaration(path.node)) return;
-
-  const displayName = `${componentName}_${suffix}`;
-  let hasDisplayName = false;
-  // For class components
-  if (path.get('body')) {
-    path.get('body').traverse({
-      ClassProperty(propertyPath: babel.NodePath<babel.types.ClassProperty>) {
-        // e.g. class App extends React.Component {
-        //        static displayName = 'App_mcp'
-        //      }
-        if (
-          t.isIdentifier(propertyPath.node.key, { name: 'displayName' }) &&
-          propertyPath.node.static
-        ) {
-          hasDisplayName = true;
-        }
-      },
-    });
-
-    // class not having displayName
-    if (!hasDisplayName) {
-      const property = t.classProperty(
-        t.identifier('displayName'),
-        t.stringLiteral(displayName),
-        null,
-        null,
-        null,
-        true, // static
-      );
-
-      path.get('body').unshiftContainer('body', property);
-    }
-  }
-}
-
-export const getDisplayNameAssignmentToLVal = (
-  LVal: babel.types.Identifier,
-  t: typeof babel.types,
-  displayName: string,
-): babel.types.ExpressionStatement => {
-  const assignment = t.expressionStatement(
-    t.assignmentExpression(
-      '=',
-      t.memberExpression(LVal, t.identifier('displayName')),
-      t.stringLiteral(displayName),
-    ),
-  );
-  return assignment;
-};
-
-/**
- * Add displayName property to a component
- */
-export function addDisplayNamePropertyAfter(
+export function findDisplayNamePropertyInClassExpression(
   path: babel.NodePath<babel.types.Node>,
   t: typeof babel.types,
-  suffix: string,
   componentName: string,
-) {
-  const displayName = `${componentName}_${suffix}`;
-  const parent = path.parent;
-  if (!parent) return;
-  if (!componentName || typeof componentName !== 'string') return;
-  const assignment = getDisplayNameAssignmentToLVal(
-    t.identifier(componentName),
-    t,
-    displayName,
-  );
-  path.insertAfter(assignment);
+): string | null {
+  if (!t.isClassDeclaration(path.node) && !t.isClassExpression(path.node)) return null;
+
+  path.traverse({
+    ClassProperty(propertyPath: babel.NodePath<babel.types.ClassProperty>) {
+      // e.g. class App extends React.Component {
+      //        static displayName = 'App_mcp'
+      //      }
+      if (
+        t.isIdentifier(propertyPath.node.key, { name: 'displayName' }) &&
+        propertyPath.node.static
+      ) {
+        if (t.isStringLiteral(propertyPath.node.value)) {
+          return propertyPath.node.value.value;
+        }
+        if (t.isIdentifier(propertyPath.node.value)) {
+          const value = findConstantIdentifierValueInScope(propertyPath, t, propertyPath.node.value);
+          if (value) return value;
+          return componentName;
+        }
+      }
+    },
+  });
+  
+
+  return null;
 }
 
 /**
- * Check if a path represents a React component (returns JSX)
+ * Handles the cases of App.displayName = 'App' or App.displayName = NAME_CONSTANT
  */
-function isReactFunctionComponent(
-  node:
-    | babel.types.ArrowFunctionExpression
-    | babel.types.FunctionExpression
-    | babel.types.FunctionDeclaration,
+export function findDisplayNameAssignmentInScope(
+  path: babel.NodePath<babel.types.Node>,
   t: typeof babel.types,
-) {
-  let returnsJsx = false;
-
-  if (t.isArrowFunctionExpression(node)) {
-    // For arrow functions with implicit return
-    if (
-      t.isJSXElement(node.body) ||
-      t.isJSXFragment(node.body) ||
-      t.isJSXExpressionContainer(node.body)
-    ) {
-      return true;
-    }
-
-    // For arrow functions with block body
-    if (t.isBlockStatement(node.body)) {
-      node.body.body.forEach((statement) => {
-        if (
-          t.isReturnStatement(statement) &&
-          statement.argument &&
-          (t.isJSXElement(statement.argument) ||
-            t.isJSXFragment(statement.argument) ||
-            t.isJSXExpressionContainer(statement.argument))
-        ) {
-          returnsJsx = true;
-        }
-      });
-    }
-  } else if (t.isFunctionDeclaration(node) || t.isFunctionExpression(node)) {
-    node.body.body.forEach((statement) => {
-      if (
-        t.isReturnStatement(statement) &&
-        statement.argument &&
-        (t.isJSXElement(statement.argument) ||
-          t.isJSXFragment(statement.argument) ||
-          t.isJSXExpressionContainer(statement.argument))
-      ) {
-        returnsJsx = true;
+  componentName: string,
+): string | null {
+  // Get the binding for the component
+  const binding = path.scope.getBinding(componentName);
+  
+  // If we can't find the binding, assume no displayName exists
+  if (!binding) return null;
+  
+  // Check all references to this component
+  for (const refPath of binding.referencePaths) {
+    // Check if it's componentName.displayName = ?
+    const parent = refPath.parent;
+    if (!t.isMemberExpression(parent)) continue;
+    if (!t.isIdentifier(parent.property, { name: "displayName" })) continue;
+    
+    // Check if it's used in an assignment
+    const memberPath = refPath.parentPath;
+    const grandParent = memberPath.parent;
+    
+    if (t.isAssignmentExpression(grandParent) && grandParent.operator === '=') {
+      // Found an assignment, now extract the value
+      const valueNode = grandParent.right;
+      const grandParentPath = memberPath.parentPath;
+      // simple case like App.displayName = 'App'
+      if (t.isStringLiteral(valueNode)) {
+        return valueNode.value;
+      } else if (t.isIdentifier(valueNode)) {
+        // it also can be App.displayName = NAME_CONSTANT
+        const value = findConstantIdentifierValueInScope(grandParentPath, t, valueNode);
+        if (value) return value;
+        return componentName;
       }
-    });
+    }
   }
+  return null;
+}
 
-  return returnsJsx;
+/**
+ * Find the value of the constant identifier in the scope
+ */
+function findConstantIdentifierValueInScope(
+  path: babel.NodePath<babel.types.Node>,
+  t: typeof babel.types,
+  valueNode: babel.types.Node,
+): string | null {
+  if (!t.isIdentifier(valueNode)) return null;
+  // it also can be App.displayName = NAME_CONSTANT
+  // so we try to find the NAME_CONSTANT in the scope
+  // if not found just return null;
+  const valueBind = path.scope.getBinding(valueNode.name);
+  if (valueBind && valueBind.constant && valueBind.path.isVariableDeclarator()) {
+    const init = valueBind.path.node.init;
+    if (t.isStringLiteral(init)) {
+      return init.value;
+    }
+  }
+  return null;
 }
 
 /**
@@ -140,41 +107,42 @@ function isReactClassComponent(
   node: babel.types.ClassExpression | babel.types.ClassDeclaration,
   t: typeof babel.types,
 ) {
-  // Check if class extends React.Component or Component
+  // Check if class extends React.Component, Component, PureComponent, or React.PureComponent
   const superClass = node.superClass;
   if (!superClass) return false;
-  if (
-    (t.isMemberExpression(superClass) &&
-      t.isIdentifier(superClass.object, { name: 'React' }) &&
-      t.isIdentifier(superClass.property, { name: 'Component' })) ||
-    t.isIdentifier(superClass, { name: 'Component' })
-  ) {
-    return true;
-  }
 
-  return false;
+  return (t.isMemberExpression(superClass) &&
+      t.isIdentifier(superClass.object, { name: 'React' }) &&
+      (t.isIdentifier(superClass.property, { name: 'Component' }) || 
+       t.isIdentifier(superClass.property, { name: 'PureComponent' }))
+    ) ||
+    t.isIdentifier(superClass, { name: 'Component' }) ||
+    t.isIdentifier(superClass, { name: 'PureComponent' })
 }
 
 /**
- * Creates a Babel plugin that adds displayName property to components
+ * Creates a Babel plugin that collects displayName property
  */
-export function createBabelDisplayNamePlugin(
-  suffix: string,
-  filename: string,
-): PluginItem {
+export function createBabelDisplayNamePlugin(): PluginItem {
   return function ({ types: t }: { types: typeof babel.types }): PluginObj {
     return {
+      /**
+       * Visit AST and collect displayName or componentName
+       */
       visitor: {
-        // Handle function components
+        // function A () {}
         FunctionDeclaration(
           path: babel.NodePath<babel.types.FunctionDeclaration>,
         ) {
           const node = path.node;
           if (isReactFunctionComponent(node, t)) {
-            addDisplayNamePropertyAfter(path, t, suffix, node.id.name);
+            const componentName = node.id.name;
+            const existingDisplayName = findDisplayNameAssignmentInScope(path, t, componentName) || componentName;
+            store.SELF_REACT_COMPONENTS.add(existingDisplayName);
           }
         },
 
+        // const App = ...
         VariableDeclarator(path: babel.NodePath<babel.types.Node>) {
           const node = path.node as babel.types.VariableDeclarator;
           if (
@@ -185,7 +153,9 @@ export function createBabelDisplayNamePlugin(
             isReactFunctionComponent(node.init, t)
           ) {
             if (t.isIdentifier(node.id)) {
-              addDisplayNamePropertyAfter(path, t, suffix, node.id.name);
+              const componentName = node.id.name;
+              const existingDisplayName = findDisplayNameAssignmentInScope(path, t, componentName) || componentName;
+              store.SELF_REACT_COMPONENTS.add(existingDisplayName);
             }
           } else if (
             // const App = class extends React.Component {}
@@ -193,32 +163,127 @@ export function createBabelDisplayNamePlugin(
             isReactClassComponent(node.init, t)
           ) {
             if (t.isIdentifier(node.id)) {
-              addDisplayNamePropertyAfter(path, t, suffix, node.id.name);
-            }
+              const componentName = node.id.name;
+              const existingDisplayName = findDisplayNameAssignmentInScope(path, t, componentName) ||
+                                        findDisplayNamePropertyInClassExpression(path, t, componentName) ||
+                                        componentName;
+              store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+            } 
           }
         },
 
+        // class App extends React.Component {}
         ClassDeclaration(path: babel.NodePath<babel.types.ClassDeclaration>) {
           const node = path.node;
           if (isReactClassComponent(node, t)) {
-            addDisplayNamePropertyToClassDeclaration(
-              path,
-              t,
-              suffix,
-              node.id.name,
-            );
+            const componentName = node.id.name;
+            const existingDisplayName = findDisplayNameAssignmentInScope(path, t, componentName) ||
+                                        findDisplayNamePropertyInClassExpression(path, t, componentName) ||
+                                        componentName;
+            store.SELF_REACT_COMPONENTS.add(existingDisplayName);
           }
         },
-
-        // TODO: ExportDefaultDeclaration
-        // export default function App() {}                         - decouple
-        // export default const App = ()=>{}                        - decouple
-        // export default class App extends React.Component {}      - inject
-        // export default class extends React.component {}          - inject with filename
-        // export default () => {}                                  - decouple, assign, export named
-        // export default function () {}                            - decouple, assign, export named
-        // ignore all other cases
       },
     };
   };
+}
+
+
+// TODO: use traverse
+/**
+ * Check if a path represents a React component (returns JSX)
+ */
+function isReactFunctionComponent(
+  node:
+    | babel.types.ArrowFunctionExpression
+    | babel.types.FunctionExpression
+    | babel.types.FunctionDeclaration,
+  t: typeof babel.types,
+) {
+  // For arrow functions with expression body (implicit return)
+  if (!t.isBlockStatement(node.body)) {
+    return isJSXNode(node.body, t) || 
+           (t.isParenthesizedExpression(node.body) && isJSXNode(node.body.expression, t));
+  }
+  
+  return searchForJSXReturn(node.body, t);
+}
+
+// Helper to check if a node is a JSX element or fragment
+function isJSXNode(node: babel.types.Expression, t: typeof babel.types) {
+  return t.isJSXElement(node) || t.isJSXFragment(node);
+}
+
+function searchForJSXReturn(node: babel.types.Statement | babel.types.Expression, t: typeof babel.types) {
+  if (!node) return false;
+  
+  // Handle return statements
+  if (t.isReturnStatement(node) && node.argument) {
+    return isJSXNode(node.argument, t);
+  }
+
+  // Arrow function expressions in arguments or expressions
+  if (t.isArrowFunctionExpression(node) || t.isFunctionExpression(node) || t.isFunctionDeclaration(node)) {
+    return isReactFunctionComponent(node, t);
+  }
+  
+  // Array of statements (function body, block statement, etc.)
+  if (t.isBlockStatement(node)) {
+    return node.body.some(statement => searchForJSXReturn(statement, t));
+  }
+  
+  // If statement
+  if (t.isIfStatement(node)) {
+    return searchForJSXReturn(node.consequent, t) ||
+           (node.alternate && searchForJSXReturn(node.alternate, t));
+  }
+  
+  // Switch statement
+  if (t.isSwitchStatement(node)) {
+    return node.cases.some(switchCase => 
+      switchCase.consequent.some(statement => searchForJSXReturn(statement, t))
+    );
+  }
+  
+  // Try statement
+  if (t.isTryStatement(node)) {
+    return searchForJSXReturn(node.block, t) || 
+           (node.handler && searchForJSXReturn(node.handler.body, t)) ||
+           (node.finalizer && searchForJSXReturn(node.finalizer, t));
+  }
+  
+  // For loop
+  if (t.isForStatement(node) || t.isForInStatement(node) || t.isForOfStatement(node)) {
+    return searchForJSXReturn(node.body, t);
+  }
+  
+  // While and do-while loops
+  if (t.isWhileStatement(node) || t.isDoWhileStatement(node)) {
+    return searchForJSXReturn(node.body, t);
+  }
+  
+  // Labeled statement
+  if (t.isLabeledStatement(node)) {
+    return searchForJSXReturn(node.body, t);
+  }
+  
+  // Ternary expression
+  if (t.isConditionalExpression(node)) {
+    return searchForJSXReturn(node.consequent, t) || searchForJSXReturn(node.alternate, t);
+  }
+  
+  // Logical expressions (&&, ||)
+  if (t.isLogicalExpression(node)) {
+    return searchForJSXReturn(node.left, t) || searchForJSXReturn(node.right, t);
+  }
+  
+  if (t.isArrayExpression(node)) {
+    return node.elements.some(element => {
+      if (t.isExpression(element)) {
+        return searchForJSXReturn(element, t);
+      }
+    });
+  }
+  
+  return false;
 }

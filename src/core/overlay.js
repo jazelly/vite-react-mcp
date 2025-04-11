@@ -77,7 +77,7 @@ const setupMcpToolsHandler = () => {
       try {
         deserializedData = JSON.parse(data);
       } catch (_error) {
-        throw new Error(`Data is not deserializable: ${data}`);
+        throw new Error(`Args is not deserializable: ${data}`);
       }
 
       const componentTreeRoot =

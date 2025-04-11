@@ -18,6 +18,5 @@ const EmptyResult = () => {
   );
 };
 
-EmptyResult.displayName = 'EmptyResult$$mcp';
 
 export default EmptyResult;

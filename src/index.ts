@@ -26,7 +26,7 @@ const resolvedViteReactMcp = `\0${viteReactMcpImportee}`;
  * @param {string} configPath Path to config file
  * @returns {Object} Object with include and exclude arrays
  */
-function readProjectConfig(configPath = 'tsconfig.json') {
+function readProjectConfig(configPath: string): { include: string[], exclude: string[] } {
   try {
     if (fs.existsSync(configPath)) {
       const configContent = fs.readFileSync(configPath, 'utf8');
@@ -69,17 +69,8 @@ function readProjectConfig(configPath = 'tsconfig.json') {
   };
 }
 
-export interface ReactMCPOptions {
-  selfComponentIdentifier?: string;
-}
 
-function ReactMCP(options?: ReactMCPOptions): Plugin {
-  let suffix = store.REACT_COMPONENT_NAME_SUFFIX;
-  if (options?.selfComponentIdentifier) {
-    suffix = options.selfComponentIdentifier;
-    store.REACT_COMPONENT_NAME_SUFFIX = suffix;
-  }
-
+function ReactMCP(): Plugin {
   const configPatterns = readProjectConfig('tsconfig.json');
   const filter = createFilter(configPatterns.include, configPatterns.exclude);
 
@@ -153,7 +144,7 @@ function ReactMCP(options?: ReactMCPOptions): Plugin {
           presets: [],
           plugins: [
             // Plugin to add displayName to React components
-            [createBabelDisplayNamePlugin(suffix, filename)],
+            [createBabelDisplayNamePlugin()],
           ],
           ast: true,
           sourceType: 'module',
@@ -181,7 +172,20 @@ function ReactMCP(options?: ReactMCPOptions): Plugin {
     },
 
     transformIndexHtml() {
+      // Convert the Set to an Array for serialization
+      const componentsArray = Array.from(store.SELF_REACT_COMPONENTS);
+      
+      // Create the script to register components to window
+      const registerComponentsScript = `
+        window.__REACT_COMPONENTS__ = ${JSON.stringify(componentsArray)};
+      `;
       return [
+        {
+          tag: 'script',
+          injectTo: 'head-prepend',
+          attrs: { type: 'text/javascript' },
+          children: registerComponentsScript,
+        },
         {
           tag: 'script',
           injectTo: 'head-prepend',
