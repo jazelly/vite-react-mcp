@@ -20,7 +20,7 @@ export const GetComponentStatesSchema = z.object({
 export const GetUnnecessaryRerendersSchema = z.object({
   timeframe: z
     .number()
-    .default(10)
+    .optional()
     .describe(
       'The timeframe to query wasted re-renders, in unit of seconds, e.g. 10 means last 10 seconds',
     ),

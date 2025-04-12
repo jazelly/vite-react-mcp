@@ -71,14 +71,18 @@ export function stringifyValue(value: any): string {
   return `${tagString}{…}`;
 }
 
-export const isPropChangeNecessary = (
+type PropChangeReason =
+  | -1 // prop ref
+  | -2 // same value but different type
+  | 1; // change is necessary
+export const isRenderNecessaryByProp = (
   prevPropValue: unknown,
   currentPropValue: unknown,
-) => {
+): PropChangeReason => {
   // there are two cases where a prop change is wasted during a rerender
   // 1. All prop refs are not changed
   // 2. even when ref is changed, but due to re-instantiating, e.g. function in functional component
-  if (prevPropValue === currentPropValue) return false;
+  if (prevPropValue === currentPropValue) return -1;
   if (
     stringifyValue(prevPropValue) === stringifyValue(currentPropValue) &&
     (typeof prevPropValue === 'function' ||
@@ -86,13 +90,22 @@ export const isPropChangeNecessary = (
     (typeof currentPropValue === 'function' ||
       typeof currentPropValue === 'object')
   ) {
-    return false;
+    return -2;
   }
   // Any other cases are necessary
-  return true;
+  return 1;
 };
 
-export const isRenderNecessary = (fiber: Fiber): boolean => {
+export const isRenderNecessary = (
+  fiber: Fiber,
+  collectReasons?: (
+    fiber: Fiber,
+    propName: string,
+    prevValue: string,
+    nextValue: string,
+    reasonFlag: PropChangeReason,
+  ) => any,
+): boolean => {
   if (!didFiberCommit(fiber)) return false;
 
   const rerenderedHostFibers = getMutatedHostFibers(fiber);
@@ -100,26 +113,198 @@ export const isRenderNecessary = (fiber: Fiber): boolean => {
   for (const rerenderedHostFiber of rerenderedHostFibers) {
     traverseProps(
       rerenderedHostFiber,
-      (_propsName: string, prevValue: unknown, nextValue: unknown) => {
-        if (isPropChangeNecessary(prevValue, nextValue)) {
+      (propsName: string, prevValue: unknown, nextValue: unknown) => {
+        const propChange = isRenderNecessaryByProp(prevValue, nextValue);
+        if (propChange > 0) {
           necessaryChange = true;
           return true;
         }
-        necessaryChange ||= false;
+        if (collectReasons) {
+          collectReasons(
+            rerenderedHostFiber,
+            propsName,
+            serializeFiberProps(prevValue),
+            serializeFiberProps(nextValue),
+            propChange,
+          );
+        }
       },
     );
   }
   return necessaryChange;
 };
 
-// onCommitFiberRoot calls this
-// Collect if the fiber is
-// 1. compositeFiber
-// 2. !isRenderNecessary
+function serializeFiberProps(
+  props,
+  options: {
+    visited?: Set<any>;
+    maxDepth?: number;
+    currentDepth?: number;
+  } = {},
+) {
+  // Initialize options with defaults
+  const visited = options.visited || new Set();
+  const maxDepth = options.maxDepth || 10;
+  const currentDepth = options.currentDepth || 0;
+
+  // Check for null or undefined
+  if (props === null || props === undefined) {
+    return props;
+  }
+
+  // Handle primitive values directly
+  if (typeof props !== 'object' && typeof props !== 'function') {
+    return props;
+  }
+
+  // Check for circular references and max depth
+  if (visited.has(props) || currentDepth >= maxDepth) {
+    return '[Circular Reference]';
+  }
+
+  // Add current object to visited set
+  visited.add(props);
+
+  // Handle arrays
+  if (Array.isArray(props)) {
+    const serializedArray = [];
+    for (let i = 0; i < props.length; i++) {
+      serializedArray[i] = serializeFiberProps(props[i], {
+        visited,
+        maxDepth,
+        currentDepth: currentDepth + 1,
+      });
+    }
+    return serializedArray;
+  }
+
+  // Handle React elements
+  if (props.$$typeof === Symbol.for('react.element')) {
+    return {
+      type:
+        typeof props.type === 'function'
+          ? props.type.name || 'FunctionComponent'
+          : props.type,
+      key: props.key,
+      ref: props.ref ? '[Ref]' : null,
+      props: serializeFiberProps(props.props, {
+        visited,
+        maxDepth,
+        currentDepth: currentDepth + 1,
+      }),
+    };
+  }
+
+  // Handle other Fiber nodes
+  if (Object.getPrototypeOf(props).constructor.name === 'FiberNode') {
+    for (const key in props.memoizedProps) {
+      props.memoizedProps[key] = serializeFiberProps(props.memoizedProps[key], {
+        visited,
+        maxDepth,
+        currentDepth: currentDepth + 1,
+      });
+    }
+  }
+
+  // Handle regular objects
+  const serializedObject = {};
+  try {
+    for (const key in props) {
+      // Skip properties that might cause issues
+      if (
+        key === '__proto__' ||
+        !Object.prototype.hasOwnProperty.call(props, key)
+      ) {
+        continue;
+      }
+
+      try {
+        const value = props[key];
+
+        // Handle functions
+        if (typeof value === 'function') {
+          serializedObject[key] = `[Function: ${value.name || 'anonymous'}]`;
+          continue;
+        }
+
+        // Handle DOM nodes
+        if (value instanceof Node) {
+          serializedObject[key] = `[DOM Element: ${value.nodeName}]`;
+          continue;
+        }
+
+        // Handle errors
+        if (value instanceof Error) {
+          serializedObject[key] = `[Error: ${value.message}]`;
+          continue;
+        }
+
+        // Handle dates
+        if (value instanceof Date) {
+          serializedObject[key] = value.toISOString();
+          continue;
+        }
+
+        // Handle RegExp
+        if (value instanceof RegExp) {
+          serializedObject[key] = value.toString();
+          continue;
+        }
+
+        // Recursively serialize other values
+        serializedObject[key] = serializeFiberProps(value, {
+          visited,
+          maxDepth,
+          currentDepth: currentDepth + 1,
+        });
+      } catch (err: any) {
+        serializedObject[key] = `[Unserializable: ${err.message}]`;
+      }
+    }
+  } catch (err: any) {
+    return `[Unserializable Object: ${err.message}]`;
+  }
+
+  return serializedObject;
+}
+
 export const collectUnnecessaryRender = (fiber: Fiber) => {
+  const rawReasons = new Map<number, Record<string, any>>();
+  const collectReasonsImpl = (
+    hostFiber: Fiber,
+    propName: string,
+    prevValue: string,
+    nextValue: string,
+    reasonFlag: PropChangeReason,
+  ) => {
+    let fiberId = fiberIdMap.get(hostFiber);
+    if (!fiberId) {
+      fiberId = getFiberId(fiber);
+    }
+    const propsMap = rawReasons.get(fiberId) ?? {};
+    if (reasonFlag === -1) {
+      propsMap[propName] = {
+        explanation: 'Prop reference not changed',
+        prevValue,
+        nextValue,
+      };
+    }
+    if (reasonFlag === -2) {
+      propsMap[propName] = {
+        explanation: 'Prop value is the same but re-instantiated',
+        prevValue,
+        nextValue,
+      };
+    }
+
+    rawReasons.set(fiberId, propsMap);
+  };
   // this should only be called when fiber is updating
   // mounting or unmounting of a fiber is not considered as wasted render
-  if (!shouldFilterFiber(fiber) && !isRenderNecessary(fiber)) {
+  if (
+    !shouldFilterFiber(fiber) &&
+    !isRenderNecessary(fiber, collectReasonsImpl)
+  ) {
     const name = getDisplayNameForFiber(fiber);
     const collectedAt = Date.now();
     const commitId = store.currentCommitFrameId;
@@ -138,12 +323,14 @@ export const collectUnnecessaryRender = (fiber: Fiber) => {
       stateNode: fiberWithStateNode?.stateNode,
       collectedAt,
       commitId,
+      fiber,
+      reasons: rawReasons,
     });
   }
 };
 
 export const queryWastedRender = (
-  start: number,
+  start?: number,
   end?: number,
   options?: { allComponents?: boolean; debugMode?: boolean },
 ) => {
@@ -157,10 +344,13 @@ export const queryWastedRender = (
     end = Date.now();
   }
   const result = [];
+  if (!start || typeof start !== 'number') start = 0;
+
   for (const wastedRender of wastedRenderFiberInfo.values()) {
     if (
       wastedRender.collectedAt >= start &&
       wastedRender.collectedAt <= end &&
+      wastedRender.fiber.return &&
       (options.allComponents ||
         window.__REACT_COMPONENTS__.includes(wastedRender.name))
     ) {
@@ -174,12 +364,22 @@ export const queryWastedRender = (
   const reducedResult = [];
   for (const wastedRender of result) {
     if (!reducedResult.some((r) => r.stateNode === wastedRender.stateNode)) {
-      flashStateNode(wastedRender.stateNode);
+      flashStateNode(wastedRender.stateNode, {
+        commitId: wastedRender.commitId,
+      });
       reducedResult.push(wastedRender);
     }
   }
   if (options.debugMode) {
     console.debug('wastedRenders', result);
   }
-  return result;
+
+  return result.map((wastedRender) => {
+    const r = {
+      ...wastedRender,
+    };
+    delete r.fiber;
+    delete r.stateNode;
+    return r;
+  });
 };

@@ -1,10 +1,4 @@
-import type { Fiber } from 'react-reconciler';
 import { target } from '../../shared/const';
-import {
-  findComponentsInFiber,
-  getAllFiberRoots,
-  getNearestFiberWithStateNode,
-} from '../../shared/util';
 import { InvalidInputError } from '../../shared/errors';
 import { getDOMNodesByComponentName } from './util';
 

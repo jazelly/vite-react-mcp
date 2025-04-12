@@ -54,7 +54,7 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
         {
           name: 'get-unnecessary-rerenders',
           description:
-            'Get the wasted re-rendered components in the last N seconds',
+            'Get the wasted re-rendered components of the current page',
           inputSchema: zodToJsonSchema(GetUnnecessaryRerendersSchema),
         },
       ],

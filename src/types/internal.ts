@@ -1,3 +1,5 @@
+import { Fiber } from 'bippy';
+
 export interface ComponentTreeNode {
   name: string | null;
   children: ComponentTreeNode[];
@@ -19,10 +21,11 @@ export type PropNode = any;
 // TODO: frameify states change, props change, hook change.
 export interface WastedRenderFiberInfo {
   name: string;
-  reason?: string;
   collectedAt: number;
   commitId: number;
+  fiber: Fiber;
   stateNode: HTMLElement | null;
+  reasons: Record<string, any>;
 }
 
 export interface BaseChange {

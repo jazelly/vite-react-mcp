@@ -118,8 +118,15 @@ export function generateASCIIComponentTree(tree: ComponentTreeNode): string {
 
 export const flashStateNode = (
   stateNode: HTMLElement | null,
-  duration: number = 4000,
-  color: string = '#9b59b6', // Purple color
+  {
+    duration = 4000,
+    color = '#9b59b6', // Purple color
+    commitId = 'Unknown',
+  }: {
+    duration?: number;
+    color?: string;
+    commitId?: string;
+  } = {},
 ) => {
   if (!(stateNode instanceof HTMLElement)) {
     return;
@@ -158,6 +165,20 @@ export const flashStateNode = (
       animation: flash-pulse-${styleId} 0.8s infinite !important; /* Faster animation */
       transition: outline 0.1s ease-in-out, background-color 0.1s ease-in-out; /* Smooth transitions */
     }
+    
+    .commit-label-${styleId} {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      background-color: ${color} !important;
+      color: white !important;
+      font-size: 12px !important;
+      padding: 2px 6px !important;
+      border-radius: 0 0 4px 0 !important;
+      z-index: 9999 !important;
+      font-family: monospace !important;
+      font-weight: bold !important;
+    }
   `;
 
   document.head.appendChild(styleElement);
@@ -172,6 +193,15 @@ export const flashStateNode = (
   // Apply the flash class
   stateNode.classList.add(`flash-element-${styleId}`);
 
+  // Add commit label if commitId is provided
+  let labelElement: HTMLElement | null = null;
+  if (commitId) {
+    labelElement = document.createElement('div');
+    labelElement.textContent = `commitId: ${commitId}`;
+    labelElement.classList.add(`commit-label-${styleId}`);
+    stateNode.appendChild(labelElement);
+  }
+
   // Set timeout to remove the flash effect
   setTimeout(() => {
     // Remove style element
@@ -182,6 +212,11 @@ export const flashStateNode = (
 
     // Remove flash class
     stateNode.classList.remove(`flash-element-${styleId}`);
+
+    // Remove commit label if it exists
+    if (labelElement) {
+      stateNode.removeChild(labelElement);
+    }
 
     // Restore original position if we changed it
     if (needsPositionReset) {

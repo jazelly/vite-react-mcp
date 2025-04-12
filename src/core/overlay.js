@@ -125,13 +125,6 @@ const setupMcpToolsHandler = () => {
         throw new Error(`Data is not deserializable: ${data}`);
       }
 
-      if (typeof deserializedData?.timeframe !== 'number') {
-        console.debug('get-unnecessary-rerenders ws handler', deserializedData);
-        throw new Error(
-          'Invalid data sent from ViteDevServer: missing timeframe',
-        );
-      }
-
       const wastedRenders =
         target.__VITE_REACT_MCP_TOOLS__.getUnnecessaryRenderedComponents(
           Date.now() - deserializedData.timeframe * 1000,

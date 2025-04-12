@@ -9,13 +9,20 @@ A Vite plugin that creates an MCP server to help LLMs to understand your React A
   - params: 
     - `componentName`: string
 
-![highligh-component](./playground/demo/demo1.gif)
+![highligh-component](./playground/demo/demo_highlight_component.gif)
 
 - `get-component-tree`
   - description: Get a tree-like representation of the component tree of the current page.
   - params:
-    - `selfOnly`: boolean if true, return the components related to your self defined components only
+    - `selfOnly`: boolean, if true, return the components related to your self defined components only
 
+- `get-unnecessary-rerenders`
+  - description: Get the wasted re-rendered components of the current page
+  - params:
+    - `timeframe`: number, if present, only get unnecessary renders within the last `timeframe` seconds
+    - `allComponent`: boolean, if truthy, get unnecessary renders for all components instead of self-defined components only.
+
+![get-unnecessary-rerenders](./playground/demo/demo_unnecessary_renders.gif)
 
 ## Getting Started
 
