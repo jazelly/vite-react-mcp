@@ -84,6 +84,9 @@ components.d.ts
 
 playground/package-lock.json
 playground/node_modules
+playground/pnpm-lock.yaml
+
+pnpm-lock.yaml
 
 # for scripts
 clones
