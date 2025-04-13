@@ -1,7 +1,7 @@
 {
   "name": "vite-react-mcp",
   "type": "module",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Vite plugin for React MCP",
   "main": "dist/index.js",
   "workspaces": [
