@@ -45,11 +45,6 @@ bippy.instrument({
     }
 
     bippy.traverseRenderedFibers(root.current || root, (fiber, phase) => {
-      // noop
-      // just to warm up fiberIdMap
-    });
-
-    bippy.traverseRenderedFibers(root.current || root, (fiber, phase) => {
       if (phase === 'update') {
         collectUnnecessaryRender(fiber);
       }
@@ -127,10 +122,10 @@ const setupMcpToolsHandler = () => {
 
       const wastedRenders =
         target.__VITE_REACT_MCP_TOOLS__.getUnnecessaryRenderedComponents(
-          Date.now() - deserializedData.timeframe * 1000,
-          Date.now(),
+          deserializedData.timeframe,
           {
-            allComponents: deserializedData.allComponents,
+            allComponents: !!deserializedData.allComponents,
+            debugMode: !!deserializedData.debugMode,
           },
         );
 
@@ -143,10 +138,9 @@ const setupMcpToolsHandler = () => {
         response = JSON.stringify({ error: _error.message });
       }
 
-      console.log('wastedRenders', wastedRenders);
       import.meta.hot.send(
         'get-unnecessary-rerenders-response',
-        JSON.stringify(wastedRenders),
+        response,
       );
     });
   }

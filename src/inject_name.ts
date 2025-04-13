@@ -1,6 +1,6 @@
-import * as babel from '@babel/core';
-import { PluginItem } from '@babel/core';
-import { PluginObj } from '@babel/core';
+import type * as babel from '@babel/core';
+import type { PluginItem } from '@babel/core';
+import type { PluginObj } from '@babel/core';
 import { store } from './shared/store';
 
 export function findDisplayNamePropertyInClassExpression(
@@ -69,9 +69,9 @@ export function findDisplayNameAssignmentInScope(
       const valueNode = grandParent.right;
       const grandParentPath = memberPath.parentPath;
       // simple case like App.displayName = 'App'
-      if (t.isStringLiteral(valueNode)) {
-        return valueNode.value;
-      } else if (t.isIdentifier(valueNode)) {
+      if (t.isStringLiteral(valueNode)) return valueNode.value;
+      
+      if (t.isIdentifier(valueNode)) {
         // it also can be App.displayName = NAME_CONSTANT
         const value = findConstantIdentifierValueInScope(
           grandParentPath,
@@ -100,8 +100,7 @@ function findConstantIdentifierValueInScope(
   // if not found just return null;
   const valueBind = path.scope.getBinding(valueNode.name);
   if (
-    valueBind &&
-    valueBind.constant &&
+    valueBind?.constant &&
     valueBind.path.isVariableDeclarator()
   ) {
     const init = valueBind.path.node.init;
@@ -137,8 +136,7 @@ function isReactClassComponent(
  * Creates a Babel plugin that collects displayName property
  */
 export function createBabelDisplayNamePlugin(): PluginItem {
-  return function ({ types: t }: { types: typeof babel.types }): PluginObj {
-    return {
+  return ({ types: t }: { types: typeof babel.types }): PluginObj => ({
       /**
        * Visit AST and collect displayName or componentName
        */
@@ -264,8 +262,7 @@ export function createBabelDisplayNamePlugin(): PluginItem {
           }
         },
       },
-    };
-  };
+    });
 }
 
 // TODO: use traverse

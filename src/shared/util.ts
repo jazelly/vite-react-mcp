@@ -20,16 +20,12 @@ import {
   SERVER_CONTEXT_SYMBOL_STRING,
   DEPRECATED_ASYNC_MODE_SYMBOL_STRING,
   SCOPE_SYMBOL_STRING,
-  MutationMask,
-  Cloned,
-  PerformedWork,
   REACT_ELEMENT_TYPE,
 } from './const';
-import type { ReactDevtools, FiberRoot, MemoizedState } from '../types/react';
-import type { Fiber } from 'react-reconciler';
+import type { ReactDevtools, FiberRoot } from '../types/react';
 import { ReactTypeOfWork } from './const';
-import { HookNode, PropNode } from '../types/internal';
-import type { ReactDevToolsGlobalHook } from 'bippy';
+import type { HookNode } from '../types/internal';
+import type { Fiber, Props, ReactDevToolsGlobalHook } from 'bippy';
 import { fiberRoots } from './store';
 
 let rdtHook: ReactDevToolsGlobalHook | ReactDevtools | null = null;
@@ -64,7 +60,7 @@ export const getFiberRoots = (rendererId: number) => {
  * Get React Fiber nodes optimistically
  * @returns { Fiber[] }
  */
-export const getAllFiberRoots = () => {
+export const getAllFiberRoots = (): FiberRoot[] => {
   const hook = getRDTHook();
   let roots = [];
   if (hook.renderers.size > 0) {
@@ -84,11 +80,11 @@ export const getAllFiberRoots = () => {
  * @returns { Fiber | null }
  */
 export const getNearestFiberWithStateNode = (
-  fiber: Fiber | FiberRoot,
+  fiber: Fiber,
   level?: number,
 ): Fiber | null => {
   // search down but in a bfs manner to find a fiber with stateNode
-  const current = 'current' in fiber ? fiber.current : fiber;
+  const current = fiber;
   if (current.stateNode) {
     return current.stateNode;
   }
@@ -123,20 +119,16 @@ export const getNearestFiberWithStateNode = (
 
 /**
  * Traverse fiber tree to find component by name
- * @param fiber
- * @param componentName
- * @param results
- * @returns { fiber: Fiber | FiberRoot; domNode: HTMLElement }[]
  */
 export const findComponentsInFiber = (
-  fiber: Fiber | FiberRoot,
+  fiber: Fiber,
   componentName: string,
   results: Fiber[] = [],
 ) => {
   if (!fiber) return results;
-  const fiberBase = 'current' in fiber ? fiber.current : fiber;
+  const fiberBase = fiber;
   const name = getDisplayNameForFiber(fiberBase);
-  if (name && name.includes(componentName)) {
+  if (name?.includes(componentName)) {
     results.push(fiberBase);
   }
 
@@ -199,7 +191,7 @@ export function getWrappedDisplayName(
  */
 export function getDisplayName(
   type: any,
-  fallbackName: string = 'Anonymous',
+  fallbackName = 'Anonymous',
 ): string {
   let displayName = fallbackName;
 
@@ -221,7 +213,7 @@ export function getDisplayName(
  */
 export function getDisplayNameForFiber(
   fiber: Fiber,
-  shouldSkipForgetCheck: boolean = false,
+  shouldSkipForgetCheck = false,
 ): string | null {
   const { elementType, type, tag } = fiber;
 
@@ -312,7 +304,7 @@ export function getDisplayNameForFiber(
     case ReactTypeOfWork.Throw:
       // This should really never be visible.
       return 'Error';
-    default:
+    default: {
       const typeSymbol = getTypeSymbol(type);
 
       switch (typeSymbol) {
@@ -365,6 +357,7 @@ export function getDisplayNameForFiber(
           // This may mean a new element type that has not yet been added to DevTools.
           return null;
       }
+    }
   }
 }
 
@@ -396,24 +389,24 @@ export const getPrevStates = (fiber: Fiber): HookNode[] | null => {
   return states;
 };
 
-export const getCurrentProps = (fiber: Fiber): PropNode[] | null => {
+export const getCurrentProps = (fiber: Fiber): Props[] | null => {
   if (!fiber) return null;
-  const props: PropNode[] = [];
+  const props: Props[] = [];
   let prop = fiber.memoizedProps;
   while (prop) {
     props.push(prop);
-    prop = prop.next;
+    prop = prop.next as Props;
   }
   return props;
 };
 
-export const getPrevProps = (fiber: Fiber): PropNode[] | null => {
+export const getPrevProps = (fiber: Fiber): Props[] | null => {
   if (!fiber.alternate) return null;
-  const props: PropNode[] = [];
+  const props: Props[] = [];
   let prop = fiber.alternate?.memoizedProps;
   while (prop) {
     props.push(prop);
-    prop = prop.next;
+    prop = prop.next as Props;
   }
   return props;
 };

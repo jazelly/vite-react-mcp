@@ -330,28 +330,20 @@ export const collectUnnecessaryRender = (fiber: Fiber) => {
 };
 
 export const queryWastedRender = (
-  start?: number,
-  end?: number,
-  options?: { allComponents?: boolean; debugMode?: boolean },
+  timeframe: number,
+  { allComponents = false, debugMode = false }: { allComponents?: boolean; debugMode?: boolean } = {},
 ) => {
-  if (!options) {
-    options = {
-      allComponents: false,
-      debugMode: false,
-    };
-  }
-  if (!end) {
-    end = Date.now();
-  }
   const result = [];
-  if (!start || typeof start !== 'number') start = 0;
+  let start = 0;
+  const end = Date.now();
+  if (timeframe && typeof timeframe === 'number') start = Date.now() - timeframe * 1000;
 
   for (const wastedRender of wastedRenderFiberInfo.values()) {
     if (
       wastedRender.collectedAt >= start &&
       wastedRender.collectedAt <= end &&
       wastedRender.fiber.return &&
-      (options.allComponents ||
+      (allComponents ||
         window.__REACT_COMPONENTS__.includes(wastedRender.name))
     ) {
       result.push(wastedRender);
@@ -370,16 +362,19 @@ export const queryWastedRender = (
       reducedResult.push(wastedRender);
     }
   }
-  if (options.debugMode) {
-    console.debug('wastedRenders', result);
+
+  const finalResult = result.map((wastedRender) => {
+    return {
+      name: wastedRender.name,
+      commitId: wastedRender.commitId,
+      collectedAt: wastedRender.collectedAt,
+      reasons: wastedRender.reasons,
+    };
+  });
+
+  if (debugMode) {
+    console.debug('wastedRenders', finalResult);
   }
 
-  return result.map((wastedRender) => {
-    const r = {
-      ...wastedRender,
-    };
-    delete r.fiber;
-    delete r.stateNode;
-    return r;
-  });
+  return finalResult;
 };

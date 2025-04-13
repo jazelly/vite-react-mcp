@@ -65,7 +65,8 @@
         "noUnusedVariables": {
           "level": "warn",
           "fix": "unsafe"
-        }
+        },
+        "noSwitchDeclarations": "off"
       }
     }
   }

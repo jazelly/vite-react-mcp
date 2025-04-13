@@ -70,7 +70,7 @@ export const REACT_MEMO_CACHE_SENTINEL: symbol = Symbol.for(
 );
 
 export const REACT_ELEMENT_TYPE =
-  (typeof Symbol != 'undefined' && Symbol.for && Symbol.for('react.element')) ||
+  (typeof Symbol !== 'undefined' && Symbol.for && Symbol.for('react.element')) ||
   LEGACY_ELEMENT_NUMBER;
 
 // https://github.com/facebook/react/blob/main/packages/react-devtools-shared/src/backend/fiber/renderer.js

@@ -37,7 +37,7 @@ function readProjectConfig(configPath: string): {
 
       // Extract include/exclude patterns
       let include = config.include || [];
-      let exclude = config.exclude || [];
+      const exclude = config.exclude || [];
 
       // Convert to glob patterns if needed
       include = include.map((pattern) => {
@@ -112,12 +112,9 @@ function ReactMCP(): Plugin {
         return null;
       }
 
-      // Extract filename for component naming
-      const filename = path.basename(id, path.extname(id));
-
       try {
         // Try to dynamically import @babel/preset-react
-        let presetReact;
+        let presetReact: boolean;
         try {
           // In ESM we can't use require, so we can check if the package is installed
           // by importing it dynamically or checking if it exists in node_modules
@@ -128,7 +125,7 @@ function ReactMCP(): Plugin {
             // If it exists, we'll let Babel use it through its name
             presetReact = true;
           }
-        } catch (e) {
+        } catch (_e) {
           // Log warning but continue - the developer's project might have its own JSX handling
           console.warn(
             '\n[vite-plugin-display-name-suffix] Warning: @babel/preset-react is not installed.',

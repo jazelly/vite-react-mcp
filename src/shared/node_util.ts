@@ -1,12 +1,12 @@
 // This files must be run in node runtime
 
-import { readFileSync } from 'fs';
-import { dirname, resolve } from 'path';
-import { ViteDevServer } from 'vite';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import type { ViteDevServer } from 'vite';
 
 const __dirname = dirname(__filename);
 
-let packageVersion;
+let packageVersion: string | undefined;
 
 /**
  * Read package.json and get the version string

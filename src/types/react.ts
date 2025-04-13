@@ -1,8 +1,8 @@
 // A mapping of React flow types to TypeScript types needed by this package
 // https://github.com/facebook/react/tree/main/packages/react-devtools-shared/src/backend/types.js
 
-import type { Fiber, Lane, Lanes } from 'react-reconciler';
-
+import type { Fiber } from 'bippy';
+import type { Lane, Lanes } from 'react-reconciler';
 export interface FiberRoot {
   callbackNode: null | object;
   callbackPriority: number;

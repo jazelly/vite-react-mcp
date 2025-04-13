@@ -1,19 +1,17 @@
+import type { Fiber } from 'bippy';
 import { getAllFiberRoots } from '../../shared/util';
-
-import { Fiber, FiberRoot } from 'react-reconciler';
 import {
   findComponentsInFiber,
   getNearestFiberWithStateNode,
 } from '../../shared/util';
-import { ComponentTreeNode } from '../../types/internal';
-import { MemoizedState } from '../../types/react';
+import type { ComponentTreeNode } from '../../types/internal';
 
 export function getFibersByComponentName(componentName: string): Fiber[] {
   const result: Fiber[] = [];
   const roots = getAllFiberRoots();
 
   for (const root of roots) {
-    const fibers = findComponentsInFiber(root, componentName);
+    const fibers = findComponentsInFiber(root.current, componentName);
     result.push(...fibers);
   }
 
@@ -28,7 +26,7 @@ export function getDOMNodesByComponentName(
   const fiberResults: { fiber: Fiber; domNode: HTMLElement }[] = [];
 
   for (const root of roots) {
-    const fibers = findComponentsInFiber(root, componentName);
+    const fibers = findComponentsInFiber(root.current, componentName);
     for (const fiber of fibers) {
       const fiberWithStateNode = getNearestFiberWithStateNode(fiber);
       if (fiberWithStateNode?.stateNode) {
@@ -65,10 +63,10 @@ export function generateASCIIComponentTree(tree: ComponentTreeNode): string {
    */
   function buildTreeLines(
     node: ComponentTreeNode,
-    prefix: string = '',
-    isLast: boolean = true,
+    prefix = '',
+    isLast = true,
     siblings: ComponentTreeNode[] = [],
-    siblingIndex: number = 0,
+    siblingIndex = 0,
   ): void {
     // Check if this name has duplicates among siblings
     const hasDuplicates =

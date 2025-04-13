@@ -1,8 +1,7 @@
-import { Fiber, FiberRoot } from 'react-reconciler';
+import type { Fiber } from 'bippy';
 import { FiberRootsNotFoundError } from '../../shared/errors';
 import { getAllFiberRoots, getDisplayNameForFiber } from '../../shared/util';
-import { ComponentTreeNode } from '../../types/internal';
-import { store } from '../../shared/store';
+import type { ComponentTreeNode } from '../../types/internal';
 
 /**
  * Recursively build a component tree with name from a fiber tree
@@ -57,16 +56,13 @@ const trimComponentTree = (
  * Given the component tree of current page
  * @param matchId An identifier to filter the component tree. Only components' name containing this id will be included
  */
-export const getComponentTree = (options?: {
-  selfOnly: boolean;
+export const getComponentTree = ({
+  selfOnly = false,
+  debugMode = false,
+}: {
+  selfOnly?: boolean;
   debugMode?: boolean;
-}): string => {
-  if (!options) {
-    options = {
-      selfOnly: false,
-      debugMode: false,
-    };
-  }
+} = {}): string => {
 
   // Get all fiber roots
   const roots = getAllFiberRoots();
@@ -74,7 +70,7 @@ export const getComponentTree = (options?: {
     throw new FiberRootsNotFoundError('No React fiber roots found');
   }
 
-  if (options.debugMode) {
+  if (debugMode) {
     console.debug('getComponentTree - roots', roots);
   }
 
@@ -82,20 +78,22 @@ export const getComponentTree = (options?: {
     name: '__BASE__',
     children: [],
   };
-  roots.forEach((root) => buildComponentTree(root.current, result));
+  for (const root of roots) {
+    buildComponentTree(root.current, result);
+  }
 
   const trimmedResult = {
     name: '__BASE__',
     children: [],
   };
 
-  if (options.debugMode) {
+  if (debugMode) {
     console.debug('getComponentTree - ComponentTreeNode result', result);
   }
 
-  result.children.forEach((child) =>
-    trimComponentTree(child, trimmedResult, options),
-  );
+  for (const child of result.children) {
+    trimComponentTree(child, trimmedResult, { selfOnly });
+  }
 
   // there will always a be a root node under __BASE__
   const finalResult = trimmedResult.children[0];

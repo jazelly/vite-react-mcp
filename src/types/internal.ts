@@ -1,4 +1,4 @@
-import { Fiber } from 'bippy';
+import type { Fiber } from 'bippy';
 
 export interface ComponentTreeNode {
   name: string | null;
@@ -45,10 +45,4 @@ export interface StateChange extends BaseChange {
 export interface ContextChange extends BaseChange {
   name: string;
   contextType: unknown;
-}
-
-interface CollectorResult<T extends BaseChange = BaseChange> {
-  current: Record<string | number, unknown>;
-  prev: Record<string | number, unknown>;
-  changes: Array<T>;
 }

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
-  CallToolResult,
+  type CallToolResult,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -15,7 +15,6 @@ import {
   HighlightComponentSchema,
 } from './schema.js';
 import { getVersionString, waitForEvent } from '../shared/node_util.js';
-import { HookNode } from '../types/internal.js';
 
 export function initMcpServer(viteDevServer: ViteDevServer): Server {
   const server = new Server(

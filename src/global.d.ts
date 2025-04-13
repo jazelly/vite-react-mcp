@@ -1,4 +1,4 @@
-import { WastedRenderFiberInfo } from './types/internal';
+import type { WastedRenderFiberInfo } from './types/internal';
 
 declare global {
   interface Window {
@@ -19,5 +19,3 @@ declare global {
     };
   }
 }
-
-export {};

@@ -1,54 +1,10 @@
-import { Fiber } from 'react-reconciler';
 import {
-  getRDTHook,
-  getDisplayNameForFiber,
-  findComponentsInFiber,
   getCurrentStates,
   getPrevStates,
 } from '../../shared/util';
-import { getDOMNodesByComponentName, getFibersByComponentName } from './util';
-import { MemoizedState } from '../../types/react';
+import { getFibersByComponentName } from './util';
 import { FiberNotFoundError } from '../../shared/errors';
-import { HookNode } from '../../types/internal';
-
-// Function to traverse the Fiber tree and find instances by component name
-const findFiberInstancesByName = (
-  startNode: Fiber | null,
-  componentName: string,
-): Fiber[] => {
-  const instances: Fiber[] = [];
-  if (!startNode) return instances;
-
-  const queue: Fiber[] = [startNode];
-
-  while (queue.length > 0) {
-    const node = queue.shift();
-    if (!node) continue;
-
-    // Check if the node type matches the component name
-    const nodeType = node.type;
-    if (nodeType) {
-      // Function components might have .displayName or .name
-      // Class components usually have .name
-      // Built-in elements like 'div' are strings
-      const name = getDisplayNameForFiber(node);
-      if (name === componentName) {
-        instances.push(node);
-      }
-    }
-
-    // Queue children for traversal
-    if (node.child) {
-      queue.push(node.child);
-    }
-    // Queue siblings for traversal
-    if (node.sibling) {
-      queue.push(node.sibling); // Queue the immediate sibling
-    }
-  }
-
-  return instances;
-};
+import type { HookNode } from '../../types/internal';
 
 export const getComponentStates = (
   componentName: string,
@@ -59,10 +15,6 @@ export const getComponentStates = (
     prevStates: HookNode[] | null;
   }
 > => {
-  console.log(
-    `[vite-react-mcp] Attempting to get state for component: ${componentName}`,
-  );
-
   const fibers = getFibersByComponentName(componentName);
 
   if (fibers.length === 0)
@@ -105,7 +57,7 @@ export const filterReportableStates = (states: HookNode[]): HookNode[] => {
       return (
         JSON.stringify(state.memoizedState) === JSON.stringify(state.baseState)
       );
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   });
