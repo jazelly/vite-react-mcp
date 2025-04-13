@@ -1,20 +1,20 @@
-import type { ViteDevServer } from 'vite';
-import { z } from 'zod';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
   type CallToolResult,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { ViteDevServer } from 'vite';
+import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
+import { getVersionString, waitForEvent } from '../shared/node_util.js';
 import {
   GetComponentStatesSchema,
   GetComponentTreeSchema,
   GetUnnecessaryRerendersSchema,
   HighlightComponentSchema,
 } from './schema.js';
-import { getVersionString, waitForEvent } from '../shared/node_util.js';
 
 export function initMcpServer(viteDevServer: ViteDevServer): Server {
   const server = new Server(

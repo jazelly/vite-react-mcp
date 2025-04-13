@@ -1,13 +1,13 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
-import { normalizePath, type ViteDevServer } from 'vite';
-import type { Plugin } from 'vite';
-import { initMcpServer, instrumentViteDevServer } from './mcp/index.js';
-import { createFilter } from '@rollup/pluginutils';
 import * as babel from '@babel/core';
-import { store } from './shared/store.js';
+import { createFilter } from '@rollup/pluginutils';
+import { type ViteDevServer, normalizePath } from 'vite';
+import type { Plugin } from 'vite';
 import { createBabelDisplayNamePlugin } from './inject_name.js';
+import { initMcpServer, instrumentViteDevServer } from './mcp/index.js';
+import { store } from './shared/store.js';
 
 function getViteReactMcpPath() {
   const pluginPath = normalizePath(

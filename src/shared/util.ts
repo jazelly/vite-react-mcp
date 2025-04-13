@@ -1,31 +1,31 @@
+import type { Fiber, Props, ReactDevToolsGlobalHook } from 'bippy';
+import type { HookNode } from '../types/internal';
+import type { FiberRoot, ReactDevtools } from '../types/react';
 import {
-  REACT_MEMO_CACHE_SENTINEL,
+  CONCURRENT_MODE_NUMBER,
+  CONCURRENT_MODE_SYMBOL_STRING,
+  CONSUMER_SYMBOL_STRING,
+  CONTEXT_NUMBER,
+  CONTEXT_SYMBOL_STRING,
+  DEPRECATED_ASYNC_MODE_SYMBOL_STRING,
   FORWARD_REF_NUMBER,
   FORWARD_REF_SYMBOL_STRING,
   MEMO_NUMBER,
   MEMO_SYMBOL_STRING,
-  target,
-  CONCURRENT_MODE_NUMBER,
-  CONCURRENT_MODE_SYMBOL_STRING,
-  PROVIDER_SYMBOL_STRING,
-  PROVIDER_NUMBER,
-  CONTEXT_NUMBER,
-  SCOPE_NUMBER,
-  PROFILER_SYMBOL_STRING,
   PROFILER_NUMBER,
-  STRICT_MODE_SYMBOL_STRING,
-  CONSUMER_SYMBOL_STRING,
-  STRICT_MODE_NUMBER,
-  CONTEXT_SYMBOL_STRING,
-  SERVER_CONTEXT_SYMBOL_STRING,
-  DEPRECATED_ASYNC_MODE_SYMBOL_STRING,
-  SCOPE_SYMBOL_STRING,
+  PROFILER_SYMBOL_STRING,
+  PROVIDER_NUMBER,
+  PROVIDER_SYMBOL_STRING,
   REACT_ELEMENT_TYPE,
+  REACT_MEMO_CACHE_SENTINEL,
+  SCOPE_NUMBER,
+  SCOPE_SYMBOL_STRING,
+  SERVER_CONTEXT_SYMBOL_STRING,
+  STRICT_MODE_NUMBER,
+  STRICT_MODE_SYMBOL_STRING,
+  target,
 } from './const';
-import type { ReactDevtools, FiberRoot } from '../types/react';
 import { ReactTypeOfWork } from './const';
-import type { HookNode } from '../types/internal';
-import type { Fiber, Props, ReactDevToolsGlobalHook } from 'bippy';
 import { fiberRoots } from './store';
 
 let rdtHook: ReactDevToolsGlobalHook | ReactDevtools | null = null;
@@ -189,10 +189,7 @@ export function getWrappedDisplayName(
  * @param fallbackName The name we fallback in case there is no displayName, default Anonymous
  * @returns { string } Guaranteed to be a string
  */
-export function getDisplayName(
-  type: any,
-  fallbackName = 'Anonymous',
-): string {
+export function getDisplayName(type: any, fallbackName = 'Anonymous'): string {
   let displayName = fallbackName;
 
   if (typeof type.displayName === 'string') {

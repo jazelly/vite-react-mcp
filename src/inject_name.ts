@@ -70,7 +70,7 @@ export function findDisplayNameAssignmentInScope(
       const grandParentPath = memberPath.parentPath;
       // simple case like App.displayName = 'App'
       if (t.isStringLiteral(valueNode)) return valueNode.value;
-      
+
       if (t.isIdentifier(valueNode)) {
         // it also can be App.displayName = NAME_CONSTANT
         const value = findConstantIdentifierValueInScope(
@@ -99,10 +99,7 @@ function findConstantIdentifierValueInScope(
   // so we try to find the NAME_CONSTANT in the scope
   // if not found just return null;
   const valueBind = path.scope.getBinding(valueNode.name);
-  if (
-    valueBind?.constant &&
-    valueBind.path.isVariableDeclarator()
-  ) {
+  if (valueBind?.constant && valueBind.path.isVariableDeclarator()) {
     const init = valueBind.path.node.init;
     if (t.isStringLiteral(init)) {
       return init.value;
@@ -137,132 +134,122 @@ function isReactClassComponent(
  */
 export function createBabelDisplayNamePlugin(): PluginItem {
   return ({ types: t }: { types: typeof babel.types }): PluginObj => ({
-      /**
-       * Visit AST and collect displayName or componentName
-       */
-      visitor: {
-        // function A () {}
-        FunctionDeclaration(
-          path: babel.NodePath<babel.types.FunctionDeclaration>,
-        ) {
-          const node = path.node;
-          if (isReactFunctionComponent(node, t)) {
-            const componentName = node.id.name;
-            const existingDisplayName =
-              findDisplayNameAssignmentInScope(path, t, componentName) ||
-              componentName;
-            store.SELF_REACT_COMPONENTS.add(existingDisplayName);
-          }
-        },
-
-        // const App = ...
-        VariableDeclarator(
-          path: babel.NodePath<babel.types.VariableDeclarator>,
-        ) {
-          const node = path.node;
-          // we only care about the case we have identifier on the LHS
-          if (!t.isIdentifier(node.id)) return;
-          if (
-            // const App = () => {} or const App = function () {}
-            (t.isArrowFunctionExpression(node.init) ||
-              t.isFunctionExpression(node.init)) &&
-            node.id &&
-            isReactFunctionComponent(node.init, t)
-          ) {
-            const componentName = node.id.name;
-            const existingDisplayName =
-              findDisplayNameAssignmentInScope(path, t, componentName) ||
-              componentName;
-            store.SELF_REACT_COMPONENTS.add(existingDisplayName);
-          } else if (
-            // const App = class extends React.Component {}
-            t.isClassExpression(node.init) &&
-            isReactClassComponent(node.init, t)
-          ) {
-            const componentName = node.id.name;
-            const existingDisplayName =
-              findDisplayNameAssignmentInScope(path, t, componentName) ||
-              findDisplayNamePropertyInClassExpression(
-                path,
-                t,
-                componentName,
-              ) ||
-              componentName;
-            store.SELF_REACT_COMPONENTS.add(existingDisplayName);
-          } else if (t.isCallExpression(node.init)) {
-            const pathRight = path.get('init');
-            const componentName = node.id.name;
-            pathRight.traverse({
-              FunctionExpression(
-                innerPath: babel.NodePath<babel.types.FunctionExpression>,
-              ) {
-                const node = innerPath.node;
-                if (isReactFunctionComponent(node, t)) {
-                  const existingDisplayName =
-                    findDisplayNameAssignmentInScope(
-                      innerPath,
-                      t,
-                      componentName,
-                    ) || componentName;
-                  store.SELF_REACT_COMPONENTS.add(existingDisplayName);
-                }
-              },
-              ArrowFunctionExpression(
-                innerPath: babel.NodePath<babel.types.ArrowFunctionExpression>,
-              ) {
-                const node = innerPath.node;
-                if (isReactFunctionComponent(node, t)) {
-                  const existingDisplayName =
-                    findDisplayNameAssignmentInScope(
-                      innerPath,
-                      t,
-                      componentName,
-                    ) || componentName;
-                  store.SELF_REACT_COMPONENTS.add(existingDisplayName);
-                }
-              },
-              ClassExpression(
-                innerPath: babel.NodePath<babel.types.ClassExpression>,
-              ) {
-                const node = innerPath.node;
-                if (isReactClassComponent(node, t)) {
-                  const existingDisplayName =
-                    findDisplayNameAssignmentInScope(
-                      innerPath,
-                      t,
-                      componentName,
-                    ) ||
-                    findDisplayNamePropertyInClassExpression(
-                      innerPath,
-                      t,
-                      componentName,
-                    ) ||
-                    componentName;
-                  store.SELF_REACT_COMPONENTS.add(existingDisplayName);
-                }
-              },
-            });
-          }
-        },
-
-        // class App extends React.Component {}
-        ClassDeclaration(path: babel.NodePath<babel.types.ClassDeclaration>) {
-          const node = path.node;
-          if (isReactClassComponent(node, t)) {
-            const componentName = node.id.name;
-            const existingDisplayName =
-              findDisplayNameAssignmentInScope(path, t, componentName) ||
-              findDisplayNamePropertyInClassExpression(
-                path,
-                t,
-                componentName,
-              ) ||
-              componentName;
-            store.SELF_REACT_COMPONENTS.add(existingDisplayName);
-          }
-        },
+    /**
+     * Visit AST and collect displayName or componentName
+     */
+    visitor: {
+      // function A () {}
+      FunctionDeclaration(
+        path: babel.NodePath<babel.types.FunctionDeclaration>,
+      ) {
+        const node = path.node;
+        if (isReactFunctionComponent(node, t)) {
+          const componentName = node.id.name;
+          const existingDisplayName =
+            findDisplayNameAssignmentInScope(path, t, componentName) ||
+            componentName;
+          store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+        }
       },
-    });
+
+      // const App = ...
+      VariableDeclarator(path: babel.NodePath<babel.types.VariableDeclarator>) {
+        const node = path.node;
+        // we only care about the case we have identifier on the LHS
+        if (!t.isIdentifier(node.id)) return;
+        if (
+          // const App = () => {} or const App = function () {}
+          (t.isArrowFunctionExpression(node.init) ||
+            t.isFunctionExpression(node.init)) &&
+          node.id &&
+          isReactFunctionComponent(node.init, t)
+        ) {
+          const componentName = node.id.name;
+          const existingDisplayName =
+            findDisplayNameAssignmentInScope(path, t, componentName) ||
+            componentName;
+          store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+        } else if (
+          // const App = class extends React.Component {}
+          t.isClassExpression(node.init) &&
+          isReactClassComponent(node.init, t)
+        ) {
+          const componentName = node.id.name;
+          const existingDisplayName =
+            findDisplayNameAssignmentInScope(path, t, componentName) ||
+            findDisplayNamePropertyInClassExpression(path, t, componentName) ||
+            componentName;
+          store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+        } else if (t.isCallExpression(node.init)) {
+          const pathRight = path.get('init');
+          const componentName = node.id.name;
+          pathRight.traverse({
+            FunctionExpression(
+              innerPath: babel.NodePath<babel.types.FunctionExpression>,
+            ) {
+              const node = innerPath.node;
+              if (isReactFunctionComponent(node, t)) {
+                const existingDisplayName =
+                  findDisplayNameAssignmentInScope(
+                    innerPath,
+                    t,
+                    componentName,
+                  ) || componentName;
+                store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+              }
+            },
+            ArrowFunctionExpression(
+              innerPath: babel.NodePath<babel.types.ArrowFunctionExpression>,
+            ) {
+              const node = innerPath.node;
+              if (isReactFunctionComponent(node, t)) {
+                const existingDisplayName =
+                  findDisplayNameAssignmentInScope(
+                    innerPath,
+                    t,
+                    componentName,
+                  ) || componentName;
+                store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+              }
+            },
+            ClassExpression(
+              innerPath: babel.NodePath<babel.types.ClassExpression>,
+            ) {
+              const node = innerPath.node;
+              if (isReactClassComponent(node, t)) {
+                const existingDisplayName =
+                  findDisplayNameAssignmentInScope(
+                    innerPath,
+                    t,
+                    componentName,
+                  ) ||
+                  findDisplayNamePropertyInClassExpression(
+                    innerPath,
+                    t,
+                    componentName,
+                  ) ||
+                  componentName;
+                store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+              }
+            },
+          });
+        }
+      },
+
+      // class App extends React.Component {}
+      ClassDeclaration(path: babel.NodePath<babel.types.ClassDeclaration>) {
+        const node = path.node;
+        if (isReactClassComponent(node, t)) {
+          const componentName = node.id.name;
+          const existingDisplayName =
+            findDisplayNameAssignmentInScope(path, t, componentName) ||
+            findDisplayNamePropertyInClassExpression(path, t, componentName) ||
+            componentName;
+          store.SELF_REACT_COMPONENTS.add(existingDisplayName);
+        }
+      },
+    },
+  });
 }
 
 // TODO: use traverse

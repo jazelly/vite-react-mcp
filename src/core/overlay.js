@@ -3,8 +3,8 @@ import { __VITE_REACT_MCP_TOOLS__ } from '../shared/const';
 import { target } from '../shared/const';
 import { fiberRoots, store } from '../shared/store';
 import { highlightComponent } from './tools/component_highlighter';
-import { getComponentTree } from './tools/component_viewer';
 import { getComponentStates } from './tools/component_state_viewer';
+import { getComponentTree } from './tools/component_viewer';
 import {
   collectUnnecessaryRender,
   queryWastedRender,
@@ -138,10 +138,7 @@ const setupMcpToolsHandler = () => {
         response = JSON.stringify({ error: _error.message });
       }
 
-      import.meta.hot.send(
-        'get-unnecessary-rerenders-response',
-        response,
-      );
+      import.meta.hot.send('get-unnecessary-rerenders-response', response);
     });
   }
 };

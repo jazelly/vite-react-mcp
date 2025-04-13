@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useUsers } from '../context/UserContext';
 
 export const useUserProfileData = (userId) => {
@@ -45,11 +45,10 @@ export const useUserProfileData = (userId) => {
         setProfileData({ ...tempData });
         setEditMode(false);
         return true; // Indicate success
-      } else {
-        // Handle potential update failure (e.g., show an error)
-        console.error('Failed to update user');
-        return false; // Indicate failure
       }
+      // Handle potential update failure (e.g., show an error)
+      console.error('Failed to update user');
+      return false; // Indicate failure
     }
     return false; // Indicate failure if profileData is null
   }, [profileData, tempData, updateUser]); // Depend on relevant state/functions

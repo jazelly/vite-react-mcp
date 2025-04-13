@@ -1,4 +1,4 @@
-import UserProfile from './UserProfile';
 import UserList from './UserList';
+import UserProfile from './UserProfile';
 
 export { UserProfile, UserList };

@@ -63,7 +63,6 @@ export const getComponentTree = ({
   selfOnly?: boolean;
   debugMode?: boolean;
 } = {}): string => {
-
   // Get all fiber roots
   const roots = getAllFiberRoots();
   if (!roots || roots.length === 0) {

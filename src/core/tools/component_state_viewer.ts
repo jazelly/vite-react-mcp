@@ -1,10 +1,7 @@
-import {
-  getCurrentStates,
-  getPrevStates,
-} from '../../shared/util';
-import { getFibersByComponentName } from './util';
 import { FiberNotFoundError } from '../../shared/errors';
+import { getCurrentStates, getPrevStates } from '../../shared/util';
 import type { HookNode } from '../../types/internal';
+import { getFibersByComponentName } from './util';
 
 export const getComponentStates = (
   componentName: string,

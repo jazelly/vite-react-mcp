@@ -1,19 +1,19 @@
 import {
+  type Fiber,
+  didFiberCommit,
+  fiberIdMap,
+  getFiberId,
+  getMutatedHostFibers,
+  shouldFilterFiber,
+  traverseProps,
+} from 'bippy';
+import { store, wastedRenderFiberInfo } from '../../shared/store';
+import {
   getDisplayName,
   getDisplayNameForFiber,
   getNearestFiberWithStateNode,
   isReactElement,
 } from '../../shared/util';
-import {
-  traverseProps,
-  fiberIdMap,
-  type Fiber,
-  didFiberCommit,
-  getMutatedHostFibers,
-  shouldFilterFiber,
-  getFiberId,
-} from 'bippy';
-import { store, wastedRenderFiberInfo } from '../../shared/store';
 import { flashStateNode } from './util';
 
 const stringifyValueExceptObject = (value: any): string | null => {
@@ -331,20 +331,23 @@ export const collectUnnecessaryRender = (fiber: Fiber) => {
 
 export const queryWastedRender = (
   timeframe: number,
-  { allComponents = false, debugMode = false }: { allComponents?: boolean; debugMode?: boolean } = {},
+  {
+    allComponents = false,
+    debugMode = false,
+  }: { allComponents?: boolean; debugMode?: boolean } = {},
 ) => {
   const result = [];
   let start = 0;
   const end = Date.now();
-  if (timeframe && typeof timeframe === 'number') start = Date.now() - timeframe * 1000;
+  if (timeframe && typeof timeframe === 'number')
+    start = Date.now() - timeframe * 1000;
 
   for (const wastedRender of wastedRenderFiberInfo.values()) {
     if (
       wastedRender.collectedAt >= start &&
       wastedRender.collectedAt <= end &&
       wastedRender.fiber.return &&
-      (allComponents ||
-        window.__REACT_COMPONENTS__.includes(wastedRender.name))
+      (allComponents || window.__REACT_COMPONENTS__.includes(wastedRender.name))
     ) {
       result.push(wastedRender);
     }
