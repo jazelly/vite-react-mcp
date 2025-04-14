@@ -64,12 +64,22 @@ const setupMcpToolsHandler = () => {
         throw new Error(`Data is not deserializable: ${data}`);
       }
       if (typeof deserializedData?.componentName !== 'string') {
-        console.debug('highlight-component ws handler', deserializedData);
-        throw new Error('Invalid data sent from ViteDevServer');
+        throw new Error('Invalid args sent from ViteDevServer');
       }
-      target.__VITE_REACT_MCP_TOOLS__.highlightReactComponent(
-        deserializedData.componentName,
-      );
+
+      let response = 'Action failed';
+      try {
+        const components = target.__VITE_REACT_MCP_TOOLS__.highlightComponent(
+          deserializedData.componentName,
+        );
+        if (components.length > 0) {
+          response = `Found and highlighted ${components.length} components`;
+        }
+      } catch (_error) {
+        response = `Error: ${_error.message}`;
+      }
+
+      import.meta.hot.send('highlight-component-response', response);
     });
 
     import.meta.hot.on('get-component-tree', (data) => {

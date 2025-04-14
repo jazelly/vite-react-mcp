@@ -1,4 +1,9 @@
-import type { Fiber, Props, ReactDevToolsGlobalHook } from 'bippy';
+import type {
+  ContextDependency,
+  Fiber,
+  Props,
+  ReactDevToolsGlobalHook,
+} from 'bippy';
 import type { HookNode } from '../types/internal';
 import type { FiberRoot, ReactDevtools } from '../types/react';
 import {
@@ -358,22 +363,44 @@ export function getDisplayNameForFiber(
   }
 }
 
-export const getCurrentStates = (fiber: Fiber): HookNode[] | null => {
-  if (!fiber) return null;
-  const states: HookNode[] = [];
+export const getCurrentStates = (fiber: Fiber): Fiber['memoizedState'][] => {
+  const states = [];
   let state = fiber.memoizedState;
   while (state) {
-    states.push({
-      memoizedState: state.memoizedState,
-      baseState: state.baseState,
-    });
+    states.push(state.memoizedState);
     state = state.next;
   }
   return states;
 };
 
-export const getPrevStates = (fiber: Fiber): HookNode[] | null => {
-  if (!fiber.alternate) return null;
+export const getCurrentContexts = (fiber: Fiber) => {
+  const contexts: unknown[] = [];
+  try {
+    const nextDependencies = fiber.dependencies;
+
+    if (!nextDependencies) throw new Error('No dependencies found');
+    if (
+      typeof nextDependencies !== 'object' ||
+      !('firstContext' in nextDependencies)
+    ) {
+      throw new Error('Invalid dependencies');
+    }
+    let nextContext: ContextDependency<unknown> | null | undefined =
+      nextDependencies.firstContext;
+    while (
+      nextContext &&
+      typeof nextContext === 'object' &&
+      'memoizedValue' in nextContext
+    ) {
+      contexts.push(nextContext.memoizedValue);
+      nextContext = nextContext?.next;
+    }
+  } catch {}
+  return contexts;
+};
+
+export const getPrevStates = (fiber: Fiber): HookNode[] => {
+  if (!fiber.alternate) return [];
   const states: HookNode[] = [];
   let state = fiber.alternate?.memoizedState;
   while (state) {
@@ -386,15 +413,8 @@ export const getPrevStates = (fiber: Fiber): HookNode[] | null => {
   return states;
 };
 
-export const getCurrentProps = (fiber: Fiber): Props[] | null => {
-  if (!fiber) return null;
-  const props: Props[] = [];
-  let prop = fiber.memoizedProps;
-  while (prop) {
-    props.push(prop);
-    prop = prop.next as Props;
-  }
-  return props;
+export const getCurrentProps = (fiber: Fiber): Fiber['memoizedProps'] => {
+  return { ...fiber.memoizedProps };
 };
 
 export const getPrevProps = (fiber: Fiber): Props[] | null => {

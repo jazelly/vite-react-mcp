@@ -40,14 +40,13 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
         {
           name: 'get-component-tree',
           description:
-            'Get the React component tree of the current page in markdown tree syntax format.',
+            'Get the React component tree of the current page in ASCII format.',
           inputSchema: zodToJsonSchema(GetComponentTreeSchema),
         },
         {
           name: 'get-component-states',
           description:
-            'Get the React component states in JSON structure format. ' +
-            'The JSON structure is a map, where key is the corresponding fibers and values are states',
+            'Get the React component props, states, and contexts in JSON structure format.',
           inputSchema: zodToJsonSchema(GetComponentStatesSchema),
         },
         {
@@ -74,8 +73,13 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
               event: 'highlight-component',
               data: JSON.stringify(args),
             });
+
+            const response = await waitForEvent<string>(
+              viteDevServer,
+              'highlight-component-response',
+            );
             return {
-              content: [{ type: 'text', text: 'Highlighting component...' }],
+              content: [{ type: 'text', text: response.data }],
             };
           }
 

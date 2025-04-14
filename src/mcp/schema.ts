@@ -5,10 +5,12 @@ export const HighlightComponentSchema = z.object({
 });
 
 export const GetComponentTreeSchema = z.object({
-  selfOnly: z
+  allComponents: z
     .boolean()
     .default(false)
-    .describe('Whether to return your self defined components only'),
+    .describe(
+      'Whether to get tree for all components, instead of just your self-defined ones',
+    ),
 });
 
 export const GetComponentStatesSchema = z.object({
