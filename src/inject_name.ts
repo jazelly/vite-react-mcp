@@ -1,7 +1,7 @@
 import type * as babel from '@babel/core';
 import type { PluginItem } from '@babel/core';
 import type { PluginObj } from '@babel/core';
-import { store } from './shared/store';
+import { store } from './shared/store.js';
 
 export function findDisplayNamePropertyInClassExpression(
   path: babel.NodePath<babel.types.Node>,

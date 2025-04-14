@@ -1,0 +1,10 @@
+{
+  "version": "v1",
+  "packages": {
+    "vite-react-mcp": {
+      "signature": "fabdef75ef8c880c00a5f05e4a0f6973",
+      "file": true,
+      "replaced": "file:..\\..\\vite-react-mcp-0.2.2.tgz"
+    }
+  }
+}

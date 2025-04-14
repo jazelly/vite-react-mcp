@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import ReactMCP from '../../src';
+import ReactMCP from 'vite-react-mcp';
 
 export default defineConfig({
   plugins: [react(), ReactMCP()],

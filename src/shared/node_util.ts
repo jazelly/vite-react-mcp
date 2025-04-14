@@ -2,9 +2,10 @@
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ViteDevServer } from 'vite';
 
-const __dirname = dirname(__filename);
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let packageVersion: string | undefined;
 
