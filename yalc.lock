@@ -1,0 +1,9 @@
+{
+  "version": "v1",
+  "packages": {
+    "vite-react-mcp": {
+      "signature": "12445c746e89ecbcbc7a02680d5597a5",
+      "file": true
+    }
+  }
+}

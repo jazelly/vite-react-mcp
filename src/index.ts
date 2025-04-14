@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import * as babel from '@babel/core';
 import { createFilter } from '@rollup/pluginutils';
 import { type ViteDevServer, normalizePath } from 'vite';
-import type { Plugin } from 'vite';
-import { createBabelDisplayNamePlugin } from './inject_name.js';
+import type { Plugin, ResolvedConfig } from 'vite';
+import { createBabelDisplayNamePlugin } from './babel_collect_name.js';
 import { initMcpServer, instrumentViteDevServer } from './mcp/index.js';
 import { store } from './shared/store.js';
 
@@ -13,7 +13,7 @@ function getViteReactMcpPath() {
   const pluginPath = normalizePath(
     path.dirname(fileURLToPath(import.meta.url)),
   );
-  return pluginPath.replace(/\/dist$/, '//src');
+  return pluginPath;
 }
 
 const viteReactMcpPath = getViteReactMcpPath();
@@ -72,9 +72,74 @@ function readProjectConfig(configPath: string): {
   };
 }
 
+
 function ReactMCP(): Plugin {
   const configPatterns = readProjectConfig('tsconfig.json');
   const filter = createFilter(configPatterns.include, configPatterns.exclude);
+  function transformBabelCollectName(code: string, id: string) {
+    if (!filter(id) || !/\.[jt]sx?$/.test(id)) {
+      return null;
+    }
+  
+    try {
+      // Try to dynamically import @babel/preset-react
+      let presetReact: boolean;
+      try {
+        // In ESM we can't use require, so we can check if the package is installed
+        // by importing it dynamically or checking if it exists in node_modules
+        const presetReactPath = path.resolve(
+          'node_modules/@babel/preset-react',
+        );
+        if (fs.existsSync(presetReactPath)) {
+          // If it exists, we'll let Babel use it through its name
+          presetReact = true;
+        }
+      } catch (_e) {
+        // Log warning but continue - the developer's project might have its own JSX handling
+        console.warn(
+          '\n[vite-plugin-display-name-suffix] Warning: @babel/preset-react is not installed.',
+        );
+        console.warn(
+          'If you encounter JSX parsing errors, install it with: npm install @babel/preset-react --save-dev\n',
+        );
+      }
+  
+      // Configure Babel transformation
+      const babelOptions: babel.TransformOptions = {
+        babelrc: false,
+        configFile: false,
+        filename: id,
+        presets: [],
+        plugins: [
+          // Plugin to add displayName to React components
+          [createBabelDisplayNamePlugin()],
+        ],
+        ast: true,
+        sourceType: 'module',
+      };
+  
+      // Add preset-react if available
+      if (presetReact) {
+        babelOptions.presets.push([
+          '@babel/preset-react',
+          { runtime: 'automatic' },
+        ]);
+      }
+  
+      // Transform the code using Babel
+      const result = babel.transformSync(code, babelOptions);
+  
+      return {
+        code: result.code,
+        map: result.map,
+      };
+    } catch (error) {
+      console.error(`Error transforming ${id}:`, error);
+      return null;
+    }
+  }
+
+  let config: ResolvedConfig;
 
   return {
     name: 'vite-react-mcp',
@@ -105,69 +170,12 @@ function ReactMCP(): Plugin {
       }
     },
 
-    // inject a displayName suffix to all self-defined components
+    configResolved(resolvedConfig) {
+      config = resolvedConfig;
+    },
+
     transform(code, id) {
-      // Only process JS/JSX/TS/TSX files that match our filter
-      if (!filter(id) || !/\.[jt]sx?$/.test(id)) {
-        return null;
-      }
-
-      try {
-        // Try to dynamically import @babel/preset-react
-        let presetReact: boolean;
-        try {
-          // In ESM we can't use require, so we can check if the package is installed
-          // by importing it dynamically or checking if it exists in node_modules
-          const presetReactPath = path.resolve(
-            'node_modules/@babel/preset-react',
-          );
-          if (fs.existsSync(presetReactPath)) {
-            // If it exists, we'll let Babel use it through its name
-            presetReact = true;
-          }
-        } catch (_e) {
-          // Log warning but continue - the developer's project might have its own JSX handling
-          console.warn(
-            '\n[vite-plugin-display-name-suffix] Warning: @babel/preset-react is not installed.',
-          );
-          console.warn(
-            'If you encounter JSX parsing errors, install it with: npm install @babel/preset-react --save-dev\n',
-          );
-        }
-
-        // Configure Babel transformation
-        const babelOptions: babel.TransformOptions = {
-          babelrc: false,
-          configFile: false,
-          filename: id,
-          presets: [],
-          plugins: [
-            // Plugin to add displayName to React components
-            [createBabelDisplayNamePlugin()],
-          ],
-          ast: true,
-          sourceType: 'module',
-        };
-
-        // Add preset-react if available
-        if (presetReact) {
-          babelOptions.presets.push([
-            '@babel/preset-react',
-            { runtime: 'automatic' },
-          ]);
-        }
-
-        // Transform the code using Babel
-        const result = babel.transformSync(code, babelOptions);
-
-        return {
-          code: result.code,
-          map: result.map,
-        };
-      } catch (error) {
-        console.error(`Error transforming ${id}:`, error);
-        return null;
-      }
+      transformBabelCollectName(code, id);
     },
 
     transformIndexHtml() {
@@ -190,7 +198,7 @@ function ReactMCP(): Plugin {
           injectTo: 'head-prepend',
           attrs: {
             type: 'module',
-            src: `/@id/${viteReactMcpImportee}:core/overlay.js`,
+            src: `${config.base || "/"}@id/${viteReactMcpImportee}:overlay.js`,
           },
         },
       ];

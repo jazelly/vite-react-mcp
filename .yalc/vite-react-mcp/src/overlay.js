@@ -1,14 +1,13 @@
 import * as bippy from 'bippy';
-import { __VITE_REACT_MCP_TOOLS__ } from '../shared/const';
-import { target } from '../shared/const';
-import { fiberRoots, store } from '../shared/store';
-import { highlightComponent } from './tools/component_highlighter';
-import { getComponentStates } from './tools/component_state_viewer';
-import { getComponentTree } from './tools/component_viewer';
+import { __VITE_REACT_MCP_TOOLS__, target } from '../shared/const.js';
+import { fiberRoots, store } from '../shared/store.js';
+import { highlightComponent } from './tools/component_highlighter.js';
+import { getComponentStates } from './tools/component_state_viewer.js';
+import { getComponentTree } from './tools/component_viewer.js';
 import {
   collectUnnecessaryRender,
   queryWastedRender,
-} from './tools/track_wasted_render';
+} from './tools/track_wasted_render.js';
 
 const init = () => {
   if (Object.hasOwn(target, __VITE_REACT_MCP_TOOLS__)) {

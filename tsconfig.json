@@ -16,11 +16,11 @@
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.tsx"
+    "src/**/*.tsx",
+    "src/**/*.js"
   ],
   "exclude": [
     "**/dist/**",
-    "**/node_modules/**",
-    "**/**/*.js"
+    "**/node_modules/**"
   ]
 }

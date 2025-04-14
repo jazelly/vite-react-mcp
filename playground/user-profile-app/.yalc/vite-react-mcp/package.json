@@ -1,7 +1,7 @@
 {
   "name": "vite-react-mcp",
   "type": "module",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Vite plugin for React MCP",
   "main": "dist/index.js",
   "workspaces": [
@@ -29,8 +29,7 @@
     "email": "xzha4350@gmail.com"
   },
   "files": [
-    "dist",
-    "LICENSE"
+    "dist"
   ],
   "license": "MIT",
   "packageManager": "pnpm@10.6.5",
@@ -44,5 +43,5 @@
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.23.5"
   },
-  "yalcSig": "fabdef75ef8c880c00a5f05e4a0f6973"
+  "yalcSig": "b539cba7fd76b1c68ac265ce05f033e6"
 }
