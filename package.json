@@ -39,14 +39,14 @@
     "@babel/types": "^7.27.0",
     "@biomejs/biome": "1.9.4",
     "@rollup/pluginutils": "^5.1.4",
-    "@types/react-reconciler": "catalog:",
+    "@types/react-reconciler": "0.26.7",
     "shx": "0.4.0",
-    "typescript": "catalog:",
-    "vite": "catalog:"
+    "typescript": "^5.8.2",
+    "vite": "^6.2.3"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.7.0",
-    "bippy": "catalog:",
+    "bippy": "0.3.8",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.23.5"
   }
