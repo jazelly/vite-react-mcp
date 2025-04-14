@@ -98,3 +98,9 @@ clones
 .turbo
 
 dist/
+
+**/.yalc
+**/.yalc/**
+yalc.lock
+**/yalc.lock
+.yalc/
