@@ -1,6 +1,6 @@
 import type { Fiber } from 'bippy';
 import { FiberRootsNotFoundError } from '../../shared/errors';
-import { getAllFiberRoots, getDisplayNameForFiber } from '../../shared/util';
+import { getAllFiberRoots, getCurrentProps, getDisplayNameForFiber } from '../../shared/util';
 import type { ComponentTreeNode } from '../../types/internal';
 
 /**
@@ -78,6 +78,10 @@ export const getComponentTree = ({
     buildComponentTree(root.current, result);
   }
 
+  if (debugMode) {
+    console.debug('getComponentTree - full result', result);
+  }
+
   const trimmedResult = {
     name: '__BASE__',
     children: [],
@@ -91,6 +95,9 @@ export const getComponentTree = ({
   if (!allComponents) {
     for (const child of result.children) {
       trimComponentTree(child, trimmedResult);
+    }
+    if (debugMode) {
+      console.debug('getComponentTree - trimmed result', trimmedResult);
     }
     finalResult = trimmedResult.children[0];
   }

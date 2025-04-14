@@ -1,6 +1,9 @@
 # vite-react-mcp
 
-A Vite plugin that creates an MCP server to help LLMs to understand your React App context
+[![npm version][npm-version-src]][npm-version-href]
+[![npm downloads][npm-downloads-src]][npm-downloads-href]
+
+A Vite plugin that creates an MCP server to help LLMs understand your React App context
 
 ## Features
 
@@ -19,9 +22,11 @@ A Vite plugin that creates an MCP server to help LLMs to understand your React A
   ![get-component-states](./playground/demo/demo_get_states.gif)
 
 - `get-component-tree`
-  - description: Get a tree-like representation of the component tree of the current page.
+  - description: Get the React component tree of the current page in ASCII format.
   - params:
-    - `selfOnly`: boolean, if true, return the components related to your self defined components only
+    - `allComponent`: boolean, if truthy, return a tree for all components instead of your self-defined components only.
+
+  ![get-component-tree](./playground/demo/demo_get_component_tree.gif)
 
 - `get-unnecessary-rerenders`
   - description: Get the wasted re-rendered components of the current page.
@@ -94,7 +99,16 @@ pnpm run playground
 
 The playground contains a simple user profile application to test React component interactions.
 
+## Acknowledgement
+
+This project is inspired by [vite-plugin-vue-mcp](https://github.com/webfansplz/vite-plugin-vue-mcp). Thanks for the awesome idea bridging mcp and devtools.
+
 
 ## License
 
-MIT 
+MIT
+
+[npm-version-src]: https://img.shields.io/npm/v/vite-react-mcp?style=flat&colorA=080f12&colorB=1fa669
+[npm-version-href]: https://npmjs.com/package/vite-react-mcp
+[npm-downloads-src]: https://img.shields.io/npm/dm/vite-react-mcp?style=flat&colorA=080f12&colorB=1fa669
+[npm-downloads-href]: https://npmjs.com/package/vite-react-mcp

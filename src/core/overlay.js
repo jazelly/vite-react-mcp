@@ -92,7 +92,8 @@ const setupMcpToolsHandler = () => {
 
       const componentTreeRoot =
         target.__VITE_REACT_MCP_TOOLS__.getComponentTree(deserializedData);
-      import.meta.hot.send(
+      console.log('get-component-tree-response', componentTreeRoot);
+        import.meta.hot.send(
         'get-component-tree-response',
         JSON.stringify(componentTreeRoot),
       );
