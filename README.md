@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/jazelly-vite-react-mcp-badge.png)](https://mseep.ai/app/jazelly-vite-react-mcp)
+
 # vite-react-mcp
 
 [![npm version][npm-version-src]][npm-version-href]
