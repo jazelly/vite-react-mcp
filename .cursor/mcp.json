@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "vite-react-mcp": {
+    "user-profile-app": {
       "url": "http://localhost:3000/sse"
     }
   }

@@ -53,6 +53,39 @@ bippy.instrument({
   },
 });
 
+// Add dynamic tool registration capability
+const customToolHandlers = new Map();
+
+const registerCustomTool = (name, handler) => {
+  customToolHandlers.set(name, handler);
+  
+  // Set up WebSocket handler for this custom tool
+  if (import.meta.hot) {
+    import.meta.hot.on(`custom-tool-${name}`, async (data) => {
+      try {
+        const deserializedData = JSON.parse(data);
+        const result = await handler(deserializedData);
+        import.meta.hot.send(`custom-tool-${name}-response`, JSON.stringify(result));
+      } catch (error) {
+        import.meta.hot.send(`custom-tool-${name}-response`, JSON.stringify({ error: error.message }));
+      }
+    });
+  }
+};
+
+// Expose registration API
+Object.defineProperty(target, __VITE_REACT_MCP_TOOLS__, {
+  value: {
+    highlightComponent: highlightComponent,
+    getComponentTree: getComponentTree,
+    getComponentStates: getComponentStates,
+    getUnnecessaryRenderedComponents: queryWastedRender,
+    registerCustomTool,
+  },
+  writable: false,
+  configurable: true,
+});
+
 const setupMcpToolsHandler = () => {
   if (import.meta.hot) {
     import.meta.hot.on('highlight-component', (data) => {

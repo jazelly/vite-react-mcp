@@ -36,6 +36,13 @@ A Vite plugin that creates an MCP server to help LLMs understand your React App 
 
   ![get-unnecessary-rerenders](./playground/demo/demo_unnecessary_renders.gif)
 
+- Custom Tools
+
+  You can now define your own tool functions in JS/TS in your Vite project, and inject it
+  to the plugin.
+
+  ![custom-tools](./playground/demo/demo_custom_tools.gif)
+
 ## Getting Started
 
 ### Installation
@@ -52,6 +59,8 @@ pnpm install @babel/preset-react
 
 ### Usage
 
+#### Built-in tools
+
 ```ts
 // vite.config.ts
 import ReactMCP from 'vite-react-mcp'
@@ -61,9 +70,51 @@ export default defineConfig({
 })
 ```
 
+#### Custom tools
+
+Define your own tool in your Vite project, e.g.
+
+```ts
+// any ts file in your Vite project
+import type { ToolResultValue } from 'vite-react-mcp';
+
+export default function myCustomTool(args: { message: string }): ToolResultValue {
+  const { message } = args;
+  console.log(`[custom-tool/log1] ${message}`);
+  return {
+    success: true,
+    message: `Log1 received: ${message}`,
+  };
+}
+```
+
+```ts
+// vite.config.ts
+import ReactMCP from 'vite-react-mcp'
+import log1 from 'path/to/your/module'
+
+export default defineConfig({
+  plugins: [ReactMCP({
+    customTools: [
+      {
+        name: 'log1',
+        description: 'Log1',
+        schema: z.object({
+          message: z.string(),
+        }),
+        clientFunction: log1,
+      }
+    ]
+  })],
+})
+```
+
+Then run your app in dev.
+> Note: vite-react-mcp is meant to be used in dev environment only
+
 At this point, you already can access `window.__VITE_REACT_MCP_TOOLS__` to use the tools in Developer panel on your browser.
 
-To use it as an MCP server, setup MCP configuration in your MCP client.
+To expose it as an MCP server, setup MCP configuration in your MCP client.
 
 - For Cursor, create a `./cursor/mcp.json` at the root level of your react project.
 

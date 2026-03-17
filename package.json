@@ -1,7 +1,7 @@
 {
   "name": "vite-react-mcp",
   "type": "module",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Vite plugin for React MCP",
   "main": "dist/index.js",
   "workspaces": [
@@ -11,8 +11,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "pnpm -r run start",
-    "build": "npx shx rm -rf dist && tsc",
-    "build:src": "npx shx rm -rf dist && tsc --project tsconfig.json --outDir dist --rootDir src",
+    "build": "npx shx rm -rf dist && tsc && npx shx cp CHANGELOG dist/CHANGELOG",
+    "build:src": "npx shx rm -rf dist && tsc --project tsconfig.json --outDir dist --rootDir src && npx shx cp CHANGELOG dist/CHANGELOG",
     "playground": "pnpm --filter user-profile-app run start",
     "format": "pnpm biome format --write",
     "lint": "pnpm biome lint --write",
@@ -22,7 +22,9 @@
     "vite",
     "react",
     "mcp",
-    "devtools"
+    "devtools",
+    "llm",
+    "plugin"
   ],
   "author": {
     "name": "jazelly",

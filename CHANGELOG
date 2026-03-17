@@ -1,0 +1,7 @@
+## 0.3.0
+
+Introduce Custom Tools - where users can define custom functions and declare as MCP tools.
+
+## 0.2.4
+
+Introduce 4 tools running in browser runtime to get context of React Fibre tree.
