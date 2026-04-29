@@ -179,21 +179,36 @@ const copyText = async (text: string): Promise<boolean> => {
   }
 };
 
+const getNormalizedSourceRoot = (): string =>
+  (target.__VITE_REACT_MCP_CONFIG__?.sourceRoot || '')
+    .replace(/\\/g, '/')
+    .replace(/\/$/, '');
+
+const isWithinSourceRoot = (filePath: string, sourceRoot: string): boolean =>
+  Boolean(
+    sourceRoot &&
+      (filePath === sourceRoot || filePath.startsWith(`${sourceRoot}/`)),
+  );
+
 const toCandidateSourceUrls = (filePath: string): string[] => {
   if (!filePath || filePath.includes('://')) {
     return [];
   }
 
-  if (filePath.startsWith('/')) {
-    return [
-      `${filePath}?raw`,
-      filePath,
-      `/@fs${filePath}?raw`,
-      `/@fs${filePath}`,
-    ];
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  if (normalizedPath.startsWith('/@fs/')) {
+    return [`${normalizedPath}?raw`, normalizedPath];
   }
 
-  const sanitizedPath = filePath.replace(/^\.?\//, '');
+  if (normalizedPath.startsWith('/')) {
+    if (isWithinSourceRoot(normalizedPath, getNormalizedSourceRoot())) {
+      return [`/@fs${normalizedPath}?raw`, `/@fs${normalizedPath}`];
+    }
+
+    return [`${normalizedPath}?raw`, normalizedPath];
+  }
+
+  const sanitizedPath = normalizedPath.replace(/^\.?\//, '');
   return [`/${sanitizedPath}?raw`, `/${sanitizedPath}`];
 };
 
@@ -220,30 +235,18 @@ const isProjectSourceFilePath = (filePath: string): boolean => {
     return !pathSegments.includes('..');
   }
 
-  const sourceRoot = (
-    target.__VITE_REACT_MCP_CONFIG__?.sourceRoot || ''
-  ).replace(/\\/g, '/');
-  const normalizedSourceRoot = sourceRoot.replace(/\/$/, '');
+  const normalizedSourceRoot = getNormalizedSourceRoot();
 
   if (normalizedPath.startsWith('/@fs/')) {
     const fileSystemPath = normalizedPath.slice('/@fs'.length);
-    return Boolean(
-      normalizedSourceRoot &&
-        (fileSystemPath === normalizedSourceRoot ||
-          fileSystemPath.startsWith(`${normalizedSourceRoot}/`)),
-    );
+    return isWithinSourceRoot(fileSystemPath, normalizedSourceRoot);
   }
 
   if (normalizedPath.startsWith('/src/')) {
     return true;
   }
 
-  if (!normalizedSourceRoot) return false;
-
-  return (
-    normalizedPath === normalizedSourceRoot ||
-    normalizedPath.startsWith(`${normalizedSourceRoot}/`)
-  );
+  return isWithinSourceRoot(normalizedPath, normalizedSourceRoot);
 };
 
 const extractRawSourceFromViteModule = (moduleText: string): string | null => {

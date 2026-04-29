@@ -56,3 +56,31 @@ test('copying the selected context includes a playground source snippet', async 
     }),
   );
 });
+
+test('copying root-relative source context does not request filesystem /src fallback', async ({
+  page,
+}) => {
+  let requestedAbsoluteSrcFallback = false;
+
+  await selectProfileEmailField(page);
+  await page.waitForFunction(() =>
+    window.__VITE_REACT_MCP__?.getLastSelectionContext(),
+  );
+  await page.route('**/src/components/UserProfile/ProfileField.jsx**', (route) =>
+    route.fulfill({ status: 404, body: '' }),
+  );
+  await page.route(
+    '**/@fs/src/components/UserProfile/ProfileField.jsx**',
+    (route) => {
+      requestedAbsoluteSrcFallback = true;
+      return route.fulfill({ status: 404, body: '' });
+    },
+  );
+
+  const copyResult = await page.evaluate(() =>
+    window.__VITE_REACT_MCP__.copyLastSelectionContext('json'),
+  );
+
+  expect(copyResult.success).toBe(true);
+  expect(requestedAbsoluteSrcFallback).toBe(false);
+});
