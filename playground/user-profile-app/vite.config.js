@@ -6,24 +6,30 @@ import { z } from 'zod';
 import log1 from './tools/log1.js';
 
 export default defineConfig({
-  plugins: [react(), ReactMCP({
-    customTools: [
-      {
-        name: 'log1',
-        description: 'Log1',
-        schema: z.object({
-          message: z.string(),
-        }),
-        clientFunction: log1,
-      }
-    ]
-  })],
+  plugins: [
+    react(),
+    ReactMCP({
+      customTools: [
+        {
+          name: 'log1',
+          description: 'Log1',
+          schema: z.object({
+            message: z.string(),
+          }),
+          clientFunction: log1,
+        },
+      ],
+      toolkit: {
+        iconUrl: '/vite-react-mcp-logo.png',
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
-    port: 3000,
+    port: 51423,
   },
 });

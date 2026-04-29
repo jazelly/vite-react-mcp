@@ -33,3 +33,39 @@ export const GetUnnecessaryRerendersSchema = z.object({
       'Whether to query wasted re-renders for all components. Must be explicitly stated to set this to true',
     ),
 });
+
+export const SetSelectionModeSchema = z.object({
+  enabled: z
+    .boolean()
+    .describe('Whether to enable element selection mode in the browser'),
+});
+
+export const GetLastSelectionContextSchema = z.object({
+  includeSourceSnippets: z
+    .boolean()
+    .default(true)
+    .describe(
+      'Whether source snippets should be included in the response payload',
+    ),
+  contextLines: z
+    .number()
+    .int()
+    .min(0)
+    .max(80)
+    .default(10)
+    .describe('How many lines to include before and after the resolved line'),
+  maxFiles: z
+    .number()
+    .int()
+    .min(1)
+    .max(40)
+    .default(8)
+    .describe('Maximum number of source files to include in source snippets'),
+});
+
+export const CopyLastSelectionContextSchema = z.object({
+  format: z
+    .enum(['text', 'json'])
+    .default('text')
+    .describe('Clipboard payload format'),
+});

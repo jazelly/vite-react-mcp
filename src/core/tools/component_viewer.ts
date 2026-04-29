@@ -1,6 +1,6 @@
 import type { Fiber } from 'bippy';
 import { FiberRootsNotFoundError } from '../../shared/errors';
-import { getAllFiberRoots, getCurrentProps, getDisplayNameForFiber } from '../../shared/util';
+import { getAllFiberRoots, getDisplayNameForFiber } from '../../shared/util';
 import type { ComponentTreeNode } from '../../types/internal';
 
 /**

@@ -7,8 +7,9 @@ import { type ViteDevServer, normalizePath } from 'vite';
 import type { Plugin, ResolvedConfig } from 'vite';
 import { createBabelDisplayNamePlugin } from './babel_collect_name.js';
 import { initMcpServer, instrumentViteDevServer } from './mcp/index.js';
+import { __VITE_REACT_MCP_CONFIG__ } from './shared/const.js';
 import { store } from './shared/store.js';
-import type { CustomTool } from './shared/types.js';
+import type { CustomTool, ToolkitConfig } from './shared/types.js';
 
 function getViteReactMcpPath() {
   const pluginPath = normalizePath(
@@ -73,8 +74,9 @@ function readProjectConfig(configPath: string): {
   };
 }
 
-interface ReactMCPOptions {
+export interface ReactMCPOptions {
   customTools?: CustomTool[];
+  toolkit?: ToolkitConfig;
 }
 
 function ReactMCP(options: ReactMCPOptions = {}): Plugin {
@@ -84,7 +86,7 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
     if (!filter(id) || !/\.[jt]sx?$/.test(id)) {
       return null;
     }
-  
+
     try {
       let presetReact: boolean;
       try {
@@ -106,7 +108,7 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
           'If you encounter JSX parsing errors, install it with: npm install @babel/preset-react --save-dev\n',
         );
       }
-  
+
       // Configure Babel transformation
       const babelOptions: babel.TransformOptions = {
         babelrc: false,
@@ -120,7 +122,7 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
         ast: true,
         sourceType: 'module',
       };
-  
+
       // Add preset-react if available
       if (presetReact) {
         babelOptions.presets.push([
@@ -128,10 +130,10 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
           { runtime: 'automatic' },
         ]);
       }
-  
+
       // Transform the code using Babel
       const result = babel.transformSync(code, babelOptions);
-  
+
       return {
         code: result.code,
         map: result.map,
@@ -144,6 +146,7 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
 
   let config: ResolvedConfig;
   const customTools = options.customTools || [];
+  const toolkitConfig = options.toolkit || {};
 
   return {
     name: 'vite-react-mcp',
@@ -190,6 +193,11 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
       const registerComponentsScript = `
         window.__REACT_COMPONENTS__ = ${JSON.stringify(componentsArray)};
       `;
+      const registerViteReactMcpConfigScript = `
+        window.${__VITE_REACT_MCP_CONFIG__} = ${JSON.stringify({
+          toolkit: toolkitConfig,
+        })};
+      `;
 
       // Generate custom tools registration script
       const customToolsScript = generateCustomToolsScript(customTools, config);
@@ -204,9 +212,15 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
         {
           tag: 'script',
           injectTo: 'head-prepend',
+          attrs: { type: 'text/javascript' },
+          children: registerViteReactMcpConfigScript,
+        },
+        {
+          tag: 'script',
+          injectTo: 'head-prepend',
           attrs: {
             type: 'module',
-            src: `${config.base || "/"}@id/${viteReactMcpImportee}:overlay.js`,
+            src: `${config.base || '/'}@id/${viteReactMcpImportee}:overlay.js`,
           },
         },
         {
@@ -239,7 +253,9 @@ function toClientImportSpecifier(
   }
 
   if (normalized.startsWith('./') || normalized.startsWith('../')) {
-    const absolutePath = normalizePath(path.resolve(resolvedConfig.root, normalized));
+    const absolutePath = normalizePath(
+      path.resolve(resolvedConfig.root, normalized),
+    );
     return `/@fs/${absolutePath}`;
   }
 
@@ -314,5 +330,12 @@ export type {
   CustomClientFunction,
   CustomTool,
   JsonValue,
+  SelectionContext,
+  SelectionResolvedSource,
+  SelectionSourceSnippet,
+  SelectionStackFrame,
+  ToolkitConfig,
+  ToolkitOffset,
+  ToolkitPosition,
   ToolResultValue,
 } from './shared/types.js';
