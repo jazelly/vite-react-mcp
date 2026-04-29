@@ -223,11 +223,26 @@ const isProjectSourceFilePath = (filePath: string): boolean => {
   const sourceRoot = (
     target.__VITE_REACT_MCP_CONFIG__?.sourceRoot || ''
   ).replace(/\\/g, '/');
-  if (!sourceRoot) return false;
+  const normalizedSourceRoot = sourceRoot.replace(/\/$/, '');
+
+  if (normalizedPath.startsWith('/@fs/')) {
+    const fileSystemPath = normalizedPath.slice('/@fs'.length);
+    return Boolean(
+      normalizedSourceRoot &&
+        (fileSystemPath === normalizedSourceRoot ||
+          fileSystemPath.startsWith(`${normalizedSourceRoot}/`)),
+    );
+  }
+
+  if (normalizedPath.startsWith('/src/')) {
+    return true;
+  }
+
+  if (!normalizedSourceRoot) return false;
 
   return (
-    normalizedPath === sourceRoot ||
-    normalizedPath.startsWith(`${sourceRoot.replace(/\/$/, '')}/`)
+    normalizedPath === normalizedSourceRoot ||
+    normalizedPath.startsWith(`${normalizedSourceRoot}/`)
   );
 };
 

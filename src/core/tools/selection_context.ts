@@ -440,7 +440,11 @@ const getComponentName = (
   stackFrames: SelectionStackFrame[],
 ): string | null => {
   for (const stackFrame of stackFrames) {
-    if (isSourceComponentName(stackFrame.functionName)) {
+    if (
+      stackFrame.fileName &&
+      isSourceFile(stackFrame.fileName) &&
+      isSourceComponentName(stackFrame.functionName)
+    ) {
       return stackFrame.functionName;
     }
   }
@@ -462,7 +466,7 @@ export const buildSelectionContextForElement = async (
     ? await buildStackFrames(nearestFiberElement)
     : [];
   const componentName =
-    getComponentName(stackFrames) || getComponentDisplayName(selectedElement);
+    getComponentDisplayName(selectedElement) || getComponentName(stackFrames);
 
   return {
     domPreview: getDomPreview(selectedElement),
