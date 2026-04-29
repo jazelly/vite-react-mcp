@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
@@ -9,13 +11,21 @@ import type { ViteDevServer } from 'vite';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 import { getVersionString, waitForEvent } from '../shared/node_util.js';
+import type {
+  CustomTool,
+  SelectionContext,
+  SelectionSourceSnippet,
+  ToolResultValue,
+} from '../shared/types.js';
 import {
+  CopyLastSelectionContextSchema,
   GetComponentStatesSchema,
   GetComponentTreeSchema,
+  GetLastSelectionContextSchema,
   GetUnnecessaryRerendersSchema,
   HighlightComponentSchema,
+  SetSelectionModeSchema,
 } from './schema.js';
-import type { CustomTool, ToolResultValue } from '../shared/types.js';
 
 const builtInTools = [
   {
@@ -37,9 +47,26 @@ const builtInTools = [
   },
   {
     name: 'get-unnecessary-rerenders',
-    description:
-      'Get the wasted re-rendered components of the current page',
+    description: 'Get the wasted re-rendered components of the current page',
     inputSchema: zodToJsonSchema(GetUnnecessaryRerendersSchema),
+  },
+  {
+    name: 'set-selection-mode',
+    description:
+      'Enable or disable browser element selection mode for context capture.',
+    inputSchema: zodToJsonSchema(SetSelectionModeSchema),
+  },
+  {
+    name: 'get-last-selection-context',
+    description:
+      'Get the latest captured selection context, optionally enriched with source snippets from the project filesystem.',
+    inputSchema: zodToJsonSchema(GetLastSelectionContextSchema),
+  },
+  {
+    name: 'copy-last-selection-context',
+    description:
+      'Copy the latest captured selection context from the browser runtime into clipboard.',
+    inputSchema: zodToJsonSchema(CopyLastSelectionContextSchema),
   },
 ] as const;
 
@@ -65,7 +92,191 @@ function formatToolResult(result: ToolResultValue): string {
   }
 }
 
-export function initMcpServer(viteDevServer: ViteDevServer, customTools: CustomTool[] = []): Server {
+const toTextResponse = (data: unknown): CallToolResult => {
+  return {
+    content: [{ type: 'text', text: JSON.stringify(data) }],
+  };
+};
+
+const sendBrowserEventAndWait = async <T>(
+  viteDevServer: ViteDevServer,
+  event: string,
+  responseEvent: string,
+  args: unknown,
+): Promise<T> => {
+  viteDevServer.ws.send({
+    type: 'custom',
+    event,
+    data: JSON.stringify(args),
+  });
+
+  const response = await waitForEvent<string>(viteDevServer, responseEvent);
+  return JSON.parse(response.data) as T;
+};
+
+const resolveAbsoluteSourcePath = (
+  rootDir: string,
+  filePath: string,
+): string | null => {
+  const trimmedPath = filePath.trim();
+  if (!trimmedPath) return null;
+
+  const candidates: string[] = [];
+
+  if (path.isAbsolute(trimmedPath)) {
+    candidates.push(trimmedPath);
+  }
+
+  candidates.push(path.resolve(rootDir, trimmedPath));
+
+  if (trimmedPath.startsWith('/')) {
+    candidates.push(path.resolve(rootDir, `.${trimmedPath}`));
+  }
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
+const getSourceSnippet = (
+  filePath: string,
+  lineNumber: number | null,
+  contextLines: number,
+): SelectionSourceSnippet | null => {
+  try {
+    const rawFileContent = fs.readFileSync(filePath, 'utf8');
+    const fileLines = rawFileContent.split(/\r?\n/);
+    const referenceLine = Math.max(
+      1,
+      Math.min(fileLines.length, lineNumber || 1),
+    );
+    const startLine = Math.max(1, referenceLine - contextLines);
+    const endLine = Math.min(fileLines.length, referenceLine + contextLines);
+
+    const snippet = fileLines
+      .slice(startLine - 1, endLine)
+      .map((lineContent, index) => {
+        const absoluteLine = startLine + index;
+        return `${absoluteLine}: ${lineContent}`;
+      })
+      .join('\n');
+
+    return {
+      filePath,
+      startLine,
+      endLine,
+      snippet,
+    };
+  } catch (_error) {
+    return null;
+  }
+};
+
+const enrichSelectionContextWithSnippets = (
+  rootDir: string,
+  selectionContext: SelectionContext,
+  contextLines: number,
+  maxFiles: number,
+): SelectionContext => {
+  const sourceSnippets: SelectionSourceSnippet[] = [];
+  const seenFilePaths = new Set<string>();
+
+  for (const resolvedSource of selectionContext.resolvedSources) {
+    const sourceFilePath = resolvedSource.filePath;
+    if (!sourceFilePath || seenFilePaths.has(sourceFilePath)) {
+      continue;
+    }
+
+    if (sourceSnippets.length >= maxFiles) {
+      break;
+    }
+
+    const absoluteSourcePath = resolveAbsoluteSourcePath(
+      rootDir,
+      sourceFilePath,
+    );
+    if (!absoluteSourcePath) {
+      continue;
+    }
+
+    const sourceSnippet = getSourceSnippet(
+      absoluteSourcePath,
+      resolvedSource.lineNumber,
+      contextLines,
+    );
+
+    if (!sourceSnippet) {
+      continue;
+    }
+
+    sourceSnippets.push({
+      ...sourceSnippet,
+      filePath: sourceFilePath,
+    });
+    seenFilePaths.add(sourceFilePath);
+  }
+
+  return {
+    ...selectionContext,
+    sourceSnippets,
+  };
+};
+
+const buildSelectionContextSummary = (
+  selectionContext: SelectionContext,
+): string => {
+  const summaryLines: string[] = [];
+  summaryLines.push(selectionContext.domPreview);
+
+  if (selectionContext.componentName) {
+    summaryLines.push(`component: ${selectionContext.componentName}`);
+  }
+
+  if (selectionContext.selector) {
+    summaryLines.push(`selector: ${selectionContext.selector}`);
+  }
+
+  if (selectionContext.resolvedSources.length > 0) {
+    summaryLines.push('resolved sources:');
+    for (const resolvedSource of selectionContext.resolvedSources) {
+      const line =
+        resolvedSource.lineNumber != null
+          ? `:${resolvedSource.lineNumber}`
+          : '';
+      const column =
+        resolvedSource.columnNumber != null
+          ? `:${resolvedSource.columnNumber}`
+          : '';
+      summaryLines.push(`- ${resolvedSource.filePath}${line}${column}`);
+    }
+  }
+
+  return summaryLines.join('\n');
+};
+
+const parseSelectionContextResponse = (response: {
+  context: SelectionContext | null;
+}): SelectionContext | null => {
+  if (!response || !response.context) {
+    return null;
+  }
+
+  return {
+    ...response.context,
+    sourceSnippets: Array.isArray(response.context.sourceSnippets)
+      ? response.context.sourceSnippets
+      : [],
+  };
+};
+
+export function initMcpServer(
+  viteDevServer: ViteDevServer,
+  customTools: CustomTool[] = [],
+): Server {
   const server = new Server(
     {
       name: 'vite-react-mcp',
@@ -79,12 +290,12 @@ export function initMcpServer(viteDevServer: ViteDevServer, customTools: CustomT
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const dynamicTools = customTools.map(tool => ({
+    const dynamicTools = customTools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: zodToJsonSchema(tool.schema),
     }));
-    
+
     return {
       tools: [...builtInTools, ...dynamicTools],
     };
@@ -116,7 +327,9 @@ export function initMcpServer(viteDevServer: ViteDevServer, customTools: CustomT
             }
 
             case 'get-component-tree': {
-              const args = GetComponentTreeSchema.parse(request.params.arguments);
+              const args = GetComponentTreeSchema.parse(
+                request.params.arguments,
+              );
               viteDevServer.ws.send({
                 type: 'custom',
                 event: 'get-component-tree',
@@ -170,12 +383,93 @@ export function initMcpServer(viteDevServer: ViteDevServer, customTools: CustomT
                 content: [{ type: 'text', text: response.data }],
               };
             }
+
+            case 'set-selection-mode': {
+              const args = SetSelectionModeSchema.parse(
+                request.params.arguments,
+              );
+              const response = await sendBrowserEventAndWait<{
+                success: boolean;
+                enabled: boolean;
+              }>(
+                viteDevServer,
+                'set-selection-mode',
+                'set-selection-mode-response',
+                args,
+              );
+
+              return toTextResponse(response);
+            }
+
+            case 'get-last-selection-context': {
+              const args = GetLastSelectionContextSchema.parse(
+                request.params.arguments,
+              );
+
+              const browserResponse = await sendBrowserEventAndWait<{
+                context: SelectionContext | null;
+              }>(
+                viteDevServer,
+                'get-last-selection-context',
+                'get-last-selection-context-response',
+                args,
+              );
+
+              const selectionContext =
+                parseSelectionContextResponse(browserResponse);
+              if (!selectionContext) {
+                return toTextResponse({
+                  success: false,
+                  message: 'No selection context has been captured yet.',
+                  context: null,
+                });
+              }
+
+              const enrichedSelectionContext = args.includeSourceSnippets
+                ? enrichSelectionContextWithSnippets(
+                    viteDevServer.config.root,
+                    selectionContext,
+                    args.contextLines,
+                    args.maxFiles,
+                  )
+                : selectionContext;
+
+              return toTextResponse({
+                success: true,
+                summary: buildSelectionContextSummary(enrichedSelectionContext),
+                context: enrichedSelectionContext,
+              });
+            }
+
+            case 'copy-last-selection-context': {
+              const args = CopyLastSelectionContextSchema.parse(
+                request.params.arguments,
+              );
+
+              const response = await sendBrowserEventAndWait<{
+                success: boolean;
+                copied: boolean;
+                format: 'text' | 'json';
+                context?: SelectionContext;
+                error?: string;
+              }>(
+                viteDevServer,
+                'copy-last-selection-context',
+                'copy-last-selection-context-response',
+                args,
+              );
+
+              return toTextResponse(response);
+            }
+
             default:
               throw new Error(`Unknown tool: ${request.params.name}`);
           }
         }
 
-        const customTool = customTools.find((tool) => tool.name === request.params.name);
+        const customTool = customTools.find(
+          (tool) => tool.name === request.params.name,
+        );
         if (customTool) {
           const parsedArgs = customTool.schema.parse(request.params.arguments);
 

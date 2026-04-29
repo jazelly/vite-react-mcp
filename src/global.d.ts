@@ -1,21 +1,56 @@
+import type {
+  SelectionContext,
+  ToolResultValue,
+  ToolkitConfig,
+} from './shared/types';
 import type { WastedRenderFiberInfo } from './types/internal';
 
 declare global {
   interface Window {
     __REACT_COMPONENTS__: string[];
+    __VITE_REACT_MCP_CONFIG__?: {
+      toolkit?: ToolkitConfig;
+    };
     __VITE_REACT_MCP_TOOLS__: {
-      highlightReactComponent: (
+      highlightComponent: (
         componentName: string,
-        options: { debugMode?: boolean },
+        options?: { debugMode?: boolean },
+      ) => unknown[];
+      getComponentTree: (options?: {
+        allComponents?: boolean;
+        debugMode?: boolean;
+      }) => unknown;
+      getComponentStates: (
+        componentName: string,
+        options?: { debugMode?: boolean },
+      ) => unknown;
+      getUnnecessaryRenderedComponents: (
+        timeframe?: number,
+        options?: {
+          allComponents?: boolean;
+          debugMode?: boolean;
+        },
+      ) => WastedRenderFiberInfo[];
+      registerCustomTool: (
+        name: string,
+        handler: (args: unknown) => ToolResultValue | Promise<ToolResultValue>,
       ) => void;
-      getComponentTree: (options: {
-        selfOnly: boolean;
-        debugMode?: boolean;
-      }) => any;
-      getComponentStates: (options: { debugMode?: boolean }) => any;
-      getUnnecessaryRenderedComponents: (options: {
-        debugMode?: boolean;
-      }) => WastedRenderFiberInfo[];
+    };
+    __VITE_REACT_MCP__: {
+      showToolkit: () => void;
+      hideToolkit: () => void;
+      setToolkitConfig: (config: Partial<ToolkitConfig>) => ToolkitConfig;
+      enterSelectionMode: () => void;
+      exitSelectionMode: () => void;
+      setSelectionMode: (enabled: boolean) => void;
+      getLastSelectionContext: () => SelectionContext | null;
+      copyLastSelectionContext: (format?: 'text' | 'json') => Promise<{
+        success: boolean;
+        copied: boolean;
+        format: 'text' | 'json';
+        context?: SelectionContext;
+        error?: string;
+      }>;
     };
   }
 }
