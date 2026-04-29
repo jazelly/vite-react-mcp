@@ -1,10 +1,21 @@
-import { getFiberFromHostInstance, getFiberStack } from 'bippy';
+import {
+  type Fiber,
+  getDisplayName,
+  getFiberFromHostInstance,
+  getFiberStack,
+  isCompositeFiber,
+  isInstrumentationActive,
+  traverseFiber,
+} from 'bippy';
 import {
   type StackFrame,
+  formatOwnerStack,
   getOwnerStack,
   getSource,
+  hasDebugStack,
   isSourceFile,
   normalizeFileName,
+  parseStack,
 } from 'bippy/source';
 import type {
   SelectionContext,
@@ -12,6 +23,7 @@ import type {
   SelectionStackFrame,
 } from '../../shared/types.js';
 import { getDisplayNameForFiber } from '../../shared/util.js';
+import { createElementSelector } from './selection_selector.js';
 
 const MAX_HTML_PREVIEW_LENGTH = 1200;
 const MAX_STACK_FRAMES = 24;
@@ -38,7 +50,36 @@ const INTERNAL_COMPONENT_NAMES = new Set([
   'Cache',
   'root',
   'createRoot()',
+  'SlotClone',
+  'InnerLayoutRouter',
+  'RedirectErrorBoundary',
+  'RedirectBoundary',
+  'HTTPAccessFallbackErrorBoundary',
+  'HTTPAccessFallbackBoundary',
+  'LoadingBoundary',
+  'ErrorBoundary',
+  'InnerScrollAndFocusHandler',
+  'ScrollAndFocusHandler',
+  'RenderFromTemplateContext',
+  'OuterLayoutRouter',
+  'body',
+  'html',
+  'DevRootHTTPAccessFallbackBoundary',
+  'AppDevOverlayErrorBoundary',
+  'AppDevOverlay',
+  'HotReload',
+  'Router',
+  'ErrorBoundaryHandler',
+  'AppRouter',
+  'ServerRoot',
+  'SegmentStateProvider',
+  'RootErrorBoundary',
+  'LoadableComponent',
+  'MotionDOMComponent',
 ]);
+
+const SERVER_COMPONENT_URL_PREFIXES = ['about://React/', 'rsc://React/'];
+const SYMBOLICATION_TIMEOUT_MS = 5000;
 
 const isUsefulComponentName = (name: string | null): boolean => {
   if (!name) return false;
@@ -59,9 +100,53 @@ const isSourceComponentName = (name: string | null): boolean => {
 };
 
 const normalizeSourceFilePath = (fileName: string): string => {
-  const normalizedFileName = normalizeFileName(fileName);
+  let normalizedFileName = normalizeFileName(fileName);
+  normalizedFileName = normalizedFileName.replace(
+    /^(?:\.\/)?\/?\([a-z][a-z0-9-]*\)\//,
+    '',
+  );
+  if (normalizedFileName.startsWith('./')) {
+    normalizedFileName = normalizedFileName.slice(2);
+  }
   return normalizedFileName.replace(/\?.*$/, '');
 };
+
+const isServerComponentUrl = (url: string): boolean =>
+  SERVER_COMPONENT_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
+
+const devirtualizeServerUrl = (url: string): string => {
+  for (const prefix of SERVER_COMPONENT_URL_PREFIXES) {
+    if (!url.startsWith(prefix)) continue;
+    const environmentEndIndex = url.indexOf('/', prefix.length);
+    const querySuffixIndex = url.lastIndexOf('?');
+    if (environmentEndIndex > -1 && querySuffixIndex > -1) {
+      return decodeURI(url.slice(environmentEndIndex + 1, querySuffixIndex));
+    }
+  }
+  return url;
+};
+
+let cachedNextBasePath: string | undefined;
+
+const getNextBasePath = (): string => {
+  if (cachedNextBasePath !== undefined) return cachedNextBasePath;
+
+  const source = document.querySelector<HTMLScriptElement>(
+    'script[src*="/_next/"]',
+  )?.src;
+  const pathname = source ? new URL(source).pathname : '';
+  const assetPathIndex = pathname.indexOf('/_next/');
+  cachedNextBasePath =
+    assetPathIndex > 0 ? pathname.slice(0, assetPathIndex) : '';
+  return cachedNextBasePath;
+};
+
+const checkIsNextProject = (): boolean =>
+  typeof document !== 'undefined' &&
+  Boolean(
+    document.getElementById('__NEXT_DATA__') ||
+      document.querySelector('nextjs-portal'),
+  );
 
 const findNearestFiberElement = (element: Element): Element | null => {
   let currentElement: Element | null = element;
@@ -88,53 +173,6 @@ const getDomPreview = (element: Element): string => {
   return `<${tagName}>`;
 };
 
-const buildSelectorSegment = (element: Element): string => {
-  const tagName = element.tagName.toLowerCase();
-  if (element.id) {
-    return `${tagName}#${element.id}`;
-  }
-
-  const classes = Array.from(element.classList)
-    .slice(0, 2)
-    .map((name) => name.trim())
-    .filter(Boolean);
-
-  if (classes.length > 0) {
-    return `${tagName}.${classes.join('.')}`;
-  }
-
-  const parentElement = element.parentElement;
-  if (!parentElement) {
-    return tagName;
-  }
-
-  const sameTagSiblings = Array.from(parentElement.children).filter(
-    (siblingElement) => siblingElement.tagName === element.tagName,
-  );
-
-  if (sameTagSiblings.length <= 1) {
-    return tagName;
-  }
-
-  const position = sameTagSiblings.indexOf(element) + 1;
-  return `${tagName}:nth-of-type(${position})`;
-};
-
-const createElementSelector = (element: Element): string => {
-  const selectorSegments: string[] = [];
-  let currentElement: Element | null = element;
-
-  while (currentElement && selectorSegments.length < 5) {
-    selectorSegments.unshift(buildSelectorSegment(currentElement));
-    if (currentElement.id) {
-      break;
-    }
-    currentElement = currentElement.parentElement;
-  }
-
-  return selectorSegments.join(' > ');
-};
-
 const mapOwnerStackFrame = (stackFrame: StackFrame): SelectionStackFrame => {
   return {
     functionName: stackFrame.functionName || null,
@@ -146,6 +184,180 @@ const mapOwnerStackFrame = (stackFrame: StackFrame): SelectionStackFrame => {
   };
 };
 
+const symbolicateServerFrames = async (
+  frames: StackFrame[],
+): Promise<StackFrame[]> => {
+  const serverFrameIndices: number[] = [];
+  const requestFrames: Array<{
+    file: string;
+    methodName: string;
+    line1: number | null;
+    column1: number | null;
+    arguments: string[];
+  }> = [];
+
+  for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
+    const frame = frames[frameIndex];
+    if (!frame.isServer || !frame.fileName) continue;
+
+    serverFrameIndices.push(frameIndex);
+    requestFrames.push({
+      file: devirtualizeServerUrl(frame.fileName),
+      methodName: frame.functionName ?? '<unknown>',
+      line1: frame.lineNumber ?? null,
+      column1: frame.columnNumber ?? null,
+      arguments: [],
+    });
+  }
+
+  if (requestFrames.length === 0) return frames;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    SYMBOLICATION_TIMEOUT_MS,
+  );
+
+  try {
+    const response = await fetch(
+      `${getNextBasePath()}/__nextjs_original-stack-frames`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          frames: requestFrames,
+          isServer: true,
+          isEdgeServer: false,
+          isAppDirectory: true,
+        }),
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) return frames;
+
+    const results = (await response.json()) as Array<{
+      status: string;
+      value?: {
+        originalStackFrame: {
+          file: string | null;
+          line1: number | null;
+          column1: number | null;
+          ignored: boolean;
+        } | null;
+      };
+    }>;
+    const resolvedFrames = [...frames];
+
+    for (
+      let resultIndex = 0;
+      resultIndex < serverFrameIndices.length;
+      resultIndex++
+    ) {
+      const result = results[resultIndex];
+      if (result?.status !== 'fulfilled') continue;
+
+      const resolved = result.value?.originalStackFrame;
+      if (!resolved?.file || resolved.ignored) continue;
+
+      const originalFrameIndex = serverFrameIndices[resultIndex];
+      resolvedFrames[originalFrameIndex] = {
+        ...frames[originalFrameIndex],
+        fileName: resolved.file,
+        lineNumber: resolved.line1 ?? undefined,
+        columnNumber: resolved.column1 ?? undefined,
+        isSymbolicated: true,
+      };
+    }
+
+    return resolvedFrames;
+  } catch (_error) {
+    return frames;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const extractServerFramesFromDebugStack = (
+  rootFiber: Fiber,
+): Map<string, StackFrame> => {
+  const serverFramesByName = new Map<string, StackFrame>();
+
+  traverseFiber(
+    rootFiber,
+    (currentFiber) => {
+      if (!hasDebugStack(currentFiber)) return false;
+
+      const debugStack = currentFiber._debugStack?.stack;
+      if (!debugStack) return false;
+
+      const ownerStack = formatOwnerStack(debugStack);
+      if (!ownerStack) return false;
+
+      for (const frame of parseStack(ownerStack)) {
+        if (!frame.functionName || !frame.fileName) continue;
+        if (!isServerComponentUrl(frame.fileName)) continue;
+        if (serverFramesByName.has(frame.functionName)) continue;
+
+        serverFramesByName.set(frame.functionName, {
+          ...frame,
+          isServer: true,
+        });
+      }
+      return false;
+    },
+    true,
+  );
+
+  return serverFramesByName;
+};
+
+const enrichServerFrameLocations = (
+  rootFiber: Fiber,
+  frames: StackFrame[],
+): StackFrame[] => {
+  const hasUnresolvedServerFrames = frames.some(
+    (frame) => frame.isServer && !frame.fileName && frame.functionName,
+  );
+  if (!hasUnresolvedServerFrames) return frames;
+
+  const serverFramesByName = extractServerFramesFromDebugStack(rootFiber);
+  if (serverFramesByName.size === 0) return frames;
+
+  return frames.map((frame) => {
+    if (!frame.isServer || frame.fileName || !frame.functionName) return frame;
+    const resolved = serverFramesByName.get(frame.functionName);
+    if (!resolved) return frame;
+    return {
+      ...frame,
+      fileName: resolved.fileName,
+      lineNumber: resolved.lineNumber,
+      columnNumber: resolved.columnNumber,
+    };
+  });
+};
+
+const getComponentDisplayName = (element: Element): string | null => {
+  if (!isInstrumentationActive()) return null;
+  const resolvedElement = findNearestFiberElement(element);
+  if (!resolvedElement) return null;
+  const fiber = getFiberFromHostInstance(resolvedElement);
+  if (!fiber) return null;
+
+  let currentFiber = fiber.return;
+  while (currentFiber) {
+    if (isCompositeFiber(currentFiber)) {
+      const name = getDisplayName(currentFiber.type);
+      if (name && isUsefulComponentName(name)) {
+        return name;
+      }
+    }
+    currentFiber = currentFiber.return;
+  }
+
+  return null;
+};
+
 const buildStackFrames = async (
   nearestFiberElement: Element,
 ): Promise<SelectionStackFrame[]> => {
@@ -155,7 +367,11 @@ const buildStackFrames = async (
   }
 
   try {
-    const ownerStack = await getOwnerStack(fiber);
+    const ownerStack = checkIsNextProject()
+      ? await symbolicateServerFrames(
+          enrichServerFrameLocations(fiber, await getOwnerStack(fiber)),
+        )
+      : await getOwnerStack(fiber);
     return ownerStack.slice(0, MAX_STACK_FRAMES).map(mapOwnerStackFrame);
   } catch (_error) {
     const fallbackFiberStack = getFiberStack(fiber).slice(0, MAX_STACK_FRAMES);
@@ -182,9 +398,20 @@ const resolveSourceFrames = (
 ): SelectionResolvedSource[] => {
   const resolvedSources: SelectionResolvedSource[] = [];
   const seenSourceKeys = new Set<string>();
+  const sourceFrames = stackFrames.filter(
+    (stackFrame) => stackFrame.fileName && isSourceFile(stackFrame.fileName),
+  );
+  const sortedSourceFrames = [
+    ...sourceFrames.filter((stackFrame) =>
+      isSourceComponentName(stackFrame.functionName),
+    ),
+    ...sourceFrames.filter(
+      (stackFrame) => !isSourceComponentName(stackFrame.functionName),
+    ),
+  ];
 
-  for (const stackFrame of stackFrames) {
-    if (!stackFrame.fileName || !isSourceFile(stackFrame.fileName)) {
+  for (const stackFrame of sortedSourceFrames) {
+    if (!stackFrame.fileName) {
       continue;
     }
 
@@ -234,11 +461,13 @@ export const buildSelectionContextForElement = async (
   const stackFrames = nearestFiberElement
     ? await buildStackFrames(nearestFiberElement)
     : [];
+  const componentName =
+    getComponentName(stackFrames) || getComponentDisplayName(selectedElement);
 
   return {
     domPreview: getDomPreview(selectedElement),
     selector: createElementSelector(selectedElement),
-    componentName: getComponentName(stackFrames),
+    componentName,
     stackFrames,
     resolvedSources: resolveSourceFrames(stackFrames),
     sourceSnippets: [],

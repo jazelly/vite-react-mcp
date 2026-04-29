@@ -32,6 +32,11 @@ export interface ToolkitConfig {
   iconUrl?: string;
 }
 
+export interface ViteReactMcpConfig {
+  toolkit?: ToolkitConfig;
+  sourceRoot?: string;
+}
+
 export interface SelectionStackFrame {
   functionName: string | null;
   fileName: string | null;

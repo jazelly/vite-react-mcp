@@ -196,6 +196,7 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
       const registerViteReactMcpConfigScript = `
         window.${__VITE_REACT_MCP_CONFIG__} = ${JSON.stringify({
           toolkit: toolkitConfig,
+          sourceRoot: config.root,
         })};
       `;
 
@@ -338,4 +339,5 @@ export type {
   ToolkitOffset,
   ToolkitPosition,
   ToolResultValue,
+  ViteReactMcpConfig,
 } from './shared/types.js';
