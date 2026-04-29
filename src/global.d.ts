@@ -2,15 +2,14 @@ import type {
   SelectionContext,
   ToolResultValue,
   ToolkitConfig,
+  ViteReactMcpConfig,
 } from './shared/types';
 import type { WastedRenderFiberInfo } from './types/internal';
 
 declare global {
   interface Window {
     __REACT_COMPONENTS__: string[];
-    __VITE_REACT_MCP_CONFIG__?: {
-      toolkit?: ToolkitConfig;
-    };
+    __VITE_REACT_MCP_CONFIG__?: ViteReactMcpConfig;
     __VITE_REACT_MCP_TOOLS__: {
       highlightComponent: (
         componentName: string,

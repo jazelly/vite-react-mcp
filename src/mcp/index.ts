@@ -121,6 +121,10 @@ const resolveAbsoluteSourcePath = (
   const trimmedPath = filePath.trim();
   if (!trimmedPath) return null;
 
+  if (trimmedPath.includes('\0')) return null;
+  if (!/\.(jsx?|tsx?)$/i.test(trimmedPath)) return null;
+
+  const normalizedRootDir = fs.realpathSync(rootDir);
   const candidates: string[] = [];
 
   if (path.isAbsolute(trimmedPath)) {
@@ -134,9 +138,34 @@ const resolveAbsoluteSourcePath = (
   }
 
   for (const candidate of candidates) {
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-      return candidate;
+    const resolvedCandidate = path.resolve(candidate);
+    if (!fs.existsSync(resolvedCandidate)) {
+      continue;
     }
+
+    const stat = fs.statSync(resolvedCandidate);
+    if (!stat.isFile()) {
+      continue;
+    }
+
+    const realCandidate = fs.realpathSync(resolvedCandidate);
+    const relativeToRoot = path.relative(normalizedRootDir, realCandidate);
+    const isInsideRoot =
+      relativeToRoot === '' ||
+      (!relativeToRoot.startsWith('..') && !path.isAbsolute(relativeToRoot));
+    if (!isInsideRoot) {
+      continue;
+    }
+
+    const pathSegments = relativeToRoot.split(path.sep);
+    if (
+      pathSegments.includes('node_modules') ||
+      pathSegments.includes('.vite')
+    ) {
+      continue;
+    }
+
+    return realCandidate;
   }
 
   return null;

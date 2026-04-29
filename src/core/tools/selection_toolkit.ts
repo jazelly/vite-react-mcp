@@ -5,6 +5,10 @@ import type {
   ToolkitPosition,
 } from '../../shared/types.js';
 import { buildSelectionContextForElement } from './selection_context.js';
+import {
+  clearSelectableElementCache,
+  getSelectableElementAtPosition,
+} from './selection_dom.js';
 
 interface ToolkitRuntimeOptions {
   initialConfig?: ToolkitConfig;
@@ -194,19 +198,37 @@ const toCandidateSourceUrls = (filePath: string): string[] => {
 };
 
 const isProjectSourceFilePath = (filePath: string): boolean => {
-  if (!filePath || !filePath.startsWith('/')) {
+  if (!filePath) {
     return false;
   }
 
-  if (filePath.includes('/node_modules/')) {
+  if (filePath.includes('\0')) {
     return false;
   }
 
-  if (filePath.includes('/.vite/')) {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const pathSegments = normalizedPath.split('/').filter(Boolean);
+  if (pathSegments.includes('node_modules') || pathSegments.includes('.vite')) {
     return false;
   }
 
-  return /\.(jsx?|tsx?)$/i.test(filePath);
+  if (!/\.(jsx?|tsx?)$/i.test(normalizedPath)) {
+    return false;
+  }
+
+  if (!normalizedPath.startsWith('/')) {
+    return !pathSegments.includes('..');
+  }
+
+  const sourceRoot = (
+    target.__VITE_REACT_MCP_CONFIG__?.sourceRoot || ''
+  ).replace(/\\/g, '/');
+  if (!sourceRoot) return false;
+
+  return (
+    normalizedPath === sourceRoot ||
+    normalizedPath.startsWith(`${sourceRoot.replace(/\/$/, '')}/`)
+  );
 };
 
 const extractRawSourceFromViteModule = (moduleText: string): string | null => {
@@ -469,20 +491,18 @@ export const createSelectionToolkit = (
     hoverElement.style.height = `${rect.height}px`;
   };
 
+  const isToolkitElement = (element: Element) =>
+    toolkitRootElement.contains(element) || hoverElement.contains(element);
+
+  const getSelectableElement = (clientX: number, clientY: number) =>
+    getSelectableElementAtPosition(clientX, clientY, isToolkitElement);
+
   const onMouseMove = (mouseEvent: MouseEvent) => {
     if (!isSelectionMode) return;
 
-    const hoveredElement = document.elementFromPoint(
-      mouseEvent.clientX,
-      mouseEvent.clientY,
+    showHoverForElement(
+      getSelectableElement(mouseEvent.clientX, mouseEvent.clientY),
     );
-
-    if (hoveredElement && toolkitRootElement.contains(hoveredElement)) {
-      showHoverForElement(null);
-      return;
-    }
-
-    showHoverForElement(hoveredElement);
   };
 
   const onSelect = async (mouseEvent: MouseEvent) => {
@@ -499,12 +519,12 @@ export const createSelectionToolkit = (
       return;
     }
 
-    const selectedElement = document.elementFromPoint(
+    const selectedElement = getSelectableElement(
       mouseEvent.clientX,
       mouseEvent.clientY,
     );
 
-    if (!selectedElement || toolkitRootElement.contains(selectedElement)) {
+    if (!selectedElement) {
       return;
     }
 
@@ -539,11 +559,13 @@ export const createSelectionToolkit = (
         'Open Vite React MCP toolkit',
       );
       showHoverForElement(null);
+      clearSelectableElementCache();
     }
   };
 
   const enterSelectionMode = () => {
     isSelectionMode = true;
+    clearSelectableElementCache();
     isPanelOpen = true;
     renderPanelVisibility();
     selectButtonElement.textContent = 'Selecting...';
@@ -564,6 +586,7 @@ export const createSelectionToolkit = (
       'Open Vite React MCP toolkit',
     );
     showHoverForElement(null);
+    clearSelectableElementCache();
   };
 
   const togglePanel = () => {
