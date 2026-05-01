@@ -1,4 +1,8 @@
 import { target } from '../../shared/const.js';
+import {
+  buildSelectionContextSummary,
+  buildSelectionSourcePreview,
+} from '../../shared/selection_context_format.js';
 import type {
   SelectionContext,
   ToolkitConfig,
@@ -47,7 +51,7 @@ const DEFAULT_TOOLKIT_CONFIG: Required<Omit<ToolkitConfig, 'iconUrl'>> & {
   iconUrl: null,
 };
 
-const DEFAULT_SNIPPET_CONTEXT_LINES = 4;
+const DEFAULT_SNIPPET_CONTEXT_LINES = 8;
 const DEFAULT_MAX_SNIPPET_FILES = 3;
 const LAUNCHER_SIZE = 58;
 
@@ -119,40 +123,8 @@ const setPosition = (
   element.style.right = `${xOffset}px`;
 };
 
-const toTextContext = (selectionContext: SelectionContext): string => {
-  const lines: string[] = [];
-  lines.push(selectionContext.domPreview);
-
-  if (selectionContext.componentName) {
-    lines.push(`in ${selectionContext.componentName}`);
-  }
-
-  if (selectionContext.selector) {
-    lines.push(`selector: ${selectionContext.selector}`);
-  }
-
-  if (selectionContext.resolvedSources.length > 0) {
-    lines.push('sources:');
-    for (const source of selectionContext.resolvedSources) {
-      const line = source.lineNumber != null ? `:${source.lineNumber}` : '';
-      const column =
-        source.columnNumber != null ? `:${source.columnNumber}` : '';
-      lines.push(`- ${source.filePath}${line}${column}`);
-    }
-  }
-
-  if (selectionContext.sourceSnippets.length > 0) {
-    lines.push('source snippets:');
-    for (const sourceSnippet of selectionContext.sourceSnippets) {
-      lines.push(
-        `- ${sourceSnippet.filePath}:${sourceSnippet.startLine}-${sourceSnippet.endLine}`,
-      );
-      lines.push(sourceSnippet.snippet);
-    }
-  }
-
-  return lines.join('\n');
-};
+const toTextContext = (selectionContext: SelectionContext): string =>
+  buildSelectionContextSummary(selectionContext);
 
 const copyText = async (text: string): Promise<boolean> => {
   if (target.navigator?.clipboard?.writeText) {
@@ -252,7 +224,7 @@ const isProjectSourceFilePath = (filePath: string): boolean => {
 const extractRawSourceFromViteModule = (moduleText: string): string | null => {
   const trimmedText = moduleText.trim();
   const defaultExportMatch = trimmedText.match(
-    /^export\s+default\s+([\s\S]+?);?$/,
+    /^export\s+default\s+((?:"(?:\\.|[^"])*")|(?:'(?:\\.|[^'])*'));\s*(?:\/\/# sourceMappingURL=[\s\S]*)?$/,
   );
 
   if (!defaultExportMatch) {
@@ -719,9 +691,13 @@ export const createSelectionToolkit = (
       }
 
       if (sourceSnippets.length > 0) {
-        lastSelectionContext = {
+        const enrichedSelectionContext = {
           ...lastSelectionContext,
           sourceSnippets,
+        };
+        lastSelectionContext = {
+          ...enrichedSelectionContext,
+          sourcePreview: buildSelectionSourcePreview(enrichedSelectionContext),
         };
       }
     }

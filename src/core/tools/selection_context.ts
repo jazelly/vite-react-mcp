@@ -17,6 +17,7 @@ import {
   normalizeFileName,
   parseStack,
 } from 'bippy/source';
+import { buildSelectionSourcePreview } from '../../shared/selection_context_format.js';
 import type {
   SelectionContext,
   SelectionResolvedSource,
@@ -99,6 +100,22 @@ const isSourceComponentName = (name: string | null): boolean => {
   return true;
 };
 
+const inferComponentNameFromSource = (
+  filePath: string,
+  functionName: string | null,
+): string | null => {
+  if (functionName && isUsefulComponentName(functionName)) {
+    return functionName;
+  }
+
+  const fileName =
+    filePath
+      .split('/')
+      .pop()
+      ?.replace(/\.[^.]+$/, '') ?? '';
+  return /^[A-Z][A-Za-z0-9]*$/.test(fileName) ? fileName : null;
+};
+
 const normalizeSourceFilePath = (fileName: string): string => {
   let normalizedFileName = normalizeFileName(fileName);
   normalizedFileName = normalizedFileName.replace(
@@ -109,6 +126,20 @@ const normalizeSourceFilePath = (fileName: string): string => {
     normalizedFileName = normalizedFileName.slice(2);
   }
   return normalizedFileName.replace(/\?.*$/, '');
+};
+
+const isProjectSourceFrame = (fileName: string): boolean => {
+  if (!isSourceFile(fileName)) {
+    return false;
+  }
+
+  const normalizedFileName = normalizeSourceFilePath(fileName);
+  const pathSegments = normalizedFileName.split('/').filter(Boolean);
+  return (
+    !pathSegments.includes('node_modules') &&
+    !pathSegments.includes('.vite') &&
+    !normalizedFileName.includes('/@vite/')
+  );
 };
 
 const isServerComponentUrl = (url: string): boolean =>
@@ -395,13 +426,28 @@ const buildStackFrames = async (
 
 const resolveSourceFrames = (
   stackFrames: SelectionStackFrame[],
+  preferredComponentName: string | null,
 ): SelectionResolvedSource[] => {
   const resolvedSources: SelectionResolvedSource[] = [];
   const seenSourceKeys = new Set<string>();
   const sourceFrames = stackFrames.filter(
-    (stackFrame) => stackFrame.fileName && isSourceFile(stackFrame.fileName),
+    (stackFrame) =>
+      stackFrame.fileName && isProjectSourceFrame(stackFrame.fileName),
   );
+  const preferredSourceFrames = sourceFrames.filter((stackFrame) => {
+    if (!stackFrame.fileName) {
+      return false;
+    }
+
+    return (
+      inferComponentNameFromSource(
+        stackFrame.fileName,
+        stackFrame.functionName,
+      ) === preferredComponentName
+    );
+  });
   const sortedSourceFrames = [
+    ...preferredSourceFrames,
     ...sourceFrames.filter((stackFrame) =>
       isSourceComponentName(stackFrame.functionName),
     ),
@@ -420,12 +466,16 @@ const resolveSourceFrames = (
       continue;
     }
 
+    const componentName = inferComponentNameFromSource(
+      stackFrame.fileName,
+      stackFrame.functionName,
+    );
     seenSourceKeys.add(sourceKey);
     resolvedSources.push({
       filePath: stackFrame.fileName,
       lineNumber: stackFrame.lineNumber,
       columnNumber: stackFrame.columnNumber,
-      componentName: stackFrame.functionName,
+      componentName,
     });
 
     if (resolvedSources.length >= MAX_SOURCE_FRAMES) {
@@ -442,7 +492,7 @@ const getComponentName = (
   for (const stackFrame of stackFrames) {
     if (
       stackFrame.fileName &&
-      isSourceFile(stackFrame.fileName) &&
+      isProjectSourceFrame(stackFrame.fileName) &&
       isSourceComponentName(stackFrame.functionName)
     ) {
       return stackFrame.functionName;
@@ -467,14 +517,20 @@ export const buildSelectionContextForElement = async (
     : [];
   const componentName =
     getComponentDisplayName(selectedElement) || getComponentName(stackFrames);
-
-  return {
+  const resolvedSources = resolveSourceFrames(stackFrames, componentName);
+  const selectionContext = {
     domPreview: getDomPreview(selectedElement),
+    sourcePreview: null,
     selector: createElementSelector(selectedElement),
     componentName,
     stackFrames,
-    resolvedSources: resolveSourceFrames(stackFrames),
+    resolvedSources,
     sourceSnippets: [],
     capturedAt: Date.now(),
+  };
+
+  return {
+    ...selectionContext,
+    sourcePreview: buildSelectionSourcePreview(selectionContext),
   };
 };
