@@ -60,6 +60,7 @@ export interface SelectionSourceSnippet {
 
 export interface SelectionContext {
   domPreview: string;
+  sourcePreview: string | null;
   selector: string | null;
   componentName: string | null;
   stackFrames: SelectionStackFrame[];

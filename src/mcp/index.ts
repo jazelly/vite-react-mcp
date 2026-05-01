@@ -11,6 +11,10 @@ import type { ViteDevServer } from 'vite';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 import { getVersionString, waitForEvent } from '../shared/node_util.js';
+import {
+  buildSelectionContextSummary,
+  buildSelectionSourcePreview,
+} from '../shared/selection_context_format.js';
 import type {
   CustomTool,
   SelectionContext,
@@ -252,39 +256,11 @@ const enrichSelectionContextWithSnippets = (
   return {
     ...selectionContext,
     sourceSnippets,
+    sourcePreview: buildSelectionSourcePreview({
+      ...selectionContext,
+      sourceSnippets,
+    }),
   };
-};
-
-const buildSelectionContextSummary = (
-  selectionContext: SelectionContext,
-): string => {
-  const summaryLines: string[] = [];
-  summaryLines.push(selectionContext.domPreview);
-
-  if (selectionContext.componentName) {
-    summaryLines.push(`component: ${selectionContext.componentName}`);
-  }
-
-  if (selectionContext.selector) {
-    summaryLines.push(`selector: ${selectionContext.selector}`);
-  }
-
-  if (selectionContext.resolvedSources.length > 0) {
-    summaryLines.push('resolved sources:');
-    for (const resolvedSource of selectionContext.resolvedSources) {
-      const line =
-        resolvedSource.lineNumber != null
-          ? `:${resolvedSource.lineNumber}`
-          : '';
-      const column =
-        resolvedSource.columnNumber != null
-          ? `:${resolvedSource.columnNumber}`
-          : '';
-      summaryLines.push(`- ${resolvedSource.filePath}${line}${column}`);
-    }
-  }
-
-  return summaryLines.join('\n');
 };
 
 const parseSelectionContextResponse = (response: {
@@ -296,6 +272,7 @@ const parseSelectionContextResponse = (response: {
 
   return {
     ...response.context,
+    sourcePreview: response.context.sourcePreview ?? null,
     sourceSnippets: Array.isArray(response.context.sourceSnippets)
       ? response.context.sourceSnippets
       : [],

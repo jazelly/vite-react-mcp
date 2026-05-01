@@ -55,6 +55,14 @@ test('copying the selected context includes a playground source snippet', async 
       snippet: expect.stringContaining('profile-field-${name}'),
     }),
   );
+  expect(copyResult.context.sourcePreview).toContain('profile-field-${name}');
+  expect(copyResult.context.sourcePreview).toContain(
+    'in ProfileField (at src/components/UserProfile/ProfileField.jsx',
+  );
+  expect(copyResult.context.sourcePreview).toContain(
+    'src/components/UserProfile/ProfileContent.jsx',
+  );
+  expect(copyResult.context.sourcePreview).not.toContain('node_modules');
 });
 
 test('copying root-relative source context does not request filesystem /src fallback', async ({
