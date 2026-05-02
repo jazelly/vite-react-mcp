@@ -1,4 +1,26 @@
 import { expect, test } from '@playwright/test';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+
+const MCP_SERVER_URL = 'http://127.0.0.1:51423/sse';
+
+const createMcpClient = async () => {
+  const client = new Client({
+    name: 'vite-react-mcp-e2e',
+    version: '0.0.0',
+  });
+  const transport = new SSEClientTransport(new URL(MCP_SERVER_URL));
+  await client.connect(transport);
+  return { client, transport };
+};
+
+const parseToolResponse = (result) => {
+  const textContent = result.content.find((content) => content.type === 'text');
+  if (!textContent || typeof textContent.text !== 'string') {
+    return null;
+  }
+  return JSON.parse(textContent.text);
+};
 
 const selectProfileEmailField = async (page) => {
   await page.goto('/profile/1');
@@ -9,6 +31,20 @@ const selectProfileEmailField = async (page) => {
 
   await page.locator('#profile-field-email').click();
 };
+
+test('copying without a selection returns a no-selection response', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  const copyResult = await page.evaluate(() =>
+    window.__VITE_REACT_MCP__.copyLastSelectionContext('json'),
+  );
+
+  expect(copyResult.success).toBe(false);
+  expect(copyResult.error).toBe('No selection context found');
+});
 
 test('selecting a profile field captures its React source context', async ({
   page,
@@ -65,6 +101,32 @@ test('copying the selected context includes a playground source snippet', async 
   expect(copyResult.context.sourcePreview).not.toContain('node_modules');
 });
 
+test('selecting an element without an id still returns a usable fallback selector', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  await page.evaluate(() => window.__VITE_REACT_MCP__.enterSelectionMode());
+  await page.locator('label', { hasText: 'Email' }).first().click();
+
+  const context = await page.waitForFunction(() =>
+    window.__VITE_REACT_MCP__?.getLastSelectionContext(),
+  );
+  const selectionContext = await context.jsonValue();
+
+  expect(selectionContext.componentName).toBe('ProfileField');
+  expect(selectionContext.selector).toBeTruthy();
+
+  const selectorMatchesSelection = await page.evaluate((selector) => {
+    if (!selector) return false;
+    return document.querySelector(selector) !== null;
+  }, selectionContext.selector);
+
+  expect(selectorMatchesSelection).toBe(true);
+});
+
 test('copying root-relative source context does not request filesystem /src fallback', async ({
   page,
 }) => {
@@ -91,4 +153,46 @@ test('copying root-relative source context does not request filesystem /src fall
 
   expect(copyResult.success).toBe(true);
   expect(requestedAbsoluteSrcFallback).toBe(false);
+});
+
+test('MCP tools return no-selection and selected-context responses', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  const { client, transport } = await createMcpClient();
+  try {
+    const noSelectionRaw = await client.callTool({
+      name: 'get-last-selection-context',
+      arguments: {
+        includeSourceSnippets: true,
+      },
+    });
+    const noSelection = parseToolResponse(noSelectionRaw);
+    expect(noSelection.success).toBe(false);
+    expect(noSelection.context).toBeNull();
+    expect(noSelection.message).toContain('No selection context');
+
+    await selectProfileEmailField(page);
+    await page.waitForFunction(() =>
+      window.__VITE_REACT_MCP__?.getLastSelectionContext(),
+    );
+
+    const selectedContextRaw = await client.callTool({
+      name: 'get-last-selection-context',
+      arguments: {
+        includeSourceSnippets: true,
+        contextLines: 3,
+        maxFiles: 2,
+      },
+    });
+    const selectedContext = parseToolResponse(selectedContextRaw);
+    expect(selectedContext.success).toBe(true);
+    expect(selectedContext.context.componentName).toBe('ProfileField');
+    expect(selectedContext.context.sourceSnippets.length).toBeGreaterThan(0);
+    expect(selectedContext.summary).toContain('ProfileField');
+  } finally {
+    await transport.close();
+  }
 });

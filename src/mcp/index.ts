@@ -12,6 +12,11 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 import { getVersionString, waitForEvent } from '../shared/node_util.js';
 import {
+  classifySourcePath,
+  isAllowedProjectSourcePath,
+  normalizeSourceRoot,
+} from '../shared/source_path.js';
+import {
   buildSelectionContextSummary,
   buildSelectionSourcePreview,
 } from '../shared/selection_context_format.js';
@@ -122,23 +127,27 @@ const resolveAbsoluteSourcePath = (
   rootDir: string,
   filePath: string,
 ): string | null => {
-  const trimmedPath = filePath.trim();
-  if (!trimmedPath) return null;
-
-  if (trimmedPath.includes('\0')) return null;
-  if (!/\.(jsx?|tsx?)$/i.test(trimmedPath)) return null;
-
   const normalizedRootDir = fs.realpathSync(rootDir);
-  const candidates: string[] = [];
+  const normalizedSourceRoot = normalizeSourceRoot(
+    normalizedRootDir.replace(/\\/g, '/'),
+  );
 
-  if (path.isAbsolute(trimmedPath)) {
-    candidates.push(trimmedPath);
+  if (!isAllowedProjectSourcePath(filePath, normalizedSourceRoot)) {
+    return null;
   }
 
-  candidates.push(path.resolve(rootDir, trimmedPath));
+  const classifiedPath = classifySourcePath(filePath, normalizedSourceRoot);
+  const candidates: string[] = [];
 
-  if (trimmedPath.startsWith('/')) {
-    candidates.push(path.resolve(rootDir, `.${trimmedPath}`));
+  if (classifiedPath.kind === 'vite-fs') {
+    const fileSystemPath = classifiedPath.normalizedPath.slice('/@fs'.length);
+    candidates.push(path.resolve(fileSystemPath));
+  } else if (classifiedPath.kind === 'fs-absolute') {
+    candidates.push(path.resolve(classifiedPath.normalizedPath));
+  } else if (classifiedPath.kind === 'vite-root-relative') {
+    candidates.push(path.resolve(rootDir, `.${classifiedPath.normalizedPath}`));
+  } else if (classifiedPath.kind === 'project-relative') {
+    candidates.push(path.resolve(rootDir, classifiedPath.normalizedPath));
   }
 
   for (const candidate of candidates) {

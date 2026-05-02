@@ -1,14 +1,14 @@
 import React from 'react';
 import { Snackbar, Alert } from '@mui/material';
 
-const ProfileNotification = ({ 
-  open, 
-  onClose 
+const ProfileNotification = ({
+  open,
+  onClose,
 }) => {
   return (
-    <Snackbar 
-      open={open} 
-      autoHideDuration={6000} 
+    <Snackbar
+      open={open}
+      autoHideDuration={6000}
       onClose={onClose}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
     >
@@ -21,4 +21,4 @@ const ProfileNotification = ({
 
 ProfileNotification.displayName = 'ProfileNotification';
 
-export default ProfileNotification; 
+export default ProfileNotification;
