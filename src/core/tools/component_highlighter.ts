@@ -1,6 +1,6 @@
-import { target } from '../../shared/const';
-import { InvalidInputError } from '../../shared/errors';
-import { getDOMNodesByComponentName } from './util';
+import { target } from '../../shared/const.js';
+import { InvalidInputError } from '../../shared/errors.js';
+import { getDOMNodesByComponentName } from './util.js';
 
 export const highlightComponent = (
   componentName: string,

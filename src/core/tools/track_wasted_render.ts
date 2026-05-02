@@ -7,14 +7,14 @@ import {
   shouldFilterFiber,
   traverseProps,
 } from 'bippy';
-import { store, wastedRenderFiberInfo } from '../../shared/store';
+import { store, wastedRenderFiberInfo } from '../../shared/store.js';
 import {
   getDisplayName,
   getDisplayNameForFiber,
   getNearestFiberWithStateNode,
   isReactElement,
-} from '../../shared/util';
-import { flashStateNode } from './util';
+} from '../../shared/util.js';
+import { flashStateNode } from './util.js';
 
 const stringifyValueExceptObject = (value: any): string | null => {
   if (value === null) return 'null';

@@ -10,7 +10,7 @@ import {
 import type { ViteDevServer } from 'vite';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
-import { getVersionString, waitForEvent } from '../shared/node_util.js';
+import { getVersionString } from '../shared/node_util.js';
 import {
   classifySourcePath,
   isAllowedProjectSourcePath,
@@ -30,11 +30,14 @@ import {
   CopyLastSelectionContextSchema,
   GetComponentStatesSchema,
   GetComponentTreeSchema,
+  GetHtmlElementsSchema,
   GetLastSelectionContextSchema,
+  GetReactSourceCodeSchema,
   GetUnnecessaryRerendersSchema,
   HighlightComponentSchema,
   SetSelectionModeSchema,
 } from './schema.js';
+import type { BridgeRequestEvent } from '../shared/protocol.js';
 
 const builtInTools = [
   {
@@ -77,6 +80,18 @@ const builtInTools = [
       'Copy the latest captured selection context from the browser runtime into clipboard.',
     inputSchema: zodToJsonSchema(CopyLastSelectionContextSchema),
   },
+  {
+    name: 'get-html-elements',
+    description:
+      'Find matching HTML elements by search strings and return deterministic candidates.',
+    inputSchema: zodToJsonSchema(GetHtmlElementsSchema),
+  },
+  {
+    name: 'get-react-source-code',
+    description:
+      'Find matching elements using search strings and return deterministic React source context for the best candidate.',
+    inputSchema: zodToJsonSchema(GetReactSourceCodeSchema),
+  },
 ] as const;
 
 type BuiltInToolName = (typeof builtInTools)[number]['name'];
@@ -105,22 +120,6 @@ const toTextResponse = (data: unknown): CallToolResult => {
   return {
     content: [{ type: 'text', text: JSON.stringify(data) }],
   };
-};
-
-const sendBrowserEventAndWait = async <T>(
-  viteDevServer: ViteDevServer,
-  event: string,
-  responseEvent: string,
-  args: unknown,
-): Promise<T> => {
-  viteDevServer.ws.send({
-    type: 'custom',
-    event,
-    data: JSON.stringify(args),
-  });
-
-  const response = await waitForEvent<string>(viteDevServer, responseEvent);
-  return JSON.parse(response.data) as T;
 };
 
 const resolveAbsoluteSourcePath = (
@@ -288,8 +287,22 @@ const parseSelectionContextResponse = (response: {
   };
 };
 
+export interface McpRuntimeBridge {
+  request: (event: BridgeRequestEvent, payload: unknown) => Promise<unknown>;
+}
+
+const requestRuntime = async <T>(
+  bridge: McpRuntimeBridge,
+  event: BridgeRequestEvent,
+  args: unknown,
+): Promise<T> => {
+  const response = await bridge.request(event, args);
+  return response as T;
+};
+
 export function initMcpServer(
-  viteDevServer: ViteDevServer,
+  bridge: McpRuntimeBridge,
+  rootDir: string,
   customTools: CustomTool[] = [],
 ): Server {
   const server = new Server(
@@ -326,18 +339,13 @@ export function initMcpServer(
               const args = HighlightComponentSchema.parse(
                 request.params.arguments,
               );
-              viteDevServer.ws.send({
-                type: 'custom',
-                event: 'highlight-component',
-                data: JSON.stringify(args),
-              });
-
-              const response = await waitForEvent<string>(
-                viteDevServer,
-                'highlight-component-response',
+              const response = await requestRuntime<string>(
+                bridge,
+                'highlight-component',
+                args,
               );
               return {
-                content: [{ type: 'text', text: response.data }],
+                content: [{ type: 'text', text: response }],
               };
             }
 
@@ -345,18 +353,13 @@ export function initMcpServer(
               const args = GetComponentTreeSchema.parse(
                 request.params.arguments,
               );
-              viteDevServer.ws.send({
-                type: 'custom',
-                event: 'get-component-tree',
-                data: JSON.stringify(args),
-              });
-
-              const response = await waitForEvent<string>(
-                viteDevServer,
-                'get-component-tree-response',
+              const response = await requestRuntime<string>(
+                bridge,
+                'get-component-tree',
+                args,
               );
               return {
-                content: [{ type: 'text', text: response.data }],
+                content: [{ type: 'text', text: response }],
               };
             }
 
@@ -364,18 +367,13 @@ export function initMcpServer(
               const args = GetComponentStatesSchema.parse(
                 request.params.arguments,
               );
-              viteDevServer.ws.send({
-                type: 'custom',
-                event: 'get-component-states',
-                data: JSON.stringify(args),
-              });
-
-              const response = await waitForEvent<string>(
-                viteDevServer,
-                'get-component-states-response',
+              const response = await requestRuntime<string>(
+                bridge,
+                'get-component-states',
+                args,
               );
               return {
-                content: [{ type: 'text', text: response.data }],
+                content: [{ type: 'text', text: response }],
               };
             }
 
@@ -384,18 +382,13 @@ export function initMcpServer(
                 request.params.arguments,
               );
 
-              viteDevServer.ws.send({
-                type: 'custom',
-                event: 'get-unnecessary-rerenders',
-                data: JSON.stringify(args),
-              });
-
-              const response = await waitForEvent<string>(
-                viteDevServer,
-                'get-unnecessary-rerenders-response',
+              const response = await requestRuntime<string>(
+                bridge,
+                'get-unnecessary-rerenders',
+                args,
               );
               return {
-                content: [{ type: 'text', text: response.data }],
+                content: [{ type: 'text', text: response }],
               };
             }
 
@@ -403,15 +396,10 @@ export function initMcpServer(
               const args = SetSelectionModeSchema.parse(
                 request.params.arguments,
               );
-              const response = await sendBrowserEventAndWait<{
+              const response = await requestRuntime<{
                 success: boolean;
                 enabled: boolean;
-              }>(
-                viteDevServer,
-                'set-selection-mode',
-                'set-selection-mode-response',
-                args,
-              );
+              }>(bridge, 'set-selection-mode', args);
 
               return toTextResponse(response);
             }
@@ -421,14 +409,9 @@ export function initMcpServer(
                 request.params.arguments,
               );
 
-              const browserResponse = await sendBrowserEventAndWait<{
+              const browserResponse = await requestRuntime<{
                 context: SelectionContext | null;
-              }>(
-                viteDevServer,
-                'get-last-selection-context',
-                'get-last-selection-context-response',
-                args,
-              );
+              }>(bridge, 'get-last-selection-context', args);
 
               const selectionContext =
                 parseSelectionContextResponse(browserResponse);
@@ -442,7 +425,7 @@ export function initMcpServer(
 
               const enrichedSelectionContext = args.includeSourceSnippets
                 ? enrichSelectionContextWithSnippets(
-                    viteDevServer.config.root,
+                    rootDir,
                     selectionContext,
                     args.contextLines,
                     args.maxFiles,
@@ -461,20 +444,60 @@ export function initMcpServer(
                 request.params.arguments,
               );
 
-              const response = await sendBrowserEventAndWait<{
+              const response = await requestRuntime<{
                 success: boolean;
                 copied: boolean;
                 format: 'text' | 'json';
                 context?: SelectionContext;
                 error?: string;
-              }>(
-                viteDevServer,
-                'copy-last-selection-context',
-                'copy-last-selection-context-response',
-                args,
-              );
+              }>(bridge, 'copy-last-selection-context', args);
 
               return toTextResponse(response);
+            }
+
+            case 'get-html-elements': {
+              const args = GetHtmlElementsSchema.parse(request.params.arguments);
+              const response = await requestRuntime<unknown>(
+                bridge,
+                'get-html-elements',
+                args,
+              );
+              return toTextResponse(response);
+            }
+
+            case 'get-react-source-code': {
+              const args = GetReactSourceCodeSchema.parse(request.params.arguments);
+              const response = (await requestRuntime<{
+                success: boolean;
+                reason?: string;
+                chosenMatch?: {
+                  selector: string | null;
+                  query: string;
+                };
+                context?: SelectionContext | null;
+              }>(bridge, 'get-react-source-code', args)) || {
+                success: false,
+              };
+
+              if (!response.success || !response.context) {
+                return toTextResponse(response);
+              }
+
+              const enrichedContext = args.includeSourceSnippets
+                ? enrichSelectionContextWithSnippets(
+                    rootDir,
+                    response.context,
+                    args.contextLines,
+                    args.maxFiles,
+                  )
+                : response.context;
+
+              return toTextResponse({
+                success: true,
+                chosenMatch: response.chosenMatch,
+                summary: buildSelectionContextSummary(enrichedContext),
+                context: enrichedContext,
+              });
             }
 
             default:

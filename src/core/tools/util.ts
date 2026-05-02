@@ -1,10 +1,10 @@
 import type { Fiber } from 'bippy';
-import { getAllFiberRoots } from '../../shared/util';
+import { getAllFiberRoots } from '../../shared/util.js';
 import {
   findComponentsInFiber,
   getNearestFiberWithStateNode,
-} from '../../shared/util';
-import type { ComponentTreeNode } from '../../types/internal';
+} from '../../shared/util.js';
+import type { ComponentTreeNode } from '../../types/internal.js';
 
 export function getFibersByComponentName(componentName: string): Fiber[] {
   const result: Fiber[] = [];

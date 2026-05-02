@@ -4,8 +4,8 @@ import type {
   Props,
   ReactDevToolsGlobalHook,
 } from 'bippy';
-import type { HookNode } from '../types/internal';
-import type { FiberRoot, ReactDevtools } from '../types/react';
+import type { HookNode } from '../types/internal.js';
+import type { FiberRoot, ReactDevtools } from '../types/react.js';
 import {
   CONCURRENT_MODE_NUMBER,
   CONCURRENT_MODE_SYMBOL_STRING,
@@ -29,9 +29,9 @@ import {
   STRICT_MODE_NUMBER,
   STRICT_MODE_SYMBOL_STRING,
   target,
-} from './const';
-import { ReactTypeOfWork } from './const';
-import { fiberRoots } from './store';
+} from './const.js';
+import { ReactTypeOfWork } from './const.js';
+import { fiberRoots } from './store.js';
 
 let rdtHook: ReactDevToolsGlobalHook | ReactDevtools | null = null;
 export let usingRealHook = false;

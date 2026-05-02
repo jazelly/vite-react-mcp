@@ -5,9 +5,14 @@ import * as babel from '@babel/core';
 import { createFilter } from '@rollup/pluginutils';
 import { type ViteDevServer, normalizePath } from 'vite';
 import type { Plugin, ResolvedConfig } from 'vite';
+import { RuntimeBridgeServer } from './bridge/server.js';
 import { createBabelDisplayNamePlugin } from './babel_collect_name.js';
 import { initMcpServer, instrumentViteDevServer } from './mcp/index.js';
-import { __VITE_REACT_MCP_CONFIG__ } from './shared/const.js';
+import {
+  __VITE_REACT_MCP_BRIDGE_URL__,
+  __VITE_REACT_MCP_CONFIG__,
+} from './shared/const.js';
+import { BRIDGE_WS_PATH } from './shared/protocol.js';
 import { store } from './shared/store.js';
 import type { CustomTool, ToolkitConfig } from './shared/types.js';
 
@@ -23,11 +28,6 @@ const viteReactMcpResourceSymbol = '?__vite-react-mcp-resource';
 const viteReactMcpImportee = 'virtual:vite-react-mcp';
 const resolvedViteReactMcp = `\0${viteReactMcpImportee}`;
 
-/**
- * Read include/exclude patterns from tsconfig.json or other config files
- * @param {string} configPath Path to config file
- * @returns {Object} Object with include and exclude arrays
- */
 function readProjectConfig(configPath: string): {
   include: string[];
   exclude: string[];
@@ -37,13 +37,10 @@ function readProjectConfig(configPath: string): {
       const configContent = fs.readFileSync(configPath, 'utf8');
       const config = JSON.parse(configContent);
 
-      // Extract include/exclude patterns
       let include = config.include || [];
       const exclude = config.exclude || [];
 
-      // Convert to glob patterns if needed
       include = include.map((pattern) => {
-        // Convert directory patterns to include all supported file types
         if (!pattern.includes('*')) {
           return pattern.endsWith('/')
             ? `${pattern}**/*.{js,jsx,ts,tsx}`
@@ -52,7 +49,6 @@ function readProjectConfig(configPath: string): {
         return pattern;
       });
 
-      // Add node_modules to exclude if not already present
       if (!exclude.some((pattern) => pattern.includes('node_modules'))) {
         exclude.push('**/node_modules/**');
       }
@@ -67,7 +63,6 @@ function readProjectConfig(configPath: string): {
     }
   }
 
-  // Default fallback patterns
   return {
     include: ['src/**/*.{js,jsx,ts,tsx}'],
     exclude: ['**/node_modules/**'],
@@ -82,48 +77,37 @@ export interface ReactMCPOptions {
 function ReactMCP(options: ReactMCPOptions = {}): Plugin {
   const configPatterns = readProjectConfig('tsconfig.json');
   const filter = createFilter(configPatterns.include, configPatterns.exclude);
+
   function transformBabelCollectName(code: string, id: string) {
     if (!filter(id) || !/\.[jt]sx?$/.test(id)) {
       return null;
     }
 
     try {
-      let presetReact: boolean;
+      let presetReact = false;
       try {
-        // In ESM we can't use require, so we can check if the package is installed
-        // by importing it dynamically or checking if it exists in node_modules
         const presetReactPath = path.resolve(
           'node_modules/@babel/preset-react',
         );
         if (fs.existsSync(presetReactPath)) {
-          // If it exists, we'll let Babel use it through its name
           presetReact = true;
         }
       } catch (_e) {
-        // Log warning but continue - the developer's project might have its own JSX handling
         console.warn(
           '\n[vite-plugin-display-name-suffix] Warning: @babel/preset-react is not installed.',
         );
-        console.warn(
-          'If you encounter JSX parsing errors, install it with: npm install @babel/preset-react --save-dev\n',
-        );
       }
 
-      // Configure Babel transformation
       const babelOptions: babel.TransformOptions = {
         babelrc: false,
         configFile: false,
         filename: id,
         presets: [],
-        plugins: [
-          // Plugin to add displayName to React components
-          [createBabelDisplayNamePlugin()],
-        ],
+        plugins: [[createBabelDisplayNamePlugin()]],
         ast: true,
         sourceType: 'module',
       };
 
-      // Add preset-react if available
       if (presetReact) {
         babelOptions.presets.push([
           '@babel/preset-react',
@@ -131,12 +115,11 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
         ]);
       }
 
-      // Transform the code using Babel
       const result = babel.transformSync(code, babelOptions);
 
       return {
-        code: result.code,
-        map: result.map,
+        code: result?.code || code,
+        map: result?.map || null,
       };
     } catch (error) {
       console.error(`Error transforming ${id}:`, error);
@@ -154,8 +137,14 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
     apply: 'serve',
 
     configureServer(viteDevServer: ViteDevServer) {
-      const mcpServer = initMcpServer(viteDevServer, customTools);
+      const runtimeBridge = new RuntimeBridgeServer();
+      if (viteDevServer.httpServer) {
+        runtimeBridge.attach(viteDevServer.httpServer);
+      }
+
+      const mcpServer = initMcpServer(runtimeBridge, viteDevServer.config.root, customTools);
       instrumentViteDevServer(viteDevServer, mcpServer);
+
       setTimeout(() => {
         console.info(
           'Vite React MCP server is running on port',
@@ -182,14 +171,12 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
     },
 
     transform(code, id) {
-      transformBabelCollectName(code, id);
+      return transformBabelCollectName(code, id);
     },
 
     transformIndexHtml() {
-      // Convert the Set to an Array for serialization
       const componentsArray = Array.from(store.SELF_REACT_COMPONENTS);
 
-      // Create the script to register components to window
       const registerComponentsScript = `
         window.__REACT_COMPONENTS__ = ${JSON.stringify(componentsArray)};
       `;
@@ -200,7 +187,13 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
         })};
       `;
 
-      // Generate custom tools registration script
+      const bridgeUrlScript = `
+        (function(){
+          var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          window.${__VITE_REACT_MCP_BRIDGE_URL__} = protocol + '//' + window.location.host + '${BRIDGE_WS_PATH}';
+        })();
+      `;
+
       const customToolsScript = generateCustomToolsScript(customTools, config);
 
       return [
@@ -215,6 +208,12 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
           injectTo: 'head-prepend',
           attrs: { type: 'text/javascript' },
           children: registerViteReactMcpConfigScript,
+        },
+        {
+          tag: 'script',
+          injectTo: 'head-prepend',
+          attrs: { type: 'text/javascript' },
+          children: bridgeUrlScript,
         },
         {
           tag: 'script',

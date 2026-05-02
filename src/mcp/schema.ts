@@ -69,3 +69,49 @@ export const CopyLastSelectionContextSchema = z.object({
     .default('text')
     .describe('Clipboard payload format'),
 });
+
+export const GetHtmlElementsSchema = z.object({
+  queries: z
+    .array(z.string().min(1))
+    .min(1)
+    .describe('List of search strings used to find matching DOM elements'),
+  maxMatches: z
+    .number()
+    .int()
+    .min(1)
+    .max(40)
+    .default(10)
+    .describe('Maximum number of matching elements to return'),
+});
+
+export const GetReactSourceCodeSchema = z.object({
+  queries: z
+    .array(z.string().min(1))
+    .min(1)
+    .describe('Ordered list of search strings to resolve a target element'),
+  maxMatches: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .default(5)
+    .describe('Maximum number of candidate elements to resolve'),
+  includeSourceSnippets: z
+    .boolean()
+    .default(true)
+    .describe('Whether source snippets should be included in the response'),
+  contextLines: z
+    .number()
+    .int()
+    .min(0)
+    .max(80)
+    .default(8)
+    .describe('How many lines to include before and after resolved lines'),
+  maxFiles: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .default(6)
+    .describe('Maximum number of source files to include in snippets'),
+});

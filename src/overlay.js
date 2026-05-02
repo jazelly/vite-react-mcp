@@ -2,6 +2,8 @@ import * as bippy from 'bippy';
 import { highlightComponent } from './core/tools/component_highlighter.js';
 import { getComponentStates } from './core/tools/component_state_viewer.js';
 import { getComponentTree } from './core/tools/component_viewer.js';
+import { buildSelectionContextForElement } from './core/tools/selection_context.js';
+import { createElementSelector } from './core/tools/selection_selector.js';
 import { createSelectionToolkit } from './core/tools/selection_toolkit.js';
 import {
   collectUnnecessaryRender,
@@ -13,30 +15,16 @@ import {
   __VITE_REACT_MCP__,
   target,
 } from './shared/const.js';
+import {
+  BRIDGE_GLOBAL_CONFIG_KEY,
+  BRIDGE_WS_PATH,
+} from './shared/protocol.js';
 import { fiberRoots, store } from './shared/store.js';
 
 const customToolHandlers = new Map();
 
 const registerCustomTool = (name, handler) => {
   customToolHandlers.set(name, handler);
-
-  if (import.meta.hot) {
-    import.meta.hot.on(`custom-tool-${name}`, async (data) => {
-      try {
-        const deserializedData = JSON.parse(data);
-        const result = await handler(deserializedData);
-        import.meta.hot.send(
-          `custom-tool-${name}-response`,
-          JSON.stringify(result),
-        );
-      } catch (error) {
-        import.meta.hot.send(
-          `custom-tool-${name}-response`,
-          JSON.stringify({ error: error?.message || 'Custom tool failed' }),
-        );
-      }
-    });
-  }
 };
 
 const viteReactMcpConfig = target[__VITE_REACT_MCP_CONFIG__] || {};
@@ -103,159 +91,259 @@ bippy.instrument({
   },
 });
 
-const setupMcpToolsHandler = () => {
-  if (!import.meta.hot) {
-    return;
+const normalizeQuery = (query) => query.trim().toLowerCase();
+
+const getElementSearchText = (element) => {
+  const parts = [];
+  parts.push(element.tagName?.toLowerCase() || '');
+  parts.push(element.id || '');
+  parts.push(element.className || '');
+  parts.push(element.textContent || '');
+
+  for (const attrName of ['name', 'aria-label', 'placeholder', 'title']) {
+    const attrValue = element.getAttribute?.(attrName);
+    if (attrValue) {
+      parts.push(attrValue);
+    }
   }
 
-  import.meta.hot.on('highlight-component', (data) => {
-    let deserializedData;
-    try {
-      deserializedData = JSON.parse(data);
-    } catch (_error) {
-      throw new Error(`Data is not deserializable: ${data}`);
-    }
-
-    if (typeof deserializedData?.componentName !== 'string') {
-      throw new Error('Invalid args sent from ViteDevServer');
-    }
-
-    let response = 'Action failed';
-    try {
-      const components = target.__VITE_REACT_MCP_TOOLS__.highlightComponent(
-        deserializedData.componentName,
-      );
-      if (components.length > 0) {
-        response = `Found and highlighted ${components.length} components`;
-      }
-    } catch (_error) {
-      response = `Error: ${_error.message}`;
-    }
-
-    import.meta.hot.send('highlight-component-response', response);
-  });
-
-  import.meta.hot.on('get-component-tree', (data) => {
-    let deserializedData;
-    try {
-      deserializedData = JSON.parse(data);
-    } catch (_error) {
-      throw new Error(`Args is not deserializable: ${data}`);
-    }
-
-    const componentTreeRoot =
-      target.__VITE_REACT_MCP_TOOLS__.getComponentTree(deserializedData);
-    import.meta.hot.send(
-      'get-component-tree-response',
-      JSON.stringify(componentTreeRoot),
-    );
-  });
-
-  import.meta.hot.on('get-component-states', (data) => {
-    let deserializedData;
-    try {
-      deserializedData = JSON.parse(data);
-    } catch (_error) {
-      throw new Error(`Data is not deserializable: ${data}`);
-    }
-    if (typeof deserializedData?.componentName !== 'string') {
-      throw new Error(
-        'Invalid data sent from ViteDevServer: missing componentName',
-      );
-    }
-
-    const componentStatesResult =
-      target.__VITE_REACT_MCP_TOOLS__.getComponentStates(
-        deserializedData.componentName,
-      );
-    import.meta.hot.send(
-      'get-component-states-response',
-      JSON.stringify(componentStatesResult),
-    );
-  });
-
-  import.meta.hot.on('get-unnecessary-rerenders', (data) => {
-    let deserializedData;
-    try {
-      deserializedData = JSON.parse(data);
-    } catch (_error) {
-      throw new Error(`Data is not deserializable: ${data}`);
-    }
-
-    const wastedRenders =
-      target.__VITE_REACT_MCP_TOOLS__.getUnnecessaryRenderedComponents(
-        deserializedData.timeframe,
-        {
-          allComponents: Boolean(deserializedData.allComponents),
-          debugMode: Boolean(deserializedData.debugMode),
-        },
-      );
-
-    let response;
-
-    try {
-      response = JSON.stringify(wastedRenders);
-    } catch (_error) {
-      response = JSON.stringify({ error: _error.message });
-    }
-
-    import.meta.hot.send('get-unnecessary-rerenders-response', response);
-  });
-
-  import.meta.hot.on('set-selection-mode', (data) => {
-    let deserializedData;
-    try {
-      deserializedData = JSON.parse(data);
-    } catch (_error) {
-      throw new Error(`Data is not deserializable: ${data}`);
-    }
-
-    if (typeof deserializedData?.enabled !== 'boolean') {
-      throw new Error('Invalid args sent from ViteDevServer: missing enabled');
-    }
-
-    target.__VITE_REACT_MCP__.setSelectionMode(deserializedData.enabled);
-    import.meta.hot.send(
-      'set-selection-mode-response',
-      JSON.stringify({ success: true, enabled: deserializedData.enabled }),
-    );
-  });
-
-  import.meta.hot.on('get-last-selection-context', (data) => {
-    let deserializedData;
-    try {
-      deserializedData = JSON.parse(data);
-    } catch (_error) {
-      throw new Error(`Data is not deserializable: ${data}`);
-    }
-
-    const context = target.__VITE_REACT_MCP__.getLastSelectionContext();
-    import.meta.hot.send(
-      'get-last-selection-context-response',
-      JSON.stringify({
-        context,
-        includeSourceSnippets: Boolean(deserializedData?.includeSourceSnippets),
-      }),
-    );
-  });
-
-  import.meta.hot.on('copy-last-selection-context', async (data) => {
-    let deserializedData;
-    try {
-      deserializedData = JSON.parse(data);
-    } catch (_error) {
-      throw new Error(`Data is not deserializable: ${data}`);
-    }
-
-    const format = deserializedData?.format === 'json' ? 'json' : 'text';
-    const response =
-      await target.__VITE_REACT_MCP__.copyLastSelectionContext(format);
-
-    import.meta.hot.send(
-      'copy-last-selection-context-response',
-      JSON.stringify(response),
-    );
-  });
+  return parts.join(' ').toLowerCase();
 };
 
-setupMcpToolsHandler();
+const findHtmlElements = (queries, maxMatches = 10) => {
+  const normalizedQueries = (queries || [])
+    .map((query) => normalizeQuery(String(query || '')))
+    .filter(Boolean);
+
+  if (normalizedQueries.length === 0) {
+    return [];
+  }
+
+  const matches = [];
+  const seenElements = new Set();
+
+  for (const query of normalizedQueries) {
+    const allElements = document.querySelectorAll('*');
+    for (const element of allElements) {
+      if (seenElements.has(element)) {
+        continue;
+      }
+
+      const searchText = getElementSearchText(element);
+      if (!searchText.includes(query)) {
+        continue;
+      }
+
+      seenElements.add(element);
+      matches.push({
+        query,
+        element,
+        selector: createElementSelector(element),
+        domPreview: (element.outerHTML || `<${element.tagName.toLowerCase()}>`).slice(
+          0,
+          800,
+        ),
+      });
+
+      if (matches.length >= maxMatches) {
+        return matches;
+      }
+    }
+  }
+
+  return matches;
+};
+
+const handleBridgeRequest = async (event, payload) => {
+  switch (event) {
+    case 'highlight-component': {
+      if (typeof payload?.componentName !== 'string') {
+        throw new Error('Invalid args: missing componentName');
+      }
+      let response = 'Action failed';
+      try {
+        const components = target.__VITE_REACT_MCP_TOOLS__.highlightComponent(
+          payload.componentName,
+        );
+        if (components.length > 0) {
+          response = `Found and highlighted ${components.length} components`;
+        }
+      } catch (error) {
+        response = `Error: ${error?.message || 'Unknown error'}`;
+      }
+      return response;
+    }
+
+    case 'get-component-tree': {
+      return JSON.stringify(
+        target.__VITE_REACT_MCP_TOOLS__.getComponentTree(payload || {}),
+      );
+    }
+
+    case 'get-component-states': {
+      if (typeof payload?.componentName !== 'string') {
+        throw new Error('Invalid args: missing componentName');
+      }
+      return JSON.stringify(
+        target.__VITE_REACT_MCP_TOOLS__.getComponentStates(payload.componentName),
+      );
+    }
+
+    case 'get-unnecessary-rerenders': {
+      const wastedRenders =
+        target.__VITE_REACT_MCP_TOOLS__.getUnnecessaryRenderedComponents(
+          payload?.timeframe,
+          {
+            allComponents: Boolean(payload?.allComponents),
+            debugMode: Boolean(payload?.debugMode),
+          },
+        );
+      return JSON.stringify(wastedRenders);
+    }
+
+    case 'set-selection-mode': {
+      if (typeof payload?.enabled !== 'boolean') {
+        throw new Error('Invalid args: missing enabled');
+      }
+      target.__VITE_REACT_MCP__.setSelectionMode(payload.enabled);
+      return { success: true, enabled: payload.enabled };
+    }
+
+    case 'get-last-selection-context': {
+      return {
+        context: target.__VITE_REACT_MCP__.getLastSelectionContext(),
+      };
+    }
+
+    case 'copy-last-selection-context': {
+      const format = payload?.format === 'json' ? 'json' : 'text';
+      return await target.__VITE_REACT_MCP__.copyLastSelectionContext(format);
+    }
+
+    case 'get-html-elements': {
+      const maxMatches =
+        typeof payload?.maxMatches === 'number' ? payload.maxMatches : 10;
+      const matches = findHtmlElements(payload?.queries || [], maxMatches).map(
+        (match) => ({
+          query: match.query,
+          selector: match.selector,
+          domPreview: match.domPreview,
+        }),
+      );
+
+      return {
+        success: true,
+        count: matches.length,
+        matches,
+      };
+    }
+
+    case 'get-react-source-code': {
+      const maxMatches =
+        typeof payload?.maxMatches === 'number' ? payload.maxMatches : 5;
+      const matches = findHtmlElements(payload?.queries || [], maxMatches);
+
+      if (matches.length === 0) {
+        return {
+          success: false,
+          reason: 'No element matched the provided search strings',
+          matches: [],
+          context: null,
+        };
+      }
+
+      const chosenMatch = matches[0];
+      const context = await buildSelectionContextForElement(chosenMatch.element);
+
+      return {
+        success: true,
+        matches: matches.map((match) => ({
+          query: match.query,
+          selector: match.selector,
+          domPreview: match.domPreview,
+        })),
+        chosenMatch: {
+          query: chosenMatch.query,
+          selector: chosenMatch.selector,
+        },
+        context,
+      };
+    }
+
+    default:
+      throw new Error(`Unsupported bridge event: ${event}`);
+  }
+};
+
+const getBridgeUrl = () => {
+  const configuredUrl = target[BRIDGE_GLOBAL_CONFIG_KEY];
+  if (typeof configuredUrl === 'string' && configuredUrl.length > 0) {
+    return configuredUrl;
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}${BRIDGE_WS_PATH}`;
+};
+
+const connectBridge = () => {
+  let socket;
+
+  const establishConnection = () => {
+    try {
+      socket = new WebSocket(getBridgeUrl());
+    } catch (_error) {
+      setTimeout(establishConnection, 1000);
+      return;
+    }
+
+    socket.addEventListener('message', async (event) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch (_error) {
+        return;
+      }
+
+      if (message?.type !== 'bridge:request') {
+        return;
+      }
+
+      try {
+        const payload = await handleBridgeRequest(message.event, message.payload);
+        socket.send(
+          JSON.stringify({
+            type: 'bridge:response',
+            id: message.id,
+            ok: true,
+            payload,
+          }),
+        );
+      } catch (error) {
+        socket.send(
+          JSON.stringify({
+            type: 'bridge:response',
+            id: message.id,
+            ok: false,
+            error: error?.message || 'Bridge request failed',
+          }),
+        );
+      }
+    });
+
+    socket.addEventListener('close', () => {
+      setTimeout(establishConnection, 1000);
+    });
+
+    socket.addEventListener('error', () => {
+      try {
+        socket.close();
+      } catch (_error) {
+        // noop
+      }
+    });
+  };
+
+  establishConnection();
+};
+
+connectBridge();

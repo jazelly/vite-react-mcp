@@ -39,7 +39,9 @@
   "packageManager": "pnpm@10.6.5",
   "peerDependencies": {
     "@babel/preset-react": ">=6",
-    "vite": ">=4"
+    "vite": ">=4",
+    "webpack": ">=5",
+    "next": ">=13"
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",
@@ -55,6 +57,12 @@
     "@modelcontextprotocol/sdk": "1.7.0",
     "bippy": "^0.5.39",
     "zod": "^3.22.4",
-    "zod-to-json-schema": "^3.23.5"
+    "zod-to-json-schema": "^3.23.5",
+    "ws": "^8.18.0"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./next": "./dist/next.js",
+    "./webpack": "./dist/webpack.js"
   }
 }
