@@ -22,6 +22,8 @@
     "vite",
     "react",
     "mcp",
+    "visual-edit",
+    "agents",
     "devtools",
     "llm",
     "plugin"

@@ -8,6 +8,11 @@ import type {
   ToolkitConfig,
   ToolkitPosition,
 } from '../../shared/types.js';
+import {
+  buildBrowserSourceCandidates,
+  isAllowedProjectSourcePath,
+  normalizeSourceRoot,
+} from '../../shared/source_path.js';
 import { buildSelectionContextForElement } from './selection_context.js';
 import {
   clearSelectableElementCache,
@@ -152,74 +157,7 @@ const copyText = async (text: string): Promise<boolean> => {
 };
 
 const getNormalizedSourceRoot = (): string =>
-  (target.__VITE_REACT_MCP_CONFIG__?.sourceRoot || '')
-    .replace(/\\/g, '/')
-    .replace(/\/$/, '');
-
-const isWithinSourceRoot = (filePath: string, sourceRoot: string): boolean =>
-  Boolean(
-    sourceRoot &&
-      (filePath === sourceRoot || filePath.startsWith(`${sourceRoot}/`)),
-  );
-
-const toCandidateSourceUrls = (filePath: string): string[] => {
-  if (!filePath || filePath.includes('://')) {
-    return [];
-  }
-
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  if (normalizedPath.startsWith('/@fs/')) {
-    return [`${normalizedPath}?raw`, normalizedPath];
-  }
-
-  if (normalizedPath.startsWith('/')) {
-    if (isWithinSourceRoot(normalizedPath, getNormalizedSourceRoot())) {
-      return [`/@fs${normalizedPath}?raw`, `/@fs${normalizedPath}`];
-    }
-
-    return [`${normalizedPath}?raw`, normalizedPath];
-  }
-
-  const sanitizedPath = normalizedPath.replace(/^\.?\//, '');
-  return [`/${sanitizedPath}?raw`, `/${sanitizedPath}`];
-};
-
-const isProjectSourceFilePath = (filePath: string): boolean => {
-  if (!filePath) {
-    return false;
-  }
-
-  if (filePath.includes('\0')) {
-    return false;
-  }
-
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  const pathSegments = normalizedPath.split('/').filter(Boolean);
-  if (pathSegments.includes('node_modules') || pathSegments.includes('.vite')) {
-    return false;
-  }
-
-  if (!/\.(jsx?|tsx?)$/i.test(normalizedPath)) {
-    return false;
-  }
-
-  if (!normalizedPath.startsWith('/')) {
-    return !pathSegments.includes('..');
-  }
-
-  const normalizedSourceRoot = getNormalizedSourceRoot();
-
-  if (normalizedPath.startsWith('/@fs/')) {
-    const fileSystemPath = normalizedPath.slice('/@fs'.length);
-    return isWithinSourceRoot(fileSystemPath, normalizedSourceRoot);
-  }
-
-  if (normalizedPath.startsWith('/src/')) {
-    return true;
-  }
-
-  return isWithinSourceRoot(normalizedPath, normalizedSourceRoot);
-};
+  normalizeSourceRoot(target.__VITE_REACT_MCP_CONFIG__?.sourceRoot);
 
 const extractRawSourceFromViteModule = (moduleText: string): string | null => {
   const trimmedText = moduleText.trim();
@@ -639,9 +577,15 @@ export const createSelectionToolkit = (
         0,
         DEFAULT_MAX_SNIPPET_FILES,
       );
+      const normalizedSourceRoot = getNormalizedSourceRoot();
 
       for (const resolvedSource of resolvedSources) {
-        if (!isProjectSourceFilePath(resolvedSource.filePath)) {
+        if (
+          !isAllowedProjectSourcePath(
+            resolvedSource.filePath,
+            normalizedSourceRoot,
+          )
+        ) {
           continue;
         }
 
@@ -649,7 +593,10 @@ export const createSelectionToolkit = (
           continue;
         }
 
-        const candidateUrls = toCandidateSourceUrls(resolvedSource.filePath);
+        const candidateUrls = buildBrowserSourceCandidates(
+          resolvedSource.filePath,
+          normalizedSourceRoot,
+        );
         if (candidateUrls.length === 0) {
           continue;
         }
