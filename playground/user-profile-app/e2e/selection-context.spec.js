@@ -196,3 +196,76 @@ test('MCP tools return no-selection and selected-context responses', async ({
     await transport.close();
   }
 });
+
+test('MCP get-html-elements and get-react-source-code return deterministic matches and source context', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  const { client, transport } = await createMcpClient();
+  try {
+    const htmlMatchesRaw = await client.callTool({
+      name: 'get-html-elements',
+      arguments: {
+        queries: ['profile-field-email'],
+        maxMatches: 3,
+      },
+    });
+    const htmlMatches = parseToolResponse(htmlMatchesRaw);
+
+    expect(htmlMatches.success).toBe(true);
+    expect(htmlMatches.count).toBeGreaterThan(0);
+    expect(htmlMatches.matches[0].selector).toBe('#profile-field-email');
+
+    const reactSourceRaw = await client.callTool({
+      name: 'get-react-source-code',
+      arguments: {
+        queries: ['profile-field-email'],
+        maxMatches: 3,
+        includeSourceSnippets: true,
+        contextLines: 4,
+        maxFiles: 3,
+      },
+    });
+    const reactSource = parseToolResponse(reactSourceRaw);
+
+    expect(reactSource.success).toBe(true);
+    expect(reactSource.chosenMatch.selector).toBe('#profile-field-email');
+    expect(reactSource.context.componentName).toBe('ProfileField');
+    expect(reactSource.context.sourceSnippets).toContainEqual(
+      expect.objectContaining({
+        filePath: expect.stringContaining(
+          'src/components/UserProfile/ProfileField.jsx',
+        ),
+      }),
+    );
+    expect(reactSource.summary).toContain('ProfileField');
+  } finally {
+    await transport.close();
+  }
+});
+
+test('MCP get-react-source-code returns no-match payload when queries miss all elements', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  const { client, transport } = await createMcpClient();
+  try {
+    const missRaw = await client.callTool({
+      name: 'get-react-source-code',
+      arguments: {
+        queries: ['this-does-not-exist-anywhere'],
+      },
+    });
+    const miss = parseToolResponse(missRaw);
+    expect(miss.success).toBe(false);
+    expect(miss.reason).toContain('No element matched');
+    expect(miss.context).toBeNull();
+  } finally {
+    await transport.close();
+  }
+});

@@ -1,6 +1,7 @@
 export const __VITE_REACT_MCP_TOOLS__ = '__VITE_REACT_MCP_TOOLS__';
 export const __VITE_REACT_MCP__ = '__VITE_REACT_MCP__';
 export const __VITE_REACT_MCP_CONFIG__ = '__VITE_REACT_MCP_CONFIG__';
+export const __VITE_REACT_MCP_BRIDGE_URL__ = '__VITE_REACT_MCP_BRIDGE_URL__';
 
 export const target = (
   typeof window !== 'undefined'

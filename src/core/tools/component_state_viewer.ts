@@ -1,12 +1,12 @@
 import type { Fiber } from 'bippy';
-import { FiberNotFoundError } from '../../shared/errors';
+import { FiberNotFoundError } from '../../shared/errors.js';
 import {
   getCurrentContexts,
   getCurrentProps,
   getCurrentStates,
-} from '../../shared/util';
-import type { HookNode } from '../../types/internal';
-import { getFibersByComponentName } from './util';
+} from '../../shared/util.js';
+import type { HookNode } from '../../types/internal.js';
+import { getFibersByComponentName } from './util.js';
 
 interface ComponentStateAndContext<T> {
   props: Fiber['memoizedProps'];

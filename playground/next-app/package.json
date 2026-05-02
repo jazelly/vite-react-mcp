@@ -1,0 +1,19 @@
+{
+  "name": "next-app-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "next dev -p 51424",
+    "build": "next build",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "15.5.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "vite-react-mcp": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.52.0"
+  }
+}

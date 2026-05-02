@@ -1,0 +1,24 @@
+{
+  "name": "webpack-react-playground",
+  "private": true,
+  "scripts": {
+    "start": "webpack serve --config webpack.config.mjs --mode development --port 51425",
+    "build": "webpack --config webpack.config.mjs --mode production",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "vite-react-mcp": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/core": "7.27.4",
+    "@babel/preset-react": "7.27.1",
+    "@playwright/test": "1.52.0",
+    "babel-loader": "10.0.0",
+    "html-webpack-plugin": "5.6.3",
+    "webpack": "5.100.1",
+    "webpack-cli": "6.0.1",
+    "webpack-dev-server": "5.2.2"
+  }
+}

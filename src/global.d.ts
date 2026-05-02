@@ -3,13 +3,14 @@ import type {
   ToolResultValue,
   ToolkitConfig,
   ViteReactMcpConfig,
-} from './shared/types';
-import type { WastedRenderFiberInfo } from './types/internal';
+} from './shared/types.js';
+import type { WastedRenderFiberInfo } from './types/internal.js';
 
 declare global {
   interface Window {
     __REACT_COMPONENTS__: string[];
     __VITE_REACT_MCP_CONFIG__?: ViteReactMcpConfig;
+    __VITE_REACT_MCP_BRIDGE_URL__?: string;
     __VITE_REACT_MCP_TOOLS__: {
       highlightComponent: (
         componentName: string,

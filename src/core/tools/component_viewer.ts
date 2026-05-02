@@ -1,7 +1,7 @@
 import type { Fiber } from 'bippy';
-import { FiberRootsNotFoundError } from '../../shared/errors';
-import { getAllFiberRoots, getDisplayNameForFiber } from '../../shared/util';
-import type { ComponentTreeNode } from '../../types/internal';
+import { FiberRootsNotFoundError } from '../../shared/errors.js';
+import { getAllFiberRoots, getDisplayNameForFiber } from '../../shared/util.js';
+import type { ComponentTreeNode } from '../../types/internal.js';
 
 /**
  * Recursively build a component tree with name from a fiber tree
