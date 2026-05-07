@@ -22,7 +22,7 @@ const baseConfig = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-react'],
+            presets: [['@babel/preset-react', { runtime: 'automatic' }]],
           },
         },
       },
@@ -45,4 +45,6 @@ const baseConfig = {
 };
 
 export default (env = {}, argv = {}) =>
-  withReactMcpWebpack(baseConfig, { mode: argv.mode || env.mode || 'development' });
+  withReactMcpWebpack(baseConfig, {
+    mode: argv.mode || env.mode || 'development',
+  });

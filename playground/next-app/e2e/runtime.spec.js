@@ -1,220 +1,117 @@
 import { expect, test } from '@playwright/test';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 
-const installMockBridge = async (page) => {
-  await page.addInitScript(() => {
-    const nativeWebSocket = window.WebSocket;
-    const sockets = [];
+const MCP_SERVER_URL = 'http://127.0.0.1:51426/sse';
 
-    class MockBridgeSocket {
-      constructor(url) {
-        this.url = String(url);
-        this.readyState = 1;
-        this.CONNECTING = 0;
-        this.OPEN = 1;
-        this.CLOSING = 2;
-        this.CLOSED = 3;
-        this.onopen = null;
-        this.onclose = null;
-        this.onerror = null;
-        this.onmessage = null;
-        this._listeners = new Map();
-        this.sentMessages = [];
-        sockets.push(this);
-
-        setTimeout(() => {
-          this._emit('open', {});
-        }, 0);
-      }
-
-      addEventListener(type, listener) {
-        if (!this._listeners.has(type)) {
-          this._listeners.set(type, []);
-        }
-        this._listeners.get(type).push(listener);
-      }
-
-      removeEventListener(type, listener) {
-        const listeners = this._listeners.get(type) || [];
-        this._listeners.set(
-          type,
-          listeners.filter((candidate) => candidate !== listener),
-        );
-      }
-
-      send(data) {
-        this.sentMessages.push(String(data));
-      }
-
-      close() {
-        this.readyState = 3;
-        this._emit('close', {});
-      }
-
-      dispatchBridgeRequest(message) {
-        this._emit('message', { data: JSON.stringify(message) });
-      }
-
-      _emit(type, event) {
-        const handler = this[`on${type}`];
-        if (typeof handler === 'function') {
-          handler(event);
-        }
-        const listeners = this._listeners.get(type) || [];
-        for (const listener of listeners) {
-          listener(event);
-        }
-      }
-    }
-
-    class BridgeAwareWebSocket {
-      static CONNECTING = nativeWebSocket.CONNECTING ?? 0;
-      static OPEN = nativeWebSocket.OPEN ?? 1;
-      static CLOSING = nativeWebSocket.CLOSING ?? 2;
-      static CLOSED = nativeWebSocket.CLOSED ?? 3;
-
-      constructor(url, protocols) {
-        const resolvedUrl = String(url);
-        if (resolvedUrl.includes('/__vite_react_mcp_bridge')) {
-          return new MockBridgeSocket(resolvedUrl);
-        }
-
-        if (protocols === undefined) {
-          return new nativeWebSocket(url);
-        }
-        return new nativeWebSocket(url, protocols);
-      }
-    }
-
-    window.__VITE_REACT_MCP_TEST_BRIDGE__ = { sockets };
-    window.WebSocket = BridgeAwareWebSocket;
+const createMcpClient = async () => {
+  const client = new Client({
+    name: 'next-playground-mcp-e2e',
+    version: '0.0.0',
   });
+  const transport = new SSEClientTransport(new URL(MCP_SERVER_URL));
+  await client.connect(transport);
+  return { client, transport };
 };
 
-const sendBridgeRequest = async (page, event, payload) => {
-  return await page.evaluate(
-    async ({ eventName, eventPayload }) => {
-      const bridge = window.__VITE_REACT_MCP_TEST_BRIDGE__;
-      const socket =
-        bridge?.sockets?.find((candidate) =>
-          String(candidate?.url || '').includes('/__vite_react_mcp_bridge'),
-        ) || null;
-      if (!socket) {
-        throw new Error('No mock bridge socket was created');
-      }
-
-      const requestId = `req-${Math.random().toString(36).slice(2)}`;
-      return await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error(`Timed out waiting for bridge response: ${eventName}`));
-        }, 4000);
-
-        const originalSend = socket.send.bind(socket);
-        socket.send = (rawData) => {
-          originalSend(rawData);
-          try {
-            const response = JSON.parse(String(rawData));
-            if (response?.id === requestId && response?.type === 'bridge:response') {
-              clearTimeout(timeoutId);
-              socket.send = originalSend;
-              resolve(response);
-            }
-          } catch (_error) {
-            // ignore malformed outbound messages
-          }
-        };
-
-        socket.dispatchBridgeRequest({
-          type: 'bridge:request',
-          id: requestId,
-          event: eventName,
-          payload: eventPayload,
-        });
-      });
-    },
-    { eventName: event, eventPayload: payload },
-  );
+const parseToolResponse = (result) => {
+  const textContent = result.content.find((content) => content.type === 'text');
+  if (!textContent || typeof textContent.text !== 'string') {
+    return null;
+  }
+  return JSON.parse(textContent.text);
 };
 
-test.beforeEach(async ({ page }) => {
-  await installMockBridge(page);
-});
-
-test('next playground injects runtime globals and bridge connection', async ({
-  page,
-}) => {
+test('next playground injects runtime globals', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__VITE_REACT_MCP__);
 
-  const runtimeShape = await page.evaluate(() => {
-    const socketUrls = (window.__VITE_REACT_MCP_TEST_BRIDGE__?.sockets || []).map(
-      (socket) => socket?.url || '',
-    );
-    return {
-      hasRuntime: Boolean(window.__VITE_REACT_MCP__),
-      hasTools: Boolean(window.__VITE_REACT_MCP_TOOLS__),
-      hasSelectionMode: typeof window.__VITE_REACT_MCP__?.setSelectionMode,
-      hasGetContext: typeof window.__VITE_REACT_MCP__?.getLastSelectionContext,
-      hasCopyContext: typeof window.__VITE_REACT_MCP__?.copyLastSelectionContext,
-      hasGetComponentTree: typeof window.__VITE_REACT_MCP_TOOLS__?.getComponentTree,
-      socketUrls,
-    };
-  });
+  const runtimeShape = await page.evaluate(() => ({
+    hasRuntime: Boolean(window.__VITE_REACT_MCP__),
+    hasTools: Boolean(window.__VITE_REACT_MCP_TOOLS__),
+    hasSelectionMode: typeof window.__VITE_REACT_MCP__?.setSelectionMode,
+    hasGetContext: typeof window.__VITE_REACT_MCP__?.getLastSelectionContext,
+    hasCopyContext: typeof window.__VITE_REACT_MCP__?.copyLastSelectionContext,
+  }));
 
   expect(runtimeShape.hasRuntime).toBe(true);
   expect(runtimeShape.hasTools).toBe(true);
   expect(runtimeShape.hasSelectionMode).toBe('function');
   expect(runtimeShape.hasGetContext).toBe('function');
   expect(runtimeShape.hasCopyContext).toBe('function');
-  expect(runtimeShape.hasGetComponentTree).toBe('function');
-  expect(runtimeShape.socketUrls.length).toBeGreaterThan(0);
-  expect(
-    runtimeShape.socketUrls.some((url) =>
-      url.includes('/__vite_react_mcp_bridge'),
-    ),
-  ).toBe(true);
 });
 
-test('next playground bridge handles get-html-elements request', async ({
-  page,
-}) => {
+test('next playground MCP tools return expected outcomes', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__VITE_REACT_MCP__);
 
-  const bridgeResponse = await sendBridgeRequest(page, 'get-html-elements', {
-    queries: ['next-copy-target'],
-    maxMatches: 3,
-  });
+  const { client, transport } = await createMcpClient();
+  try {
+    const htmlMatchesRaw = await client.callTool({
+      name: 'get-html-elements',
+      arguments: {
+        queries: ['next-copy-target'],
+        maxMatches: 3,
+      },
+    });
+    const htmlMatches = parseToolResponse(htmlMatchesRaw);
+    expect(htmlMatches.success).toBe(true);
+    expect(htmlMatches.count).toBeGreaterThan(0);
+    expect(htmlMatches.matches[0].selector).toBe('#next-copy-target');
 
-  expect(bridgeResponse.ok).toBe(true);
-  expect(bridgeResponse.payload.success).toBe(true);
-  expect(bridgeResponse.payload.count).toBeGreaterThan(0);
-  expect(bridgeResponse.payload.matches[0].selector).toBe('#next-copy-target');
-});
+    const reactSourceRaw = await client.callTool({
+      name: 'get-react-source-code',
+      arguments: {
+        queries: ['next-copy-target'],
+        maxMatches: 3,
+        includeSourceSnippets: true,
+      },
+    });
+    const reactSource = parseToolResponse(reactSourceRaw);
+    expect(reactSource.success).toBe(true);
+    expect(reactSource.chosenMatch.selector).toBe('#next-copy-target');
+    expect(reactSource.context).toBeTruthy();
 
-test('next playground bridge handles get-react-source-code success and no-match responses', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+    const noMatchRaw = await client.callTool({
+      name: 'get-react-source-code',
+      arguments: {
+        queries: ['text-not-present-in-next-playground'],
+      },
+    });
+    const noMatch = parseToolResponse(noMatchRaw);
+    expect(noMatch.success).toBe(false);
+    expect(noMatch.reason).toContain('No element matched');
+    expect(noMatch.context).toBeNull();
 
-  const successResponse = await sendBridgeRequest(page, 'get-react-source-code', {
-    queries: ['next-copy-target'],
-    maxMatches: 3,
-  });
+    const enableSelectionRaw = await client.callTool({
+      name: 'set-selection-mode',
+      arguments: { enabled: true },
+    });
+    const enableSelection = parseToolResponse(enableSelectionRaw);
+    expect(enableSelection.success).toBe(true);
+    expect(enableSelection.enabled).toBe(true);
 
-  expect(successResponse.ok).toBe(true);
-  expect(successResponse.payload.success).toBe(true);
-  expect(successResponse.payload.chosenMatch.selector).toBe('#next-copy-target');
-  expect(successResponse.payload.matches.length).toBeGreaterThan(0);
-  expect(successResponse.payload.context).toBeTruthy();
-  expect(successResponse.payload.context.selector).toBeTruthy();
+    await page.locator('#next-copy-target').click();
+    const contextRaw = await client.callTool({
+      name: 'get-last-selection-context',
+      arguments: {
+        includeSourceSnippets: true,
+        contextLines: 3,
+        maxFiles: 3,
+      },
+    });
+    const context = parseToolResponse(contextRaw);
+    expect(context.success).toBe(true);
+    expect(context.context.selector).toBe('#next-copy-target');
 
-  const noMatchResponse = await sendBridgeRequest(page, 'get-react-source-code', {
-    queries: ['text-not-present-in-next-playground'],
-  });
-
-  expect(noMatchResponse.ok).toBe(true);
-  expect(noMatchResponse.payload.success).toBe(false);
-  expect(noMatchResponse.payload.reason).toContain('No element matched');
-  expect(noMatchResponse.payload.context).toBeNull();
+    const copyRaw = await client.callTool({
+      name: 'copy-last-selection-context',
+      arguments: { format: 'json' },
+    });
+    const copyResponse = parseToolResponse(copyRaw);
+    expect(copyResponse.success).toBe(true);
+    expect(copyResponse.copied).toBe(true);
+  } finally {
+    await transport.close();
+  }
 });

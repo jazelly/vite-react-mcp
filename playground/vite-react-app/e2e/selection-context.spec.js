@@ -22,14 +22,66 @@ const parseToolResponse = (result) => {
   return JSON.parse(textContent.text);
 };
 
+const getToolText = (result) => {
+  const textContent = result.content.find((content) => content.type === 'text');
+  if (!textContent || typeof textContent.text !== 'string') {
+    return '';
+  }
+  return textContent.text;
+};
+
 const selectProfileEmailField = async (page) => {
   await page.goto('/profile/1');
   await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
 
   await page.waitForFunction(() => window.__VITE_REACT_MCP__);
-  await page.evaluate(() => window.__VITE_REACT_MCP__.enterSelectionMode());
-
+  await page.evaluate(() => window.__VITE_REACT_MCP__.setSelectionMode(true));
   await page.locator('#profile-field-email').click();
+
+  const didCapture = await page.evaluate(() =>
+    Boolean(window.__VITE_REACT_MCP__?.getLastSelectionContext()),
+  );
+  if (!didCapture) {
+    await page.evaluate(() => window.__VITE_REACT_MCP__.setSelectionMode(true));
+    await page.locator('#profile-field-email').click();
+  }
+};
+
+const getToolkitRoot = (page) =>
+  page.locator('[data-vite-react-mcp-toolkit="true"]');
+
+const openToolkitPanel = async (page) => {
+  const toolkitRoot = getToolkitRoot(page);
+  await toolkitRoot.waitFor();
+  const selectButton = toolkitRoot.getByRole('button', {
+    name: 'Select',
+    exact: true,
+  });
+  if (await selectButton.isVisible()) {
+    return;
+  }
+
+  const launcherButton = toolkitRoot.locator(
+    'button[aria-label*="Vite React MCP toolkit"]',
+  );
+
+  await launcherButton.first().click({ force: true });
+
+  if (!(await selectButton.isVisible())) {
+    await launcherButton.first().click({ force: true });
+  }
+
+  await expect(selectButton).toBeVisible();
+};
+
+const captureWithToolkitUi = async (page, selector) => {
+  const toolkitRoot = getToolkitRoot(page);
+  await openToolkitPanel(page);
+  await toolkitRoot.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.locator(selector).click();
+  await expect(
+    toolkitRoot.getByText('Captured', { exact: false }),
+  ).toBeVisible();
 };
 
 test('copying without a selection returns a no-selection response', async ({
@@ -265,6 +317,140 @@ test('MCP get-react-source-code returns no-match payload when queries miss all e
     expect(miss.success).toBe(false);
     expect(miss.reason).toContain('No element matched');
     expect(miss.context).toBeNull();
+  } finally {
+    await transport.close();
+  }
+});
+
+test('toolkit bottom-right UI can capture reusable component source context across parents', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  const toolkitRoot = getToolkitRoot(page);
+  const toolkitPosition = await toolkitRoot.evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    return {
+      position: styles.position,
+      right: styles.right,
+      bottom: styles.bottom,
+    };
+  });
+  expect(toolkitPosition.position).toBe('fixed');
+  expect(toolkitPosition.right).toBe('20px');
+  expect(toolkitPosition.bottom).toBe('20px');
+
+  const { client, transport } = await createMcpClient();
+  try {
+    await captureWithToolkitUi(page, '#profile-display-email-value');
+    await toolkitRoot.getByRole('button', { name: 'Copy', exact: true }).click();
+
+    const profileFieldContextRaw = await client.callTool({
+      name: 'get-last-selection-context',
+      arguments: {
+        includeSourceSnippets: true,
+        contextLines: 4,
+        maxFiles: 4,
+      },
+    });
+    const profileFieldContext = parseToolResponse(profileFieldContextRaw);
+    expect(profileFieldContext.success).toBe(true);
+    expect(profileFieldContext.context.selector).toBe('#profile-display-email-value');
+    expect(profileFieldContext.context.resolvedSources).toContainEqual(
+      expect.objectContaining({
+        filePath: expect.stringContaining('src/components/Common/LabeledValue.jsx'),
+      }),
+    );
+    expect(profileFieldContext.context.resolvedSources).toContainEqual(
+      expect.objectContaining({
+        filePath: expect.stringContaining('src/components/UserProfile/ProfileField.jsx'),
+      }),
+    );
+
+    await captureWithToolkitUi(page, '#profile-header-occupation-value');
+    const profileHeaderContextRaw = await client.callTool({
+      name: 'get-last-selection-context',
+      arguments: {
+        includeSourceSnippets: true,
+        contextLines: 4,
+        maxFiles: 4,
+      },
+    });
+    const profileHeaderContext = parseToolResponse(profileHeaderContextRaw);
+    expect(profileHeaderContext.success).toBe(true);
+    expect(profileHeaderContext.context.selector).toBe(
+      '#profile-header-occupation-value',
+    );
+    expect(profileHeaderContext.context.resolvedSources).toContainEqual(
+      expect.objectContaining({
+        filePath: expect.stringContaining('src/components/Common/LabeledValue.jsx'),
+      }),
+    );
+    expect(profileHeaderContext.context.resolvedSources).toContainEqual(
+      expect.objectContaining({
+        filePath: expect.stringContaining('src/components/UserProfile/ProfileHeader.jsx'),
+      }),
+    );
+  } finally {
+    await transport.close();
+  }
+});
+
+test('MCP built-in tooling endpoints all return expected outcomes', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  const { client, transport } = await createMcpClient();
+  try {
+    const highlightRaw = await client.callTool({
+      name: 'highlight-component',
+      arguments: { componentName: 'ProfileField' },
+    });
+    const highlightText = getToolText(highlightRaw);
+    expect(highlightText).toContain('highlighted');
+
+    const treeRaw = await client.callTool({
+      name: 'get-component-tree',
+      arguments: { allComponents: false },
+    });
+    const treeText = getToolText(treeRaw);
+    const tree = JSON.parse(treeText);
+    expect(tree).toBeTruthy();
+    expect(JSON.stringify(tree)).toContain('UserProfile');
+
+    const statesRaw = await client.callTool({
+      name: 'get-component-states',
+      arguments: { componentName: 'ProfileField' },
+    });
+    const statesText = getToolText(statesRaw);
+    const states = JSON.parse(statesText);
+    expect(states).toBeTruthy();
+    expect(Object.keys(states).length).toBeGreaterThan(0);
+
+    const rerendersRaw = await client.callTool({
+      name: 'get-unnecessary-rerenders',
+      arguments: { timeframe: 60, allComponents: true },
+    });
+    const rerendersText = getToolText(rerendersRaw);
+    const rerenders = JSON.parse(rerendersText);
+    expect(Array.isArray(rerenders)).toBe(true);
+
+    await selectProfileEmailField(page);
+    const copiedRaw = await client.callTool({
+      name: 'copy-last-selection-context',
+      arguments: { format: 'json' },
+    });
+    const copied = parseToolResponse(copiedRaw);
+    expect(typeof copied.success).toBe('boolean');
+    expect(typeof copied.copied).toBe('boolean');
+    expect(copied.format).toBe('json');
+    expect(copied.context).toBeTruthy();
+    if (!copied.success) {
+      expect(copied.error).toContain('Failed to copy context');
+    }
   } finally {
     await transport.close();
   }

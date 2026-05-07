@@ -5,7 +5,7 @@
   "scripts": {
     "start": "next dev -p 51424",
     "build": "next build",
-    "test:e2e": "playwright test"
+    "test:e2e": "pnpm -C ../.. run build && playwright test"
   },
   "dependencies": {
     "next": "15.5.4",

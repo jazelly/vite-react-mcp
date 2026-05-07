@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { useProfile } from '../../context/ProfileContext';
+import LabeledValue from '../Common/LabeledValue';
 
 const ProfileField = memo(({ 
   label, 
@@ -49,10 +50,12 @@ const ProfileField = memo(({
   }
   
   return (
-    <div style={{ marginBottom: '16px' }}>
-      <span style={{ fontSize: '0.75rem', color: 'rgba(0, 0, 0, 0.6)', display: 'block' }}>{label}</span>
-      <p style={{ margin: '4px 0 0 0', fontSize: '1rem' }}>{value}</p>
-    </div>
+    <LabeledValue
+      idBase={`profile-display-${name}`}
+      label={label}
+      value={value}
+      containerStyle={{ marginBottom: '16px' }}
+    />
   );
 });
 ProfileField.displayName = 'ProfileField';
