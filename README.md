@@ -191,9 +191,9 @@ pnpm run playground
 The playground contains a simple user profile application to test React component interactions.
 
 For e2e automation, Playwright uses a fixed local dev port (`51423`) configured in
-[`playground/user-profile-app/vite.config.js`](./playground/user-profile-app/vite.config.js)
+[`playground/vite-react-app/vite.config.js`](./playground/vite-react-app/vite.config.js)
 and
-[`playground/user-profile-app/playwright.config.js`](./playground/user-profile-app/playwright.config.js).
+[`playground/vite-react-app/playwright.config.js`](./playground/vite-react-app/playwright.config.js).
 
 Dependency versions in this package intentionally keep semver ranges for integration libraries (for example `bippy`) and use the workspace lockfile (`pnpm-lock.yaml`) for reproducible installs.
 

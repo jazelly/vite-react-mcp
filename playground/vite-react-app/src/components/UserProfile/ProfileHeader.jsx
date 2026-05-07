@@ -3,6 +3,7 @@ import { Box, Typography, Avatar, IconButton, Divider } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
+import LabeledValue from '../Common/LabeledValue';
 
 const ProfileHeader = ({ 
   profileData, 
@@ -29,9 +30,14 @@ const ProfileHeader = ({
             <Typography variant="h5">
               {profileData.firstName} {profileData.lastName}
             </Typography>
-            <Typography variant="subtitle1" color="text.secondary">
-              {profileData.occupation}
-            </Typography>
+            <LabeledValue
+              idBase="profile-header-occupation"
+              label="Role"
+              value={profileData.occupation}
+              containerStyle={{ marginTop: '6px' }}
+              labelStyle={{ fontSize: '0.7rem' }}
+              valueStyle={{ marginTop: '2px', fontSize: '0.95rem' }}
+            />
           </Box>
         </Box>
         

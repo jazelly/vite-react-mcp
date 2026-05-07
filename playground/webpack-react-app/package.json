@@ -1,10 +1,11 @@
 {
   "name": "webpack-react-playground",
   "private": true,
+  "type": "module",
   "scripts": {
     "start": "webpack serve --config webpack.config.mjs --mode development --port 51425",
     "build": "webpack --config webpack.config.mjs --mode production",
-    "test:e2e": "playwright test"
+    "test:e2e": "pnpm -C ../.. run build && playwright test"
   },
   "dependencies": {
     "react": "19.1.1",
