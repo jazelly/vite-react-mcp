@@ -1,0 +1,66 @@
+{
+  "name": "catalog",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/catalog/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nrwl/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "compiler": "babel",
+        "outputPath": "dist/apps/catalog",
+        "index": "apps/catalog/src/index.html",
+        "baseHref": "/",
+        "main": "apps/catalog/src/main.ts",
+        "polyfills": "apps/catalog/src/polyfills.ts",
+        "tsConfig": "apps/catalog/tsconfig.app.json",
+        "assets": ["apps/catalog/src/assets"],
+        "styles": ["apps/catalog/src/styles.css"],
+        "scripts": [],
+        "webpackConfig": "apps/catalog/webpack.config.js"
+      },
+      "configurations": {
+        "development": {
+          "extractLicenses": false,
+          "optimization": false,
+          "sourceMap": true,
+          "vendorChunk": true
+        },
+        "production": {
+          "extractLicenses": true,
+          "optimization": true,
+          "sourceMap": false,
+          "vendorChunk": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nrwl/webpack:dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "catalog:build",
+        "host": "127.0.0.1",
+        "port": 4201
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "catalog:build:development"
+        },
+        "production": {
+          "buildTarget": "catalog:build:production"
+        }
+      }
+    },
+    "dev": {
+      "executor": "@nrwl/webpack:dev-server",
+      "options": {
+        "buildTarget": "catalog:build:development",
+        "host": "127.0.0.1",
+        "port": 4201
+      }
+    }
+  },
+  "tags": ["scope:remote", "type:app"]
+}

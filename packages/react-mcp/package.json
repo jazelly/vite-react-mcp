@@ -1,0 +1,35 @@
+{
+  "name": "react-mcp",
+  "type": "module",
+  "version": "0.3.0",
+  "description": "MCP server primitives for React runtime inspection",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "shx rm -rf dist && tsc"
+  },
+  "keywords": [
+    "react",
+    "mcp",
+    "model-context-protocol",
+    "agents",
+    "devtools"
+  ],
+  "author": {
+    "name": "jazelly",
+    "email": "xzha4350@gmail.com"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "vite-react-mcp": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}

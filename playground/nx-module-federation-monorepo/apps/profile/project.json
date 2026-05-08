@@ -1,0 +1,66 @@
+{
+  "name": "profile",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/profile/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nrwl/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "compiler": "babel",
+        "outputPath": "dist/apps/profile",
+        "index": "apps/profile/src/index.html",
+        "baseHref": "/",
+        "main": "apps/profile/src/main.ts",
+        "polyfills": "apps/profile/src/polyfills.ts",
+        "tsConfig": "apps/profile/tsconfig.app.json",
+        "assets": ["apps/profile/src/assets"],
+        "styles": ["apps/profile/src/styles.css"],
+        "scripts": [],
+        "webpackConfig": "apps/profile/webpack.config.js"
+      },
+      "configurations": {
+        "development": {
+          "extractLicenses": false,
+          "optimization": false,
+          "sourceMap": true,
+          "vendorChunk": true
+        },
+        "production": {
+          "extractLicenses": true,
+          "optimization": true,
+          "sourceMap": false,
+          "vendorChunk": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nrwl/webpack:dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "profile:build",
+        "host": "127.0.0.1",
+        "port": 4202
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "profile:build:development"
+        },
+        "production": {
+          "buildTarget": "profile:build:production"
+        }
+      }
+    },
+    "dev": {
+      "executor": "@nrwl/webpack:dev-server",
+      "options": {
+        "buildTarget": "profile:build:development",
+        "host": "127.0.0.1",
+        "port": 4202
+      }
+    }
+  },
+  "tags": ["scope:remote", "type:app"]
+}
