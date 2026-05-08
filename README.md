@@ -5,6 +5,15 @@
 
 A Vite plugin that creates an MCP server to help LLMs understand your React App context
 
+## Workspace Packages
+
+This repository is a pnpm workspace. Published packages live under `packages/`:
+
+- `vite-react-mcp`: Vite integration.
+- `webpack-react-mcp`: Webpack integration.
+- `react-mcp`: MCP server and runtime bridge primitives.
+- `react-component-select`: React component selection and context capture toolkit.
+
 ## Features
 
 - `highlight-component`
@@ -189,6 +198,23 @@ pnpm run playground
 ```
 
 The playground contains a simple user profile application to test React component interactions.
+
+There is also an Nx-style module federation fixture for older enterprise
+monorepos:
+
+```bash
+pnpm run playground:nx-mf
+```
+
+It lives in
+[`playground/nx-module-federation-monorepo`](./playground/nx-module-federation-monorepo)
+and models a pnpm-managed Nx 15 monorepo with one root `package.json`, a shell
+host, multiple remotes, app-level `project.json` files, app-level
+`module-federation.config.js` files, root `module-federation.js` project-graph
+remote resolution, and root `webpack.config.base.js` environment filtering. It
+uses `@nrwl/webpack:webpack`, Webpack 5 Module Federation, React 18.2.0, React
+DOM 18.2.0, React Router DOM 6.4.2, TypeScript 4.8.4, Babel, ESLint, and a
+legacy React 17 dependency edge.
 
 For e2e automation, Playwright uses a fixed local dev port (`51423`) configured in
 [`playground/vite-react-app/vite.config.js`](./playground/vite-react-app/vite.config.js)

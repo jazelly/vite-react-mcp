@@ -8,8 +8,8 @@
   "files": {
     "ignoreUnknown": false,
     "include": [
-      "src/**/*.ts",
-      "src/**/*.js",
+      "packages/**/*.ts",
+      "packages/**/*.js",
       "playground/**/*.ts",
       "playground/**/*.tsx",
       "*.ts",

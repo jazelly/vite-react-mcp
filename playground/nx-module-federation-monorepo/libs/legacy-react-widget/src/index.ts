@@ -1,0 +1,1 @@
+export { LegacyRuntimeBadge } from './LegacyRuntimeBadge';

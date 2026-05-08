@@ -1,0 +1,583 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import {
+  CallToolRequestSchema,
+  type CallToolResult,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import type { ViteDevServer } from 'vite';
+import { z } from 'zod';
+import zodToJsonSchema from 'zod-to-json-schema';
+import { getVersionString } from '../shared/node_util.js';
+import type { BridgeRequestEvent } from '../shared/protocol.js';
+import {
+  buildSelectionContextSummary,
+  buildSelectionSourcePreview,
+} from '../shared/selection_context_format.js';
+import {
+  classifySourcePath,
+  isAllowedProjectSourcePath,
+  normalizeSourceRoot,
+} from '../shared/source_path.js';
+import type {
+  CustomTool,
+  SelectionContext,
+  SelectionSourceSnippet,
+  ToolResultValue,
+} from '../shared/types.js';
+import {
+  CopyLastSelectionContextSchema,
+  GetComponentStatesSchema,
+  GetComponentTreeSchema,
+  GetHtmlElementsSchema,
+  GetLastSelectionContextSchema,
+  GetReactSourceCodeSchema,
+  GetUnnecessaryRerendersSchema,
+  HighlightComponentSchema,
+  SetSelectionModeSchema,
+} from './schema.js';
+
+const builtInTools = [
+  {
+    name: 'highlight-component',
+    description: 'Highlight React component based on the component name.',
+    inputSchema: zodToJsonSchema(HighlightComponentSchema),
+  },
+  {
+    name: 'get-component-tree',
+    description:
+      'Get the React component tree of the current page in ASCII format.',
+    inputSchema: zodToJsonSchema(GetComponentTreeSchema),
+  },
+  {
+    name: 'get-component-states',
+    description:
+      'Get the React component props, states, and contexts in JSON structure format.',
+    inputSchema: zodToJsonSchema(GetComponentStatesSchema),
+  },
+  {
+    name: 'get-unnecessary-rerenders',
+    description: 'Get the wasted re-rendered components of the current page',
+    inputSchema: zodToJsonSchema(GetUnnecessaryRerendersSchema),
+  },
+  {
+    name: 'set-selection-mode',
+    description:
+      'Enable or disable browser element selection mode for context capture.',
+    inputSchema: zodToJsonSchema(SetSelectionModeSchema),
+  },
+  {
+    name: 'get-last-selection-context',
+    description:
+      'Get the latest captured selection context, optionally enriched with source snippets from the project filesystem.',
+    inputSchema: zodToJsonSchema(GetLastSelectionContextSchema),
+  },
+  {
+    name: 'copy-last-selection-context',
+    description:
+      'Copy the latest captured selection context from the browser runtime into clipboard.',
+    inputSchema: zodToJsonSchema(CopyLastSelectionContextSchema),
+  },
+  {
+    name: 'get-html-elements',
+    description:
+      'Find matching HTML elements by search strings and return deterministic candidates.',
+    inputSchema: zodToJsonSchema(GetHtmlElementsSchema),
+  },
+  {
+    name: 'get-react-source-code',
+    description:
+      'Find matching elements using search strings and return deterministic React source context for the best candidate.',
+    inputSchema: zodToJsonSchema(GetReactSourceCodeSchema),
+  },
+] as const;
+
+type BuiltInToolName = (typeof builtInTools)[number]['name'];
+
+const builtInToolNames = new Set(builtInTools.map((tool) => tool.name));
+
+function isBuiltInToolName(name: string): name is BuiltInToolName {
+  return builtInToolNames.has(name as BuiltInToolName);
+}
+
+function formatToolResult(result: ToolResultValue): string {
+  if (typeof result === 'string') {
+    return result;
+  }
+  if (result === undefined) {
+    return 'Custom tool executed successfully.';
+  }
+  try {
+    return JSON.stringify(result);
+  } catch (_error) {
+    return String(result);
+  }
+}
+
+const toTextResponse = (data: unknown): CallToolResult => {
+  return {
+    content: [{ type: 'text', text: JSON.stringify(data) }],
+  };
+};
+
+const resolveAbsoluteSourcePath = (
+  rootDir: string,
+  filePath: string,
+): string | null => {
+  const normalizedRootDir = fs.realpathSync(rootDir);
+  const normalizedSourceRoot = normalizeSourceRoot(
+    normalizedRootDir.replace(/\\/g, '/'),
+  );
+
+  if (!isAllowedProjectSourcePath(filePath, normalizedSourceRoot)) {
+    return null;
+  }
+
+  const classifiedPath = classifySourcePath(filePath, normalizedSourceRoot);
+  const candidates: string[] = [];
+
+  if (classifiedPath.kind === 'vite-fs') {
+    const fileSystemPath = classifiedPath.normalizedPath.slice('/@fs'.length);
+    candidates.push(path.resolve(fileSystemPath));
+  } else if (classifiedPath.kind === 'fs-absolute') {
+    candidates.push(path.resolve(classifiedPath.normalizedPath));
+  } else if (classifiedPath.kind === 'vite-root-relative') {
+    candidates.push(path.resolve(rootDir, `.${classifiedPath.normalizedPath}`));
+  } else if (classifiedPath.kind === 'project-relative') {
+    candidates.push(path.resolve(rootDir, classifiedPath.normalizedPath));
+  }
+
+  for (const candidate of candidates) {
+    const resolvedCandidate = path.resolve(candidate);
+    if (!fs.existsSync(resolvedCandidate)) {
+      continue;
+    }
+
+    const stat = fs.statSync(resolvedCandidate);
+    if (!stat.isFile()) {
+      continue;
+    }
+
+    const realCandidate = fs.realpathSync(resolvedCandidate);
+    const relativeToRoot = path.relative(normalizedRootDir, realCandidate);
+    const isInsideRoot =
+      relativeToRoot === '' ||
+      (!relativeToRoot.startsWith('..') && !path.isAbsolute(relativeToRoot));
+    if (!isInsideRoot) {
+      continue;
+    }
+
+    const pathSegments = relativeToRoot.split(path.sep);
+    if (
+      pathSegments.includes('node_modules') ||
+      pathSegments.includes('.vite')
+    ) {
+      continue;
+    }
+
+    return realCandidate;
+  }
+
+  return null;
+};
+
+const getSourceSnippet = (
+  filePath: string,
+  lineNumber: number | null,
+  contextLines: number,
+): SelectionSourceSnippet | null => {
+  try {
+    const rawFileContent = fs.readFileSync(filePath, 'utf8');
+    const fileLines = rawFileContent.split(/\r?\n/);
+    const referenceLine = Math.max(
+      1,
+      Math.min(fileLines.length, lineNumber || 1),
+    );
+    const startLine = Math.max(1, referenceLine - contextLines);
+    const endLine = Math.min(fileLines.length, referenceLine + contextLines);
+
+    const snippet = fileLines
+      .slice(startLine - 1, endLine)
+      .map((lineContent, index) => {
+        const absoluteLine = startLine + index;
+        return `${absoluteLine}: ${lineContent}`;
+      })
+      .join('\n');
+
+    return {
+      filePath,
+      startLine,
+      endLine,
+      snippet,
+    };
+  } catch (_error) {
+    return null;
+  }
+};
+
+const enrichSelectionContextWithSnippets = (
+  rootDir: string,
+  selectionContext: SelectionContext,
+  contextLines: number,
+  maxFiles: number,
+): SelectionContext => {
+  const sourceSnippets: SelectionSourceSnippet[] = [];
+  const seenFilePaths = new Set<string>();
+
+  for (const resolvedSource of selectionContext.resolvedSources) {
+    const sourceFilePath = resolvedSource.filePath;
+    if (!sourceFilePath || seenFilePaths.has(sourceFilePath)) {
+      continue;
+    }
+
+    if (sourceSnippets.length >= maxFiles) {
+      break;
+    }
+
+    const absoluteSourcePath = resolveAbsoluteSourcePath(
+      rootDir,
+      sourceFilePath,
+    );
+    if (!absoluteSourcePath) {
+      continue;
+    }
+
+    const sourceSnippet = getSourceSnippet(
+      absoluteSourcePath,
+      resolvedSource.lineNumber,
+      contextLines,
+    );
+
+    if (!sourceSnippet) {
+      continue;
+    }
+
+    sourceSnippets.push({
+      ...sourceSnippet,
+      filePath: sourceFilePath,
+    });
+    seenFilePaths.add(sourceFilePath);
+  }
+
+  return {
+    ...selectionContext,
+    sourceSnippets,
+    sourcePreview: buildSelectionSourcePreview({
+      ...selectionContext,
+      sourceSnippets,
+    }),
+  };
+};
+
+const parseSelectionContextResponse = (response: {
+  context: SelectionContext | null;
+}): SelectionContext | null => {
+  if (!response || !response.context) {
+    return null;
+  }
+
+  return {
+    ...response.context,
+    sourcePreview: response.context.sourcePreview ?? null,
+    sourceSnippets: Array.isArray(response.context.sourceSnippets)
+      ? response.context.sourceSnippets
+      : [],
+  };
+};
+
+export interface McpRuntimeBridge {
+  request: (event: BridgeRequestEvent, payload: unknown) => Promise<unknown>;
+}
+
+const requestRuntime = async <T>(
+  bridge: McpRuntimeBridge,
+  event: BridgeRequestEvent,
+  args: unknown,
+): Promise<T> => {
+  const response = await bridge.request(event, args);
+  return response as T;
+};
+
+export function initMcpServer(
+  bridge: McpRuntimeBridge,
+  rootDir: string,
+  customTools: CustomTool[] = [],
+): Server {
+  const server = new Server(
+    {
+      name: 'vite-react-mcp',
+      version: getVersionString(),
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    },
+  );
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const dynamicTools = customTools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: zodToJsonSchema(tool.schema),
+    }));
+
+    return {
+      tools: [...builtInTools, ...dynamicTools],
+    };
+  });
+
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    async (request): Promise<CallToolResult> => {
+      try {
+        if (isBuiltInToolName(request.params.name)) {
+          switch (request.params.name) {
+            case 'highlight-component': {
+              const args = HighlightComponentSchema.parse(
+                request.params.arguments,
+              );
+              const response = await requestRuntime<string>(
+                bridge,
+                'highlight-component',
+                args,
+              );
+              return {
+                content: [{ type: 'text', text: response }],
+              };
+            }
+
+            case 'get-component-tree': {
+              const args = GetComponentTreeSchema.parse(
+                request.params.arguments,
+              );
+              const response = await requestRuntime<string>(
+                bridge,
+                'get-component-tree',
+                args,
+              );
+              return {
+                content: [{ type: 'text', text: response }],
+              };
+            }
+
+            case 'get-component-states': {
+              const args = GetComponentStatesSchema.parse(
+                request.params.arguments,
+              );
+              const response = await requestRuntime<string>(
+                bridge,
+                'get-component-states',
+                args,
+              );
+              return {
+                content: [{ type: 'text', text: response }],
+              };
+            }
+
+            case 'get-unnecessary-rerenders': {
+              const args = GetUnnecessaryRerendersSchema.parse(
+                request.params.arguments,
+              );
+
+              const response = await requestRuntime<string>(
+                bridge,
+                'get-unnecessary-rerenders',
+                args,
+              );
+              return {
+                content: [{ type: 'text', text: response }],
+              };
+            }
+
+            case 'set-selection-mode': {
+              const args = SetSelectionModeSchema.parse(
+                request.params.arguments,
+              );
+              const response = await requestRuntime<{
+                success: boolean;
+                enabled: boolean;
+              }>(bridge, 'set-selection-mode', args);
+
+              return toTextResponse(response);
+            }
+
+            case 'get-last-selection-context': {
+              const args = GetLastSelectionContextSchema.parse(
+                request.params.arguments,
+              );
+
+              const browserResponse = await requestRuntime<{
+                context: SelectionContext | null;
+              }>(bridge, 'get-last-selection-context', args);
+
+              const selectionContext =
+                parseSelectionContextResponse(browserResponse);
+              if (!selectionContext) {
+                return toTextResponse({
+                  success: false,
+                  message: 'No selection context has been captured yet.',
+                  context: null,
+                });
+              }
+
+              const enrichedSelectionContext = args.includeSourceSnippets
+                ? enrichSelectionContextWithSnippets(
+                    rootDir,
+                    selectionContext,
+                    args.contextLines,
+                    args.maxFiles,
+                  )
+                : selectionContext;
+
+              return toTextResponse({
+                success: true,
+                summary: buildSelectionContextSummary(enrichedSelectionContext),
+                context: enrichedSelectionContext,
+              });
+            }
+
+            case 'copy-last-selection-context': {
+              const args = CopyLastSelectionContextSchema.parse(
+                request.params.arguments,
+              );
+
+              const response = await requestRuntime<{
+                success: boolean;
+                copied: boolean;
+                format: 'text' | 'json';
+                context?: SelectionContext;
+                error?: string;
+              }>(bridge, 'copy-last-selection-context', args);
+
+              return toTextResponse(response);
+            }
+
+            case 'get-html-elements': {
+              const args = GetHtmlElementsSchema.parse(
+                request.params.arguments,
+              );
+              const response = await requestRuntime<unknown>(
+                bridge,
+                'get-html-elements',
+                args,
+              );
+              return toTextResponse(response);
+            }
+
+            case 'get-react-source-code': {
+              const args = GetReactSourceCodeSchema.parse(
+                request.params.arguments,
+              );
+              const response = (await requestRuntime<{
+                success: boolean;
+                reason?: string;
+                chosenMatch?: {
+                  selector: string | null;
+                  query: string;
+                };
+                context?: SelectionContext | null;
+              }>(bridge, 'get-react-source-code', args)) || {
+                success: false,
+              };
+
+              if (!response.success || !response.context) {
+                return toTextResponse(response);
+              }
+
+              const enrichedContext = args.includeSourceSnippets
+                ? enrichSelectionContextWithSnippets(
+                    rootDir,
+                    response.context,
+                    args.contextLines,
+                    args.maxFiles,
+                  )
+                : response.context;
+
+              return toTextResponse({
+                success: true,
+                chosenMatch: response.chosenMatch,
+                summary: buildSelectionContextSummary(enrichedContext),
+                context: enrichedContext,
+              });
+            }
+
+            default:
+              throw new Error(`Unknown tool: ${request.params.name}`);
+          }
+        }
+
+        const customTool = customTools.find(
+          (tool) => tool.name === request.params.name,
+        );
+        if (customTool) {
+          const parsedArgs = customTool.schema.parse(request.params.arguments);
+
+          if (typeof customTool.clientFunction !== 'function') {
+            throw new Error(
+              `Custom tool "${customTool.name}" must provide a function clientFunction for MCP execution.`,
+            );
+          }
+
+          const result = await customTool.clientFunction(parsedArgs);
+          return {
+            content: [{ type: 'text', text: formatToolResult(result) }],
+          };
+        }
+
+        throw new Error(`Unknown tool: ${request.params.name}`);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          throw new Error(`Invalid input: ${JSON.stringify(error.errors)}`);
+        }
+        throw error;
+      }
+    },
+  );
+
+  return server;
+}
+
+export function instrumentViteDevServer(
+  viteDevServer: ViteDevServer,
+  mcpServer: Server,
+) {
+  const transports = new Map<string, SSEServerTransport>();
+
+  viteDevServer.middlewares.use('/sse', async (_req, res) => {
+    const transport = new SSEServerTransport('/messages', res);
+    transports.set(transport.sessionId, transport);
+    res.on('close', () => {
+      transports.delete(transport.sessionId);
+    });
+    await mcpServer.connect(transport);
+  });
+
+  viteDevServer.middlewares.use('/messages', async (req, res) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.end('Method Not Allowed');
+      return;
+    }
+
+    const query = new URLSearchParams(req.url?.split('?').pop() || '');
+    const clientId = query.get('sessionId');
+
+    if (!clientId || typeof clientId !== 'string') {
+      res.statusCode = 400;
+      res.end('Bad Request');
+      return;
+    }
+
+    const transport = transports.get(clientId);
+    if (!transport) {
+      res.statusCode = 404;
+      res.end('Not Found');
+      return;
+    }
+
+    await transport.handlePostMessage(req, res);
+  });
+}

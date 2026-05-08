@@ -1,0 +1,8 @@
+{
+  "name": "legacy-react-widget",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/legacy-react-widget/src",
+  "projectType": "library",
+  "targets": {},
+  "tags": ["scope:shared", "type:legacy"]
+}

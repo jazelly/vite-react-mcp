@@ -1,68 +1,22 @@
 {
-  "name": "vite-react-mcp",
+  "name": "react-mcp-workspace",
+  "private": true,
   "type": "module",
-  "version": "0.3.0",
-  "description": "Vite plugin for React MCP",
-  "main": "dist/index.js",
-  "workspaces": [
-    "packages/*",
-    "playground/*"
-  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "pnpm -r run start",
-    "build": "npx shx rm -rf dist && tsc && npx shx cp CHANGELOG dist/CHANGELOG",
-    "build:src": "npx shx rm -rf dist && tsc --project tsconfig.json --outDir dist --rootDir src && npx shx cp CHANGELOG dist/CHANGELOG",
+    "build": "pnpm -r --filter './packages/**' run build",
+    "build:src": "pnpm --filter vite-react-mcp run build:src",
+    "dev": "pnpm -r --parallel --if-present run start",
     "playground": "pnpm --filter vite-react-app run start",
+    "playground:nx-mf": "pnpm -C playground/nx-module-federation-monorepo run start",
     "format": "pnpm biome format --write",
     "lint": "pnpm biome lint --write",
-    "check": "pnpm biome check --write"
+    "check": "pnpm biome check --write",
+    "test": "pnpm -r --if-present run test"
   },
-  "keywords": [
-    "vite",
-    "react",
-    "mcp",
-    "visual-edit",
-    "agents",
-    "devtools",
-    "llm",
-    "plugin"
-  ],
-  "author": {
-    "name": "jazelly",
-    "email": "xzha4350@gmail.com"
-  },
-  "files": [
-    "dist"
-  ],
-  "license": "MIT",
   "packageManager": "pnpm@10.6.5",
-  "peerDependencies": {
-    "@babel/preset-react": ">=6",
-    "vite": ">=4",
-    "webpack": ">=5",
-    "next": ">=13"
-  },
   "devDependencies": {
-    "@babel/core": "^7.26.10",
-    "@babel/types": "^7.27.0",
     "@biomejs/biome": "1.9.4",
-    "@rollup/pluginutils": "^5.1.4",
-    "@types/react-reconciler": "0.26.7",
     "shx": "0.4.0",
-    "typescript": "^5.8.2",
-    "vite": "^6.2.3"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "1.7.0",
-    "bippy": "^0.5.39",
-    "zod": "^3.22.4",
-    "zod-to-json-schema": "^3.23.5",
-    "ws": "^8.18.0"
-  },
-  "exports": {
-    ".": "./dist/index.js",
-    "./next": "./dist/next.js",
-    "./webpack": "./dist/webpack.js"
+    "typescript": "^5.8.2"
   }
 }

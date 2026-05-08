@@ -1,0 +1,36 @@
+{
+  "name": "react-component-select",
+  "type": "module",
+  "version": "0.3.0",
+  "description": "Browser selection toolkit for capturing React component context",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "shx rm -rf dist && tsc"
+  },
+  "keywords": [
+    "react",
+    "component",
+    "select",
+    "selection",
+    "devtools",
+    "agents"
+  ],
+  "author": {
+    "name": "jazelly",
+    "email": "xzha4350@gmail.com"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "vite-react-mcp": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}

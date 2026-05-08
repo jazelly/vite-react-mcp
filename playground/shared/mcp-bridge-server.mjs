@@ -1,8 +1,7 @@
 import http from 'node:http';
 import { URLSearchParams } from 'node:url';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { RuntimeBridgeServer } from '../../dist/bridge/server.js';
-import { initMcpServer } from '../../dist/mcp/index.js';
+import { RuntimeBridgeServer, initMcpServer } from 'react-mcp';
 
 const port = Number(process.env.VITE_REACT_MCP_SERVER_PORT || 51426);
 const host = process.env.VITE_REACT_MCP_SERVER_HOST || '127.0.0.1';
