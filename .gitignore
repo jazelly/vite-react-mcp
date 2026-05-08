@@ -65,6 +65,11 @@ typings/
 # next.js build output
 .next
 
+# Playwright output
+test-results/
+playwright-report/
+blob-report/
+
 dist
 
 # Serverless directories
