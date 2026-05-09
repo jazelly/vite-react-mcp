@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 
-const MCP_SERVER_URL = 'http://127.0.0.1:51425/sse';
+const MCP_SERVER_URL = `http://127.0.0.1:${process.env.WEBPACK_REACT_PLAYGROUND_PORT || '51425'}/sse`;
 
 const createMcpClient = async () => {
   const client = new Client({

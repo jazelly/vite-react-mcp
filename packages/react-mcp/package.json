@@ -1,6 +1,7 @@
 {
   "name": "react-mcp",
   "type": "module",
+  "private": true,
   "version": "0.3.0",
   "description": "MCP server primitives for React runtime inspection",
   "main": "dist/index.js",

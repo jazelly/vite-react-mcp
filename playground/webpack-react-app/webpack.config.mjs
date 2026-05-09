@@ -5,6 +5,9 @@ import withReactMcpWebpack from 'webpack-react-mcp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const devServerPort = Number(
+  process.env.WEBPACK_REACT_PLAYGROUND_PORT || process.env.PORT || 51425,
+);
 
 const baseConfig = {
   mode: 'development',
@@ -26,6 +29,10 @@ const baseConfig = {
           },
         },
       },
+      {
+        test: /\.css$/i,
+        use: ['style-loader', 'css-loader'],
+      },
     ],
   },
   resolve: {
@@ -39,7 +46,7 @@ const baseConfig = {
   ],
   devServer: {
     host: '127.0.0.1',
-    port: 51425,
+    port: devServerPort,
     hot: true,
   },
 };

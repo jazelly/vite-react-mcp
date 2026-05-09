@@ -12,6 +12,7 @@ interface WebpackEnv {
 
 export interface ReactMcpWebpackOptions {
   customTools?: CustomTool[];
+  rootDir?: string;
 }
 
 type WebpackDevServer = {
@@ -111,7 +112,10 @@ export const withReactMcpWebpack = (
   const nextConfig = { ...config };
   const entryPath = getClientEntryPath();
   const rootDir =
-    typeof nextConfig.context === 'string' ? nextConfig.context : process.cwd();
+    options.rootDir ||
+    (typeof nextConfig.context === 'string'
+      ? nextConfig.context
+      : process.cwd());
   const runtimeBridge = new RuntimeBridgeServer();
   const mcpServer = initMcpServer(
     runtimeBridge,

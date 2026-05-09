@@ -7,12 +7,10 @@ A Vite plugin that creates an MCP server to help LLMs understand your React App 
 
 ## Workspace Packages
 
-This repository is a pnpm workspace. Published packages live under `packages/`:
+This repository is a pnpm workspace. Published plugin packages live under `packages/`:
 
 - `vite-react-mcp`: Vite integration.
 - `webpack-react-mcp`: Webpack integration.
-- `react-mcp`: MCP server and runtime bridge primitives.
-- `react-component-select`: React component selection and context capture toolkit.
 
 ## Features
 
