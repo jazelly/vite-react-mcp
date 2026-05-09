@@ -18,6 +18,9 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "paths": {
+      "@mfplayground/hearthhub-ui": [
+        "libs/hearthhub-ui/src/index.ts"
+      ],
       "@mfplayground/legacy-react-widget": [
         "libs/legacy-react-widget/src/index.ts"
       ]

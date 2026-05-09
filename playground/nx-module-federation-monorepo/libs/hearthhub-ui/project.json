@@ -1,0 +1,8 @@
+{
+  "name": "hearthhub-ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/hearthhub-ui/src",
+  "projectType": "library",
+  "targets": {},
+  "tags": ["scope:shared", "type:ui"]
+}
