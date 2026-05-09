@@ -60,18 +60,18 @@ const expectProfileMemberCardSource = (context) => {
   expect(context.resolvedSources).toContainEqual(
     expect.objectContaining({
       componentName: 'ProfileMemberCard',
-      filePath: expect.stringContaining('src/app/Routes.tsx'),
+      filePath: expect.stringContaining('ProfileMemberCard.tsx'),
     }),
   );
   expect(context.sourceSnippets).toContainEqual(
     expect.objectContaining({
-      filePath: expect.stringContaining('src/app/Routes.tsx'),
+      filePath: expect.stringContaining('ProfileMemberCard.tsx'),
       snippet: expect.stringContaining('function ProfileMemberCard'),
     }),
   );
   expect(context.sourceSnippets).toContainEqual(
     expect.objectContaining({
-      filePath: expect.stringContaining('src/app/Routes.tsx'),
+      filePath: expect.stringContaining('ProfileMemberCard.tsx'),
       snippet: expect.stringContaining('profile-member-${memberId}'),
     }),
   );
@@ -163,7 +163,7 @@ test('nx module federation selection captures remote component source context', 
   expect(selectionContext.resolvedSources).toContainEqual(
     expect.objectContaining({
       componentName: 'ProfileMemberCard',
-      filePath: expect.stringContaining('src/app/Routes.tsx'),
+      filePath: expect.stringContaining('ProfileMemberCard.tsx'),
     }),
   );
 
