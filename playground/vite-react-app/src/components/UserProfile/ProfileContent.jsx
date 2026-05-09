@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Button, Grid, CardContent } from '@mui/material';
+import { Box, Button, CardContent, Grid, Stack } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -14,7 +14,6 @@ const ProfileContent = () => {
   }
 
   return (
-    <>
     <CardContent>
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6}>
@@ -77,7 +76,7 @@ const ProfileContent = () => {
       </Grid>
 
       {!editMode && (
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
           <Button 
             variant="contained" 
             color="primary" 
@@ -90,7 +89,7 @@ const ProfileContent = () => {
       )}
 
       {editMode && (
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 3, justifyContent: 'flex-end' }}>
           <Button 
             variant="contained" 
             color="primary" 
@@ -107,10 +106,9 @@ const ProfileContent = () => {
           >
             Cancel
           </Button>
-        </Box>
+        </Stack>
       )}
     </CardContent>
-    </>
   );
 };
 

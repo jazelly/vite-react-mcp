@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "start": "nx run-many --target=serve --projects=catalog,profile,shell --parallel=3",
+    "start": "node ./scripts/start-dev.mjs",
     "start:shell": "nx run shell:serve",
     "start:catalog": "nx run catalog:serve",
     "start:profile": "nx run profile:serve",
@@ -12,6 +12,11 @@
     "test:e2e": "pnpm run build:packages && playwright test"
   },
   "dependencies": {
+    "@chakra-ui/react": "2.10.9",
+    "@emotion/react": "catalog:",
+    "@emotion/styled": "catalog:",
+    "@heroicons/react": "^2.2.0",
+    "framer-motion": "^12.38.0",
     "react": "18.2.0",
     "react-17-compat": "npm:react@17.0.2",
     "react-dom": "18.2.0",
@@ -31,8 +36,8 @@
     "@nrwl/webpack": "15.9.7",
     "@nrwl/workspace": "15.9.7",
     "@playwright/test": "1.52.0",
-    "@types/react": "18.0.21",
-    "@types/react-dom": "18.0.6",
+    "@types/react": "18.3.23",
+    "@types/react-dom": "18.3.7",
     "@typescript-eslint/eslint-plugin": "5.36.1",
     "@typescript-eslint/parser": "5.36.1",
     "babel-loader": "10.0.0",

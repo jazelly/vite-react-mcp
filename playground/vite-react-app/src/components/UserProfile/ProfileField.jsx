@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+import { Paper, TextField } from '@mui/material';
 import { useProfile } from '../../context/ProfileContext';
 import LabeledValue from '../Common/LabeledValue';
 
@@ -18,44 +19,31 @@ const ProfileField = memo(({
       name: name,
       value: value,
       onChange: handleInputChange,
-      style: {
-        width: '100%',
-        padding: '16.5px 14px',
-        borderRadius: '4px',
-        border: '1px solid rgba(0, 0, 0, 0.23)',
-        boxSizing: 'border-box',
-        fontFamily: 'inherit',
-        fontSize: '1rem',
-        marginTop: '8px',
-        marginBottom: '4px'
-      }
     };
 
     return (
-      <div style={{ marginBottom: '16px' }}>
-        <label htmlFor={`profile-field-${name}`} style={{ fontSize: '0.75rem', color: 'rgba(0, 0, 0, 0.6)' }}>{label}</label>
-        {multiline ? (
-          <textarea
-            {...commonProps}
-            rows={rows}
-          />
-        ) : (
-          <input
-            {...commonProps}
-            type="text"
-          />
-        )}
-      </div>
+      <TextField
+        {...commonProps}
+        fullWidth
+        label={label}
+        margin="dense"
+        multiline={multiline}
+        rows={multiline ? rows : undefined}
+        type="text"
+        variant="outlined"
+      />
     );
   }
   
   return (
-    <LabeledValue
-      idBase={`profile-display-${name}`}
-      label={label}
-      value={value}
-      containerStyle={{ marginBottom: '16px' }}
-    />
+    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', p: 2 }}>
+      <LabeledValue
+        idBase={`profile-display-${name}`}
+        label={label}
+        value={value}
+        valueStyle={{ fontWeight: 700 }}
+      />
+    </Paper>
   );
 });
 ProfileField.displayName = 'ProfileField';

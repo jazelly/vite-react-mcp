@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-const MCP_SERVER_URL = 'http://127.0.0.1:4200/sse';
+const shellPort = process.env.NX_MF_SHELL_PORT || '4200';
+const catalogPort = process.env.NX_MF_CATALOG_PORT || '4201';
+const profilePort = process.env.NX_MF_PROFILE_PORT || '4202';
+const MCP_SERVER_URL = `http://127.0.0.1:${shellPort}/sse`;
 const REMOTE_ENTRY_URLS = [
-  ['http://127.0.0.1:4201/remoteEntry.js', 'var catalog'],
-  ['http://127.0.0.1:4202/remoteEntry.js', 'var profile'],
+  [`http://127.0.0.1:${catalogPort}/remoteEntry.js`, 'var catalog'],
+  [`http://127.0.0.1:${profilePort}/remoteEntry.js`, 'var profile'],
 ];
 
 const waitForRemoteEntries = async (request) => {
@@ -51,6 +54,27 @@ const getToolText = (result) => {
     return '';
   }
   return textContent.text;
+};
+
+const expectProfileMemberCardSource = (context) => {
+  expect(context.resolvedSources).toContainEqual(
+    expect.objectContaining({
+      componentName: 'ProfileMemberCard',
+      filePath: expect.stringContaining('src/app/Routes.tsx'),
+    }),
+  );
+  expect(context.sourceSnippets).toContainEqual(
+    expect.objectContaining({
+      filePath: expect.stringContaining('src/app/Routes.tsx'),
+      snippet: expect.stringContaining('function ProfileMemberCard'),
+    }),
+  );
+  expect(context.sourceSnippets).toContainEqual(
+    expect.objectContaining({
+      filePath: expect.stringContaining('src/app/Routes.tsx'),
+      snippet: expect.stringContaining('profile-member-${memberId}'),
+    }),
+  );
 };
 
 const selectRemoteProfileMember = async (page, request) => {
@@ -149,7 +173,7 @@ test('nx module federation selection captures remote component source context', 
       name: 'get-last-selection-context',
       arguments: {
         includeSourceSnippets: true,
-        contextLines: 4,
+        contextLines: 12,
         maxFiles: 3,
       },
     });
@@ -158,6 +182,8 @@ test('nx module federation selection captures remote component source context', 
     expect(selectedContext.context.componentName).toBe('ProfileMemberCard');
     expect(selectedContext.context.selector).toBe('#profile-member-sam-rivera');
     expect(selectedContext.summary).toContain('ProfileMemberCard');
+    expect(selectedContext.summary).toContain('function ProfileMemberCard');
+    expectProfileMemberCardSource(selectedContext.context);
 
     const reactSourceRaw = await client.callTool({
       name: 'get-react-source-code',
@@ -165,7 +191,7 @@ test('nx module federation selection captures remote component source context', 
         queries: ['article profile-member-sam-rivera'],
         maxMatches: 3,
         includeSourceSnippets: true,
-        contextLines: 4,
+        contextLines: 12,
         maxFiles: 3,
       },
     });
@@ -175,12 +201,8 @@ test('nx module federation selection captures remote component source context', 
       '#profile-member-sam-rivera',
     );
     expect(reactSource.context.componentName).toBe('ProfileMemberCard');
-    expect(reactSource.context.resolvedSources).toContainEqual(
-      expect.objectContaining({
-        componentName: 'ProfileMemberCard',
-        filePath: expect.stringContaining('src/app/Routes.tsx'),
-      }),
-    );
+    expect(reactSource.summary).toContain('function ProfileMemberCard');
+    expectProfileMemberCardSource(reactSource.context);
 
     const highlightRaw = await client.callTool({
       name: 'highlight-component',

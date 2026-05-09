@@ -9,8 +9,18 @@ const sharedVersions = {
 };
 
 const singletonPackages = new Set(['react', 'react-dom', 'react-router-dom']);
+const projectPortEnvKeys = {
+  catalog: 'NX_MF_CATALOG_PORT',
+  profile: 'NX_MF_PROFILE_PORT',
+  shell: 'NX_MF_SHELL_PORT',
+};
 
-const getProjectServePort = (project) => {
+const getProjectServePort = (project, projectName) => {
+  const portEnvKey = projectPortEnvKeys[projectName];
+  if (portEnvKey && process.env[portEnvKey]) {
+    return process.env[portEnvKey];
+  }
+
   const serve = project?.data?.targets?.serve || project?.targets?.serve;
   const dev = project?.data?.targets?.dev || project?.targets?.dev;
   return serve?.options?.port || dev?.options?.port;
@@ -27,7 +37,7 @@ const getRemoteDefinition = (remote, graph, isDevelopment) => {
   }
 
   const remoteProject = graph.nodes[remote];
-  const port = getProjectServePort(remoteProject);
+  const port = getProjectServePort(remoteProject, remote);
 
   if (!port) {
     throw new Error(
@@ -75,6 +85,7 @@ const withModuleFederation = async (moduleFederationConfig) => {
     );
     const projectPort = getProjectServePort(
       graph.nodes[moduleFederationConfig.name],
+      moduleFederationConfig.name,
     );
     const publicPath =
       !isProduction && projectPort

@@ -147,6 +147,16 @@ const resolveAbsoluteSourcePath = (
     candidates.push(path.resolve(rootDir, `.${classifiedPath.normalizedPath}`));
   } else if (classifiedPath.kind === 'project-relative') {
     candidates.push(path.resolve(rootDir, classifiedPath.normalizedPath));
+
+    const nxWebpackSourcePathMatch = classifiedPath.normalizedPath.match(
+      /^([^/]+)\/(?:\.\/)?src\/(.+)$/,
+    );
+    if (nxWebpackSourcePathMatch) {
+      const [, projectName, sourcePath] = nxWebpackSourcePathMatch;
+      candidates.push(
+        path.resolve(rootDir, 'apps', projectName, 'src', sourcePath),
+      );
+    }
   }
 
   for (const candidate of candidates) {
