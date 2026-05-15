@@ -21,6 +21,25 @@ const formatComponentSourceLine = (source: SelectionResolvedSource): string => {
     : `  in ${location}`;
 };
 
+const formatExternalComponentLine = (
+  selectionContext: SelectionContext,
+): string | null => {
+  const externalComponent = selectionContext.externalComponent;
+  if (!externalComponent) {
+    return null;
+  }
+
+  const packageName = externalComponent.packageName
+    ? ` from ${externalComponent.packageName}`
+    : '';
+  const usedBy = externalComponent.usedBy;
+  const usedByText = usedBy
+    ? ` used by ${usedBy.componentName ?? 'local component'} at ${formatSourceLocation(usedBy)}`
+    : '';
+
+  return `selected external component: <${externalComponent.componentName}>${packageName}${usedByText}`;
+};
+
 const formatSourceSnippet = (sourceSnippet: SelectionSourceSnippet): string =>
   [
     `Source (${formatDisplayFilePath(sourceSnippet.filePath)}:${sourceSnippet.startLine}-${sourceSnippet.endLine})`,
@@ -59,7 +78,10 @@ export const buildSelectionSourcePreview = (
   const sourceChain = buildComponentSourceChain(
     selectionContext.resolvedSources,
   );
-  const preview = [snippetText, sourceChain].filter(Boolean).join('\n');
+  const externalComponentLine = formatExternalComponentLine(selectionContext);
+  const preview = [snippetText, externalComponentLine, sourceChain]
+    .filter(Boolean)
+    .join('\n');
 
   return preview || null;
 };

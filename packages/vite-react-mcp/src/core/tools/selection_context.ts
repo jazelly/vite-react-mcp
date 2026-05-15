@@ -20,6 +20,7 @@ import {
 import { buildSelectionSourcePreview } from '../../shared/selection_context_format.js';
 import type {
   SelectionContext,
+  SelectionExternalComponent,
   SelectionResolvedSource,
   SelectionStackFrame,
 } from '../../shared/types.js';
@@ -140,6 +141,66 @@ const isProjectSourceFrame = (fileName: string): boolean => {
     !pathSegments.includes('.vite') &&
     !normalizedFileName.includes('/@vite/')
   );
+};
+
+const isExternalSourceFrame = (fileName: string): boolean => {
+  const normalizedFileName = normalizeSourceFilePath(fileName);
+  const pathSegments = normalizedFileName.split('/').filter(Boolean);
+  const looksLikeJavaScriptSource = /\.(?:[cm]?js|jsx?|tsx?)$/i.test(
+    normalizedFileName,
+  );
+
+  if (!looksLikeJavaScriptSource) {
+    return false;
+  }
+
+  return (
+    pathSegments.includes('node_modules') ||
+    pathSegments.includes('.vite') ||
+    normalizedFileName.includes('/@vite/')
+  );
+};
+
+const normalizeDisplayComponentName = (name: string | null): string | null => {
+  if (!name) return null;
+  const memoMatch = name.match(/^Memo\((.+)\)$/);
+  if (memoMatch) return memoMatch[1];
+  const forwardRefMatch = name.match(/^ForwardRef\((.+)\)$/);
+  if (forwardRefMatch) return forwardRefMatch[1];
+  return name;
+};
+
+const extractPackageNameFromFilePath = (filePath: string): string | null => {
+  const normalizedFileName = normalizeSourceFilePath(filePath);
+  const pathSegments = normalizedFileName.split('/').filter(Boolean);
+
+  for (let index = pathSegments.length - 1; index >= 0; index--) {
+    if (pathSegments[index] !== 'node_modules') {
+      continue;
+    }
+
+    const packageStartIndex = index + 1;
+    const packageName = pathSegments[packageStartIndex];
+    if (!packageName) {
+      continue;
+    }
+
+    if (packageName.startsWith('@')) {
+      const scopedPackageName = pathSegments[packageStartIndex + 1];
+      return scopedPackageName ? `${packageName}/${scopedPackageName}` : null;
+    }
+
+    return packageName;
+  }
+
+  const viteDependencyMatch = normalizedFileName.match(
+    /(?:^|\/)(?:deps\/)?((?:@[^/]+\/)?[^/@][^/]*)\.js$/,
+  );
+  if (viteDependencyMatch) {
+    return viteDependencyMatch[1].replace(/_/g, '/');
+  }
+
+  return null;
 };
 
 const isServerComponentUrl = (url: string): boolean =>
@@ -397,14 +458,7 @@ const buildStackFrames = async (
     return [];
   }
 
-  try {
-    const ownerStack = checkIsNextProject()
-      ? await symbolicateServerFrames(
-          enrichServerFrameLocations(fiber, await getOwnerStack(fiber)),
-        )
-      : await getOwnerStack(fiber);
-    return ownerStack.slice(0, MAX_STACK_FRAMES).map(mapOwnerStackFrame);
-  } catch (_error) {
+  const buildFiberStackFrames = async (): Promise<SelectionStackFrame[]> => {
     const fallbackFiberStack = getFiberStack(fiber).slice(0, MAX_STACK_FRAMES);
     const stackFrames: SelectionStackFrame[] = [];
 
@@ -421,6 +475,39 @@ const buildStackFrames = async (
     }
 
     return stackFrames;
+  };
+
+  try {
+    const ownerStack = checkIsNextProject()
+      ? await symbolicateServerFrames(
+          enrichServerFrameLocations(fiber, await getOwnerStack(fiber)),
+        )
+      : await getOwnerStack(fiber);
+    const ownerStackFrames = ownerStack
+      .slice(0, MAX_STACK_FRAMES)
+      .map(mapOwnerStackFrame);
+    const fiberStackFrames = await buildFiberStackFrames();
+    const seenFrameKeys = new Set(
+      ownerStackFrames.map(
+        (stackFrame) =>
+          `${stackFrame.functionName ?? ''}:${stackFrame.fileName ?? ''}:${stackFrame.lineNumber ?? ''}:${stackFrame.columnNumber ?? ''}`,
+      ),
+    );
+    const supplementalFiberFrames = fiberStackFrames.filter((stackFrame) => {
+      const frameKey = `${stackFrame.functionName ?? ''}:${stackFrame.fileName ?? ''}:${stackFrame.lineNumber ?? ''}:${stackFrame.columnNumber ?? ''}`;
+      if (seenFrameKeys.has(frameKey)) {
+        return false;
+      }
+      seenFrameKeys.add(frameKey);
+      return true;
+    });
+
+    return [...ownerStackFrames, ...supplementalFiberFrames].slice(
+      0,
+      MAX_STACK_FRAMES,
+    );
+  } catch (_error) {
+    return buildFiberStackFrames();
   }
 };
 
@@ -486,6 +573,48 @@ const resolveSourceFrames = (
   return resolvedSources;
 };
 
+const resolveExternalComponent = (
+  stackFrames: SelectionStackFrame[],
+  selectedComponentName: string | null,
+  resolvedSources: SelectionResolvedSource[],
+): SelectionExternalComponent | null => {
+  const selectedDisplayName = normalizeDisplayComponentName(
+    selectedComponentName,
+  );
+  if (!selectedDisplayName) {
+    return null;
+  }
+
+  const externalFrames = stackFrames.filter(
+    (stackFrame) =>
+      stackFrame.fileName &&
+      isExternalSourceFrame(stackFrame.fileName) &&
+      isUsefulComponentName(stackFrame.functionName),
+  );
+  if (externalFrames.length === 0) {
+    return null;
+  }
+
+  const selectedExternalFrame =
+    externalFrames.find(
+      (stackFrame) =>
+        normalizeDisplayComponentName(stackFrame.functionName) ===
+        selectedDisplayName,
+    ) ?? externalFrames[0];
+  if (!selectedExternalFrame.fileName) {
+    return null;
+  }
+
+  return {
+    componentName:
+      normalizeDisplayComponentName(selectedExternalFrame.functionName) ||
+      selectedDisplayName,
+    packageName: extractPackageNameFromFilePath(selectedExternalFrame.fileName),
+    filePath: normalizeSourceFilePath(selectedExternalFrame.fileName),
+    usedBy: resolvedSources[0] ?? null,
+  };
+};
+
 const getComponentName = (
   stackFrames: SelectionStackFrame[],
 ): string | null => {
@@ -518,11 +647,17 @@ export const buildSelectionContextForElement = async (
   const componentName =
     getComponentDisplayName(selectedElement) || getComponentName(stackFrames);
   const resolvedSources = resolveSourceFrames(stackFrames, componentName);
+  const externalComponent = resolveExternalComponent(
+    stackFrames,
+    componentName,
+    resolvedSources,
+  );
   const selectionContext = {
     domPreview: getDomPreview(selectedElement),
     sourcePreview: null,
     selector: createElementSelector(selectedElement),
     componentName,
+    externalComponent,
     stackFrames,
     resolvedSources,
     sourceSnippets: [],

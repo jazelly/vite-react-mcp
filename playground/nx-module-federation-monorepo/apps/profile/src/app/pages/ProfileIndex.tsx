@@ -13,6 +13,7 @@ import {
 } from '@mfplayground/hearthhub-ui';
 import { HouseholdContacts } from '../components/HouseholdContacts';
 import { HouseholdProfileSummary } from '../components/HouseholdProfileSummary';
+import { ExternalDependencySelectionProbe } from '../components/ExternalDependencySelectionProbe';
 import { PreferencePanel } from '../components/PreferencePanel';
 
 export function ProfileIndex() {
@@ -35,6 +36,8 @@ export function ProfileIndex() {
         <HouseholdContacts />
         <HouseholdProfileSummary />
       </SimpleGrid>
+
+      <ExternalDependencySelectionProbe />
 
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
         <PreferencePanel icon={BoltIcon} title="Selection guarantee">

@@ -24,6 +24,7 @@ import {
 import type {
   CustomTool,
   SelectionContext,
+  SelectionResolvedSource,
   SelectionSourceSnippet,
   ToolResultValue,
 } from '../shared/types.js';
@@ -227,12 +228,192 @@ const getSourceSnippet = (
   }
 };
 
+const LOCAL_COMPONENT_NAME_PATTERN = /^[A-Z][A-Za-z0-9_$]*$/;
+const IGNORED_LOCAL_USAGE_COMPONENTS = new Set([
+  'Button',
+  'Card',
+  'Card2',
+  'CardBody',
+  'CardBody2',
+  'ChakraComponent2',
+  'HStack',
+  'VStack',
+  'Box',
+  'Flex',
+  'Stack',
+  'Text',
+  'Heading',
+  'RenderedRoute',
+]);
+
+const isExternalPath = (filePath: string | null): boolean =>
+  Boolean(
+    filePath &&
+      (filePath.includes('/node_modules/') ||
+        filePath.includes('node_modules/') ||
+        filePath.includes('/.vite/') ||
+        filePath.includes('/@vite/')),
+  );
+
+const inferLocalUsageComponentName = (
+  selectionContext: SelectionContext,
+): string | null => {
+  for (const stackFrame of selectionContext.stackFrames) {
+    const componentName = stackFrame.functionName;
+    if (!componentName || !LOCAL_COMPONENT_NAME_PATTERN.test(componentName)) {
+      continue;
+    }
+    if (IGNORED_LOCAL_USAGE_COMPONENTS.has(componentName)) {
+      continue;
+    }
+    if (isExternalPath(stackFrame.fileName)) {
+      continue;
+    }
+    return componentName;
+  }
+
+  return null;
+};
+
+const walkProjectSourceFiles = (
+  directory: string,
+  visit: (filePath: string) => boolean,
+): boolean => {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(directory, { withFileTypes: true });
+  } catch (_error) {
+    return false;
+  }
+
+  for (const entry of entries) {
+    if (
+      entry.name === 'node_modules' ||
+      entry.name === '.git' ||
+      entry.name === 'dist' ||
+      entry.name === 'tmp'
+    ) {
+      continue;
+    }
+
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (walkProjectSourceFiles(entryPath, visit)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (!/\.(?:jsx?|tsx?)$/i.test(entry.name)) {
+      continue;
+    }
+
+    if (visit(entryPath)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const findComponentSourceInProject = (
+  rootDir: string,
+  componentName: string,
+): SelectionResolvedSource | null => {
+  const declarationPattern = new RegExp(
+    `(?:function\\s+${componentName}\\b|const\\s+${componentName}\\s*=|class\\s+${componentName}\\b)`,
+  );
+  let matchedSource: SelectionResolvedSource | null = null;
+  const normalizedRootDir = fs.realpathSync(rootDir);
+
+  walkProjectSourceFiles(rootDir, (filePath) => {
+    let sourceText: string;
+    try {
+      sourceText = fs.readFileSync(filePath, 'utf8');
+    } catch (_error) {
+      return false;
+    }
+
+    if (!declarationPattern.test(sourceText)) {
+      return false;
+    }
+
+    const lines = sourceText.split(/\r?\n/);
+    const matchIndex = lines.findIndex((line) =>
+      declarationPattern.test(line),
+    );
+    const realFilePath = fs.realpathSync(filePath);
+    const relativeFilePath = path
+      .relative(normalizedRootDir, realFilePath)
+      .replace(/\\/g, '/');
+
+    matchedSource = {
+      filePath: relativeFilePath,
+      lineNumber: matchIndex >= 0 ? matchIndex + 1 : 1,
+      columnNumber: null,
+      componentName,
+    };
+    return true;
+  });
+
+  return matchedSource;
+};
+
+const enrichExternalComponentUsage = (
+  rootDir: string,
+  selectionContext: SelectionContext,
+): SelectionContext => {
+  if (!selectionContext.externalComponent) {
+    return selectionContext;
+  }
+  if (selectionContext.externalComponent.usedBy) {
+    return selectionContext;
+  }
+
+  const localUsageComponentName =
+    inferLocalUsageComponentName(selectionContext);
+  if (!localUsageComponentName) {
+    return selectionContext;
+  }
+
+  const localUsageSource = findComponentSourceInProject(
+    rootDir,
+    localUsageComponentName,
+  );
+  if (!localUsageSource) {
+    return selectionContext;
+  }
+
+  const nextResolvedSources = selectionContext.resolvedSources.some(
+    (source) =>
+      source.filePath === localUsageSource.filePath &&
+      source.componentName === localUsageSource.componentName,
+  )
+    ? selectionContext.resolvedSources
+    : [localUsageSource, ...selectionContext.resolvedSources];
+
+  const nextSelectionContext = {
+    ...selectionContext,
+    externalComponent: {
+      ...selectionContext.externalComponent,
+      usedBy: localUsageSource,
+    },
+    resolvedSources: nextResolvedSources,
+  };
+
+  return {
+    ...nextSelectionContext,
+    sourcePreview: buildSelectionSourcePreview(nextSelectionContext),
+  };
+};
+
 const enrichSelectionContextWithSnippets = (
   rootDir: string,
   selectionContext: SelectionContext,
   contextLines: number,
   maxFiles: number,
 ): SelectionContext => {
+  selectionContext = enrichExternalComponentUsage(rootDir, selectionContext);
   const sourceSnippets: SelectionSourceSnippet[] = [];
   const seenFilePaths = new Set<string>();
 
@@ -290,6 +471,7 @@ const parseSelectionContextResponse = (response: {
 
   return {
     ...response.context,
+    externalComponent: response.context.externalComponent ?? null,
     sourcePreview: response.context.sourcePreview ?? null,
     sourceSnippets: Array.isArray(response.context.sourceSnippets)
       ? response.context.sourceSnippets
@@ -440,7 +622,7 @@ export function initMcpServer(
                     args.contextLines,
                     args.maxFiles,
                   )
-                : selectionContext;
+                : enrichExternalComponentUsage(rootDir, selectionContext);
 
               return toTextResponse({
                 success: true,
@@ -504,7 +686,7 @@ export function initMcpServer(
                     args.contextLines,
                     args.maxFiles,
                   )
-                : response.context;
+                : enrichExternalComponentUsage(rootDir, response.context);
 
               return toTextResponse({
                 success: true,
