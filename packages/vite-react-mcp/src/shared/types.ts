@@ -51,6 +51,13 @@ export interface SelectionResolvedSource {
   componentName: string | null;
 }
 
+export interface SelectionExternalComponent {
+  componentName: string;
+  packageName: string | null;
+  filePath: string | null;
+  usedBy: SelectionResolvedSource | null;
+}
+
 export interface SelectionSourceSnippet {
   filePath: string;
   startLine: number;
@@ -63,6 +70,7 @@ export interface SelectionContext {
   sourcePreview: string | null;
   selector: string | null;
   componentName: string | null;
+  externalComponent: SelectionExternalComponent | null;
   stackFrames: SelectionStackFrame[];
   resolvedSources: SelectionResolvedSource[];
   sourceSnippets: SelectionSourceSnippet[];
