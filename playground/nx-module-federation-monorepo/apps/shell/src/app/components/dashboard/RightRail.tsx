@@ -12,17 +12,45 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { CalendarDaysIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { AppIcon, ShellPanel, issueTriage, readinessTasks, routeOwners } from '@mfplayground/hearthhub-ui';
+import {
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
+import {
+  AppIcon,
+  ShellPanel,
+  issueTriage,
+  readinessTasks,
+  routeOwners,
+} from '@mfplayground/hearthhub-ui';
 
 function UpcomingVisitCard() {
   return (
-    <ShellPanel action={<AppIcon icon={CalendarDaysIcon} />} title="Upcoming Visit">
+    <ShellPanel
+      action={<AppIcon icon={CalendarDaysIcon} />}
+      title="Upcoming Visit"
+    >
       <HStack align="stretch" spacing={4}>
-        <Box alignItems="center" borderColor="blackAlpha.200" borderWidth="1px" display="flex" flexDirection="column" justifyContent="center" rounded="lg" w="72px">
-          <Text color="hearth.600" fontSize="xs" fontWeight={900}>MAY</Text>
-          <Text fontSize="3xl" fontWeight={900}>28</Text>
-          <Text color="gray.500" fontSize="xs">WED</Text>
+        <Box
+          alignItems="center"
+          borderColor="blackAlpha.200"
+          borderWidth="1px"
+          display="flex"
+          flexDirection="column"
+          justifyContent="center"
+          rounded="lg"
+          w="72px"
+        >
+          <Text color="hearth.600" fontSize="xs" fontWeight={900}>
+            MAY
+          </Text>
+          <Text fontSize="3xl" fontWeight={900}>
+            28
+          </Text>
+          <Text color="gray.500" fontSize="xs">
+            WED
+          </Text>
         </Box>
         <Box flex="1">
           <HStack justify="space-between">
@@ -33,13 +61,19 @@ function UpcomingVisitCard() {
           <Text color="gray.600">123 Maple Ridge Dr</Text>
           <HStack mt={2}>
             <Avatar name="Alex Ramirez" size="xs" />
-            <Text color="gray.600" fontSize="sm">Technician: Alex Ramirez</Text>
+            <Text color="gray.600" fontSize="sm">
+              Technician: Alex Ramirez
+            </Text>
           </HStack>
         </Box>
       </HStack>
       <HStack mt={4}>
-        <Button colorScheme="green" flex="1" size="sm">View Visit</Button>
-        <Button flex="1" size="sm" variant="outline">Reschedule</Button>
+        <Button colorScheme="green" flex="1" size="sm">
+          View Visit
+        </Button>
+        <Button flex="1" size="sm" variant="outline">
+          Reschedule
+        </Button>
       </HStack>
     </ShellPanel>
   );
@@ -47,17 +81,30 @@ function UpcomingVisitCard() {
 
 function SeasonalReadinessCard() {
   return (
-    <ShellPanel action={<Button colorScheme="green" size="xs" variant="link">View all</Button>} title="Seasonal Readiness">
+    <ShellPanel
+      action={
+        <Button colorScheme="green" size="xs" variant="link">
+          View all
+        </Button>
+      }
+      title="Seasonal Readiness"
+    >
       <HStack align="center" mb={4} spacing={4}>
         <Circle borderColor="hearth.600" borderWidth="8px" size="86px">
           <Box textAlign="center">
-            <Text fontSize="2xl" fontWeight={900}>72%</Text>
-            <Text color="gray.600" fontSize="xs">Ready</Text>
+            <Text fontSize="2xl" fontWeight={900}>
+              72%
+            </Text>
+            <Text color="gray.600" fontSize="xs">
+              Ready
+            </Text>
           </Box>
         </Circle>
         <Box>
           <Text fontWeight={800}>You&apos;re on track for summer.</Text>
-          <Text color="gray.600" fontSize="sm">2 of 7 seasonal tasks remaining.</Text>
+          <Text color="gray.600" fontSize="sm">
+            2 of 7 seasonal tasks remaining.
+          </Text>
         </Box>
       </HStack>
       <Stack divider={<Divider />} spacing={2}>
@@ -68,14 +115,18 @@ function SeasonalReadinessCard() {
                 <Circle borderColor="gray.400" borderWidth="1px" size="14px" />
               ) : (
                 <Icon
-                  as={state === 'done' ? CheckCircleIcon : ExclamationTriangleIcon}
+                  as={
+                    state === 'done' ? CheckCircleIcon : ExclamationTriangleIcon
+                  }
                   boxSize={4}
                   color={state === 'done' ? 'green.500' : 'orange.500'}
                 />
               )}
               <Text fontSize="sm">{task}</Text>
             </HStack>
-            <Text color="gray.500" fontSize="xs">{date}</Text>
+            <Text color="gray.500" fontSize="xs">
+              {date}
+            </Text>
           </HStack>
         ))}
       </Stack>
@@ -88,22 +139,55 @@ function SeasonalReadinessCard() {
 
 function IssueTriageCard() {
   return (
-    <ShellPanel action={<Button colorScheme="green" size="xs" variant="link">View all (3)</Button>} title="Issue Triage">
+    <ShellPanel
+      action={
+        <Button colorScheme="green" size="xs" variant="link">
+          View all (3)
+        </Button>
+      }
+      title="Issue Triage"
+    >
       <Stack spacing={3}>
         {issueTriage.map(([issue, home, level, time]) => (
           <HStack key={issue} justify="space-between">
             <HStack>
-              <Circle bg={level === 'High' ? 'red.500' : level === 'Medium' ? 'orange.400' : 'yellow.400'} color="white" size="24px">
+              <Circle
+                bg={
+                  level === 'High'
+                    ? 'red.500'
+                    : level === 'Medium'
+                      ? 'orange.400'
+                      : 'yellow.400'
+                }
+                color="white"
+                size="24px"
+              >
                 !
               </Circle>
               <Box>
-                <Text fontSize="sm" fontWeight={800}>{issue}</Text>
-                <Text color="gray.500" fontSize="xs">{home}</Text>
+                <Text fontSize="sm" fontWeight={800}>
+                  {issue}
+                </Text>
+                <Text color="gray.500" fontSize="xs">
+                  {home}
+                </Text>
               </Box>
             </HStack>
             <HStack>
-              <Badge colorScheme={level === 'High' ? 'red' : level === 'Medium' ? 'orange' : 'green'}>{level}</Badge>
-              <Text color="gray.500" fontSize="xs">{time}</Text>
+              <Badge
+                colorScheme={
+                  level === 'High'
+                    ? 'red'
+                    : level === 'Medium'
+                      ? 'orange'
+                      : 'green'
+                }
+              >
+                {level}
+              </Badge>
+              <Text color="gray.500" fontSize="xs">
+                {time}
+              </Text>
             </HStack>
           </HStack>
         ))}
@@ -117,15 +201,34 @@ function IssueTriageCard() {
 
 function RouteOwnershipCard() {
   return (
-    <ShellPanel action={<Button colorScheme="green" size="xs" variant="link">View map</Button>} title="Route Ownership">
+    <ShellPanel
+      action={
+        <Button colorScheme="green" size="xs" variant="link">
+          View map
+        </Button>
+      }
+      title="Route Ownership"
+    >
       <Stack spacing={3}>
         {routeOwners.map(([owner, count, progress]) => (
           <HStack key={owner}>
             <Avatar name={String(owner)} size="xs" />
-            <Text flex="1" fontSize="sm">{owner}</Text>
-            <Text color="gray.600" fontSize="xs">{count}</Text>
-            <Progress colorScheme="green" flex="1" rounded="full" size="sm" value={Number(progress)} />
-            <Text color="gray.600" fontSize="xs">{progress}%</Text>
+            <Text flex="1" fontSize="sm">
+              {owner}
+            </Text>
+            <Text color="gray.600" fontSize="xs">
+              {count}
+            </Text>
+            <Progress
+              colorScheme="green"
+              flex="1"
+              rounded="full"
+              size="sm"
+              value={Number(progress)}
+            />
+            <Text color="gray.600" fontSize="xs">
+              {progress}%
+            </Text>
           </HStack>
         ))}
       </Stack>

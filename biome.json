@@ -3,7 +3,7 @@
   "vcs": {
     "enabled": false,
     "clientKind": "git",
-    "useIgnoreFile": false
+    "useIgnoreFile": true
   },
   "files": {
     "ignoreUnknown": false,
@@ -15,7 +15,15 @@
       "*.ts",
       "*.tsx"
     ],
-    "ignore": ["node_modules", "dist", "coverage", "css-to-tailwind.ts"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      "coverage",
+      ".next",
+      "playground/**/.next/**",
+      "playground/**/test-results/**",
+      "css-to-tailwind.ts"
+    ]
   },
   "formatter": {
     "enabled": true,

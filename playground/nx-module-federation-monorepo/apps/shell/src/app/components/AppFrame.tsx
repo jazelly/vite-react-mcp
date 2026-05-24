@@ -24,9 +24,9 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   AppIcon,
+  type IconComponent,
   primaryNavigation,
   secondaryNavigation,
-  type IconComponent,
 } from '@mfplayground/hearthhub-ui';
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -61,7 +61,14 @@ function SidebarLink({
         </Text>
       </HStack>
       {count ? (
-        <Box as="span" bg="whiteAlpha.300" borderRadius="full" fontSize="xs" fontWeight={800} px={2}>
+        <Box
+          as="span"
+          bg="whiteAlpha.300"
+          borderRadius="full"
+          fontSize="xs"
+          fontWeight={800}
+          px={2}
+        >
           {count}
         </Box>
       ) : null}
@@ -98,7 +105,13 @@ function Sidebar() {
         </Heading>
       </HStack>
 
-      <HStack borderColor="whiteAlpha.300" borderWidth="1px" mb={4} p={3} rounded="lg">
+      <HStack
+        borderColor="whiteAlpha.300"
+        borderWidth="1px"
+        mb={4}
+        p={3}
+        rounded="lg"
+      >
         <AppIcon icon={ShieldCheckIcon} />
         <Box minW={0}>
           <Text fontSize="sm" fontWeight={800}>
@@ -127,11 +140,22 @@ function Sidebar() {
 
       <Box>
         {secondaryNavigation.map((item) => (
-          <SidebarLink count={item.count} icon={item.icon} key={item.label} label={item.label} />
+          <SidebarLink
+            count={item.count}
+            icon={item.icon}
+            key={item.label}
+            label={item.label}
+          />
         ))}
       </Box>
 
-      <Box borderColor="whiteAlpha.300" borderWidth="1px" mt="auto" p={4} rounded="lg">
+      <Box
+        borderColor="whiteAlpha.300"
+        borderWidth="1px"
+        mt="auto"
+        p={4}
+        rounded="lg"
+      >
         <HStack mb={3}>
           <AppIcon icon={LifebuoyIcon} />
           <Box>
@@ -148,7 +172,12 @@ function Sidebar() {
         </Button>
       </Box>
 
-      <HStack borderTopColor="whiteAlpha.300" borderTopWidth="1px" mt={4} pt={4}>
+      <HStack
+        borderTopColor="whiteAlpha.300"
+        borderTopWidth="1px"
+        mt={4}
+        pt={4}
+      >
         <Avatar name="Jennifer Park" size="sm" />
         <Box>
           <Text fontSize="sm" fontWeight={800}>
@@ -187,15 +216,32 @@ function TopBar() {
           <InputLeftElement pointerEvents="none">
             <Icon as={MagnifyingGlassIcon} boxSize={5} color="gray.500" />
           </InputLeftElement>
-          <Input bg="white" placeholder="Search homes, services, vendors, or requests..." rounded="lg" />
+          <Input
+            bg="white"
+            placeholder="Search homes, services, vendors, or requests..."
+            rounded="lg"
+          />
         </InputGroup>
-        <Circle bg="white" borderColor="blackAlpha.200" borderWidth="1px" size="40px">
+        <Circle
+          bg="white"
+          borderColor="blackAlpha.200"
+          borderWidth="1px"
+          size="40px"
+        >
           <Icon as={BellIcon} boxSize={5} />
         </Circle>
-        <Circle bg="white" borderColor="blackAlpha.200" borderWidth="1px" size="40px">
+        <Circle
+          bg="white"
+          borderColor="blackAlpha.200"
+          borderWidth="1px"
+          size="40px"
+        >
           <Icon as={ChatBubbleLeftRightIcon} boxSize={5} />
         </Circle>
-        <Button colorScheme="green" rightIcon={<Icon as={ChevronDownIcon} boxSize={4} />}>
+        <Button
+          colorScheme="green"
+          rightIcon={<Icon as={ChevronDownIcon} boxSize={4} />}
+        >
           New Request
         </Button>
       </HStack>
@@ -205,7 +251,13 @@ function TopBar() {
 
 function MobileHeader() {
   return (
-    <HStack bg="hearth.900" color="white" display={{ base: 'flex', lg: 'none' }} justify="space-between" p={4}>
+    <HStack
+      bg="hearth.900"
+      color="white"
+      display={{ base: 'flex', lg: 'none' }}
+      justify="space-between"
+      p={4}
+    >
       <HStack>
         <AppIcon icon={HomeModernIcon} />
         <Heading color="white" size="md">

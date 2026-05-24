@@ -12,7 +12,12 @@ export function PreferencePanel({
   title: string;
 }) {
   return (
-    <Card bg="white" borderColor="blackAlpha.200" borderWidth="1px" rounded="lg">
+    <Card
+      bg="white"
+      borderColor="blackAlpha.200"
+      borderWidth="1px"
+      rounded="lg"
+    >
       <CardBody>
         <HStack color="hearth.700" mb={3}>
           <AppIcon icon={icon} />

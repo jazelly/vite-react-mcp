@@ -1,4 +1,3 @@
-import { LegacyRuntimeBadge } from '@mfplayground/legacy-react-widget';
 import {
   Box,
   Divider,
@@ -19,6 +18,7 @@ import {
   PuzzlePieceIcon,
 } from '@heroicons/react/24/outline';
 import { AppIcon, SectionCard } from '@mfplayground/hearthhub-ui';
+import { LegacyRuntimeBadge } from '@mfplayground/legacy-react-widget';
 
 export function Diagnostics() {
   return (
@@ -30,10 +30,16 @@ export function Diagnostics() {
         <Text as="h2" fontSize="3xl" fontWeight={900} mt={3}>
           Production diagnostics for the federated HearthHub app.
         </Text>
-        <Text color="gray.600" fontSize="lg" lineHeight="1.8" maxW="820px" mt={4}>
-          Developers use this board to confirm that customer-facing screens still
-          expose accurate component trees, stable selection targets, and route
-          ownership after each remote ships.
+        <Text
+          color="gray.600"
+          fontSize="lg"
+          lineHeight="1.8"
+          maxW="820px"
+          mt={4}
+        >
+          Developers use this board to confirm that customer-facing screens
+          still expose accurate component trees, stable selection targets, and
+          route ownership after each remote ships.
         </Text>
       </Box>
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
@@ -44,7 +50,10 @@ export function Diagnostics() {
         </SectionCard>
         <SectionCard icon={PuzzlePieceIcon} title="Remote boundaries">
           <List spacing={2}>
-            {['catalog/Routes owns service plans', 'profile/Routes owns household context'].map((item) => (
+            {[
+              'catalog/Routes owns service plans',
+              'profile/Routes owns household context',
+            ].map((item) => (
               <ListItem key={item}>
                 <ListIcon as={CheckCircleIcon} color="green.500" />
                 {item}
@@ -53,7 +62,9 @@ export function Diagnostics() {
           </List>
         </SectionCard>
         <SectionCard icon={ArrowPathIcon} title="Shared runtime contract">
-          <Text color="gray.600">React 18.2.0 and React Router 6.4.2 remain strict singletons.</Text>
+          <Text color="gray.600">
+            React 18.2.0 and React Router 6.4.2 remain strict singletons.
+          </Text>
           <Divider my={4} />
           <Tag colorScheme="green">
             <TagLabel>module-federation.js enforced</TagLabel>

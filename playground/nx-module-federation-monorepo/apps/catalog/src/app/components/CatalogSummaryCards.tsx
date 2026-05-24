@@ -1,6 +1,10 @@
 import { SimpleGrid, Text } from '@chakra-ui/react';
-import { CalendarDaysIcon, ServerStackIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
-import { MetricCard, SectionCard, servicePlans } from '@mfplayground/hearthhub-ui';
+import { ServerStackIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import {
+  MetricCard,
+  SectionCard,
+  servicePlans,
+} from '@mfplayground/hearthhub-ui';
 
 export function CatalogSummaryCards() {
   return (
@@ -15,7 +19,9 @@ export function CatalogSummaryCards() {
         value={`${servicePlans.length} service plans`}
       />
       <SectionCard icon={ShieldCheckIcon} title="Selector model">
-        <Text color="gray.600">Chakra tables, plan links, badges, and progress rows</Text>
+        <Text color="gray.600">
+          Chakra tables, plan links, badges, and progress rows
+        </Text>
         <Text fontWeight={800}>source aware</Text>
       </SectionCard>
     </SimpleGrid>

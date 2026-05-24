@@ -90,11 +90,18 @@ bippy.instrument({
 
 const normalizeQuery = (query) => query.trim().toLowerCase();
 
+const getElementClassName = (element) => {
+  if (typeof element.className === 'string') {
+    return element.className;
+  }
+  return element.getAttribute?.('class') || '';
+};
+
 const getElementSearchText = (element) => {
   const parts = [];
   parts.push(element.tagName?.toLowerCase() || '');
   parts.push(element.id || '');
-  parts.push(element.className || '');
+  parts.push(getElementClassName(element));
   parts.push(element.textContent || '');
 
   for (const attrName of ['name', 'aria-label', 'placeholder', 'title']) {
@@ -105,6 +112,41 @@ const getElementSearchText = (element) => {
   }
 
   return parts.join(' ').toLowerCase();
+};
+
+const getElementDepth = (element) => {
+  let depth = 0;
+  let current = element;
+  while (current?.parentElement) {
+    depth += 1;
+    current = current.parentElement;
+  }
+  return depth;
+};
+
+const getElementMatchScore = (element, query) => {
+  const id = normalizeQuery(element.id || '');
+  if (id === query) return 0;
+
+  for (const attrName of ['name', 'aria-label', 'placeholder', 'title']) {
+    const attrValue = normalizeQuery(element.getAttribute?.(attrName) || '');
+    if (attrValue === query) return 5;
+  }
+
+  if (id.includes(query)) return 10;
+
+  for (const attrName of ['name', 'aria-label', 'placeholder', 'title']) {
+    const attrValue = normalizeQuery(element.getAttribute?.(attrName) || '');
+    if (attrValue.includes(query)) return 20;
+  }
+
+  const className = normalizeQuery(getElementClassName(element));
+  if (className.includes(query)) return 30;
+
+  const text = normalizeQuery(element.textContent || '');
+  if (text.includes(query)) return 80;
+
+  return 100;
 };
 
 const findHtmlElements = (queries, maxMatches = 10) => {
@@ -135,19 +177,24 @@ const findHtmlElements = (queries, maxMatches = 10) => {
       matches.push({
         query,
         element,
+        score: getElementMatchScore(element, query),
+        depth: getElementDepth(element),
         selector: createElementSelector(element),
         domPreview: (
           element.outerHTML || `<${element.tagName.toLowerCase()}>`
         ).slice(0, 800),
       });
-
-      if (matches.length >= maxMatches) {
-        return matches;
-      }
     }
   }
 
-  return matches;
+  return matches
+    .sort((left, right) => {
+      if (left.score !== right.score) {
+        return left.score - right.score;
+      }
+      return right.depth - left.depth;
+    })
+    .slice(0, maxMatches);
 };
 
 const handleBridgeRequest = async (event, payload) => {

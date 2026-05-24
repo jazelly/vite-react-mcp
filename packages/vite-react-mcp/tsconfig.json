@@ -9,6 +9,7 @@
     "resolveJsonModule": true,
     "allowJs": true,
     "strict": true,
+    "skipLibCheck": true,
     "strictNullChecks": false,
     "noImplicitAny": false,
     "outDir": "dist",

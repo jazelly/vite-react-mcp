@@ -4,7 +4,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "e2e": "playwright test",
+    "e2e": "env -u NO_COLOR playwright test",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -27,7 +27,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.2.3",
+    "vite": "^6.4.2",
     "vite-react-mcp": "workspace:*"
   },
   "browserslist": {

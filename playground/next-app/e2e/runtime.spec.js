@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 
 const MCP_SERVER_URL = 'http://127.0.0.1:51426/sse';
 
 const createMcpClient = async () => {
+  const [{ Client }, { SSEClientTransport }] = await Promise.all([
+    import('@modelcontextprotocol/sdk/client/index.js'),
+    import('@modelcontextprotocol/sdk/client/sse.js'),
+  ]);
   const client = new Client({
     name: 'next-playground-mcp-e2e',
     version: '0.0.0',
@@ -92,6 +94,9 @@ test('next playground MCP tools return expected outcomes', async ({ page }) => {
     expect(enableSelection.enabled).toBe(true);
 
     await page.locator('#next-copy-target').click();
+    await page.waitForFunction(() =>
+      window.__VITE_REACT_MCP__?.getLastSelectionContext(),
+    );
     const contextRaw = await client.callTool({
       name: 'get-last-selection-context',
       arguments: {

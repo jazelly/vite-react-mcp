@@ -15,8 +15,9 @@ export function MarketplaceQualityBar() {
       </List>
       <Divider my={4} />
       <Text color="gray.600" lineHeight="1.7">
-        The catalog remote can evolve pricing, taxonomy, and service merchandising
-        independently while the shell preserves a stable customer navigation model.
+        The catalog remote can evolve pricing, taxonomy, and service
+        merchandising independently while the shell preserves a stable customer
+        navigation model.
       </Text>
     </SectionCard>
   );

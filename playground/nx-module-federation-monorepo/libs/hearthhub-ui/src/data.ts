@@ -35,11 +35,41 @@ export const secondaryNavigation = [
 ];
 
 export const shellStats = [
-  { label: 'Open Requests', value: '3', delta: '+1', help: '2 urgent', tone: 'red' },
-  { label: 'Upcoming Visits', value: '8', delta: '+2', help: 'Next 7 days', tone: 'red' },
-  { label: 'Active Subscriptions', value: '12', delta: '-', help: 'Across 24 homes', tone: 'gray' },
-  { label: 'Monthly Spend', value: '$18,540', delta: '↓ 8%', help: 'vs Apr 2025', tone: 'green' },
-  { label: 'Vendor Rating', value: '4.8', delta: '☆', help: 'Average', tone: 'gold' },
+  {
+    label: 'Open Requests',
+    value: '3',
+    delta: '+1',
+    help: '2 urgent',
+    tone: 'red',
+  },
+  {
+    label: 'Upcoming Visits',
+    value: '8',
+    delta: '+2',
+    help: 'Next 7 days',
+    tone: 'red',
+  },
+  {
+    label: 'Active Subscriptions',
+    value: '12',
+    delta: '-',
+    help: 'Across 24 homes',
+    tone: 'gray',
+  },
+  {
+    label: 'Monthly Spend',
+    value: '$18,540',
+    delta: '↓ 8%',
+    help: 'vs Apr 2025',
+    tone: 'green',
+  },
+  {
+    label: 'Vendor Rating',
+    value: '4.8',
+    delta: '☆',
+    help: 'Average',
+    tone: 'gold',
+  },
 ];
 
 export type Vendor = {

@@ -1,10 +1,26 @@
-import { Badge, Box, Button, Circle, Divider, HStack, Stack, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  Button,
+  Circle,
+  Divider,
+  HStack,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { AppIcon, ShellPanel, servicePlans } from '@mfplayground/hearthhub-ui';
 import { Link } from 'react-router-dom';
 
 export function ServicePlansPanel() {
   return (
-    <ShellPanel action={<Button colorScheme="green" size="xs" variant="link">Manage</Button>} title="Service Plans">
+    <ShellPanel
+      action={
+        <Button colorScheme="green" size="xs" variant="link">
+          Manage
+        </Button>
+      }
+      title="Service Plans"
+    >
       <Stack divider={<Divider />} spacing={3}>
         {servicePlans.map((plan) => (
           <HStack key={plan.id} justify="space-between">
@@ -19,11 +35,21 @@ export function ServicePlansPanel() {
                 </Text>
               </Box>
             </HStack>
-            <Badge colorScheme={plan.status === 'Active' ? 'green' : 'orange'}>{plan.status}</Badge>
+            <Badge colorScheme={plan.status === 'Active' ? 'green' : 'orange'}>
+              {plan.status}
+            </Badge>
           </HStack>
         ))}
       </Stack>
-      <Button as={Link} colorScheme="green" mt={4} size="sm" to="/catalog" variant="link" w="100%">
+      <Button
+        as={Link}
+        colorScheme="green"
+        mt={4}
+        size="sm"
+        to="/catalog"
+        variant="link"
+        w="100%"
+      >
         View All Plans
       </Button>
     </ShellPanel>

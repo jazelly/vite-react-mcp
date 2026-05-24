@@ -27,7 +27,9 @@ export function HeroPanel() {
         as={Link}
         color="white"
         mt={6}
-        rightIcon={<Icon as={ChevronDownIcon} boxSize={4} transform="rotate(-90deg)" />}
+        rightIcon={
+          <Icon as={ChevronDownIcon} boxSize={4} transform="rotate(-90deg)" />
+        }
         to="/diagnostics"
         variant="outline"
       >

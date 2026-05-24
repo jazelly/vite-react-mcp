@@ -1,7 +1,7 @@
-import { LegacyRuntimeBadge } from '@mfplayground/legacy-react-widget';
 import { Grid, Stack } from '@chakra-ui/react';
 import { WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
 import { RemotePageHeader } from '@mfplayground/hearthhub-ui';
+import { LegacyRuntimeBadge } from '@mfplayground/legacy-react-widget';
 import { CatalogSummaryCards } from '../components/CatalogSummaryCards';
 import { MarketplaceQualityBar } from '../components/MarketplaceQualityBar';
 import { ServicePlanTable } from '../components/ServicePlanTable';

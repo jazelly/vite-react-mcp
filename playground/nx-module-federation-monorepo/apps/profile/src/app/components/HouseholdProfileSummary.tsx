@@ -1,5 +1,22 @@
-import { Box, Card, CardBody, Divider, HStack, Heading, List, ListIcon, ListItem, Tag, TagLabel, Text, VStack } from '@chakra-ui/react';
-import { CheckCircleIcon, HomeModernIcon, KeyIcon } from '@heroicons/react/24/outline';
+import {
+  Card,
+  CardBody,
+  Divider,
+  HStack,
+  Heading,
+  List,
+  ListIcon,
+  ListItem,
+  Tag,
+  TagLabel,
+  Text,
+  VStack,
+} from '@chakra-ui/react';
+import {
+  CheckCircleIcon,
+  HomeModernIcon,
+  KeyIcon,
+} from '@heroicons/react/24/outline';
 import { IconBadge, householdPreferences } from '@mfplayground/hearthhub-ui';
 
 export function HouseholdProfileSummary() {
@@ -8,8 +25,14 @@ export function HouseholdProfileSummary() {
       <Card bg="hearth.900" color="white" rounded="lg">
         <CardBody>
           <HStack mb={4} spacing={3}>
-            <IconBadge bg="whiteAlpha.200" color="white" icon={HomeModernIcon} />
-            <Heading color="white" size="md">Household profile summary</Heading>
+            <IconBadge
+              bg="whiteAlpha.200"
+              color="white"
+              icon={HomeModernIcon}
+            />
+            <Heading color="white" size="md">
+              Household profile summary
+            </Heading>
           </HStack>
           <Text color="whiteAlpha.800" lineHeight="1.75">
             Two-story family home, home office on the ground floor, nursery
@@ -18,7 +41,12 @@ export function HouseholdProfileSummary() {
           </Text>
           <Divider borderColor="whiteAlpha.300" my={4} />
           <HStack flexWrap="wrap" spacing={2}>
-            {['Side gate access', 'Pet-aware visits', 'Quiet hours', 'Text first'].map((tag) => (
+            {[
+              'Side gate access',
+              'Pet-aware visits',
+              'Quiet hours',
+              'Text first',
+            ].map((tag) => (
               <Tag bg="whiteAlpha.200" color="white" key={tag}>
                 <TagLabel>{tag}</TagLabel>
               </Tag>
@@ -27,7 +55,12 @@ export function HouseholdProfileSummary() {
         </CardBody>
       </Card>
 
-      <Card bg="white" borderColor="blackAlpha.200" borderWidth="1px" rounded="lg">
+      <Card
+        bg="white"
+        borderColor="blackAlpha.200"
+        borderWidth="1px"
+        rounded="lg"
+      >
         <CardBody>
           <HStack mb={4} spacing={3}>
             <IconBadge icon={KeyIcon} />

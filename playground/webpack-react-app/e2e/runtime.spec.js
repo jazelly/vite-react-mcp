@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 
 const MCP_SERVER_URL = `http://127.0.0.1:${process.env.WEBPACK_REACT_PLAYGROUND_PORT || '51425'}/sse`;
 
 const createMcpClient = async () => {
+  const [{ Client }, { SSEClientTransport }] = await Promise.all([
+    import('@modelcontextprotocol/sdk/client/index.js'),
+    import('@modelcontextprotocol/sdk/client/sse.js'),
+  ]);
   const client = new Client({
     name: 'webpack-playground-mcp-e2e',
     version: '0.0.0',

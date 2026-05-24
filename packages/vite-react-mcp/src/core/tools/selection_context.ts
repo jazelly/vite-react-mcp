@@ -450,6 +450,33 @@ const getComponentDisplayName = (element: Element): string | null => {
   return null;
 };
 
+const getFiberComponentRankByName = (element: Element): Map<string, number> => {
+  const rankByName = new Map<string, number>();
+  if (!isInstrumentationActive()) return rankByName;
+
+  const resolvedElement = findNearestFiberElement(element);
+  if (!resolvedElement) return rankByName;
+  const fiber = getFiberFromHostInstance(resolvedElement);
+  if (!fiber) return rankByName;
+
+  let currentFiber = fiber.return;
+  let rank = 0;
+  while (currentFiber) {
+    if (isCompositeFiber(currentFiber)) {
+      const name = normalizeDisplayComponentName(
+        getDisplayName(currentFiber.type),
+      );
+      if (name && !rankByName.has(name)) {
+        rankByName.set(name, rank);
+      }
+      rank += 1;
+    }
+    currentFiber = currentFiber.return;
+  }
+
+  return rankByName;
+};
+
 const buildStackFrames = async (
   nearestFiberElement: Element,
 ): Promise<SelectionStackFrame[]> => {
@@ -514,6 +541,7 @@ const buildStackFrames = async (
 const resolveSourceFrames = (
   stackFrames: SelectionStackFrame[],
   preferredComponentName: string | null,
+  componentRankByName: Map<string, number>,
 ): SelectionResolvedSource[] => {
   const resolvedSources: SelectionResolvedSource[] = [];
   const seenSourceKeys = new Set<string>();
@@ -521,27 +549,44 @@ const resolveSourceFrames = (
     (stackFrame) =>
       stackFrame.fileName && isProjectSourceFrame(stackFrame.fileName),
   );
-  const preferredSourceFrames = sourceFrames.filter((stackFrame) => {
-    if (!stackFrame.fileName) {
-      return false;
+
+  const getFrameComponentName = (stackFrame: SelectionStackFrame) =>
+    stackFrame.fileName
+      ? inferComponentNameFromSource(
+          stackFrame.fileName,
+          stackFrame.functionName,
+        )
+      : null;
+
+  const getFiberRank = (stackFrame: SelectionStackFrame): number => {
+    const componentName = getFrameComponentName(stackFrame);
+    if (!componentName) return Number.POSITIVE_INFINITY;
+    return componentRankByName.get(componentName) ?? Number.POSITIVE_INFINITY;
+  };
+
+  const sortedSourceFrames = [...sourceFrames].sort((left, right) => {
+    const leftRank = getFiberRank(left);
+    const rightRank = getFiberRank(right);
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank;
     }
 
-    return (
-      inferComponentNameFromSource(
-        stackFrame.fileName,
-        stackFrame.functionName,
-      ) === preferredComponentName
-    );
+    const leftComponentName = getFrameComponentName(left);
+    const rightComponentName = getFrameComponentName(right);
+    const leftIsPreferred = leftComponentName === preferredComponentName;
+    const rightIsPreferred = rightComponentName === preferredComponentName;
+    if (leftIsPreferred !== rightIsPreferred) {
+      return leftIsPreferred ? -1 : 1;
+    }
+
+    const leftIsSourceComponent = isSourceComponentName(left.functionName);
+    const rightIsSourceComponent = isSourceComponentName(right.functionName);
+    if (leftIsSourceComponent !== rightIsSourceComponent) {
+      return leftIsSourceComponent ? -1 : 1;
+    }
+
+    return 0;
   });
-  const sortedSourceFrames = [
-    ...preferredSourceFrames,
-    ...sourceFrames.filter((stackFrame) =>
-      isSourceComponentName(stackFrame.functionName),
-    ),
-    ...sourceFrames.filter(
-      (stackFrame) => !isSourceComponentName(stackFrame.functionName),
-    ),
-  ];
 
   for (const stackFrame of sortedSourceFrames) {
     if (!stackFrame.fileName) {
@@ -644,9 +689,20 @@ export const buildSelectionContextForElement = async (
   const stackFrames = nearestFiberElement
     ? await buildStackFrames(nearestFiberElement)
     : [];
+  const componentRankByName = getFiberComponentRankByName(selectedElement);
+  const displayComponentName = getComponentDisplayName(selectedElement);
+  const stackComponentName = getComponentName(stackFrames);
+  const fallbackComponentName = stackComponentName || displayComponentName;
+  const resolvedSources = resolveSourceFrames(
+    stackFrames,
+    fallbackComponentName,
+    componentRankByName,
+  );
+  const sourceComponentName =
+    resolvedSources.find((source) => source.componentName)?.componentName ??
+    null;
   const componentName =
-    getComponentDisplayName(selectedElement) || getComponentName(stackFrames);
-  const resolvedSources = resolveSourceFrames(stackFrames, componentName);
+    sourceComponentName || stackComponentName || displayComponentName;
   const externalComponent = resolveExternalComponent(
     stackFrames,
     componentName,
