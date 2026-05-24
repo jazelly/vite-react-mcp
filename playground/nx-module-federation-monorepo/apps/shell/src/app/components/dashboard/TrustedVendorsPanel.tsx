@@ -1,9 +1,32 @@
-import { Box, Button, Circle, HStack, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react';
-import { AppIcon, ShellPanel, trustedVendors } from '@mfplayground/hearthhub-ui';
+import {
+  Box,
+  Button,
+  Circle,
+  HStack,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+} from '@chakra-ui/react';
+import {
+  AppIcon,
+  ShellPanel,
+  trustedVendors,
+} from '@mfplayground/hearthhub-ui';
 
 export function TrustedVendorsPanel() {
   return (
-    <ShellPanel action={<Button colorScheme="green" size="xs" variant="link">View all</Button>} title="Trusted Vendors">
+    <ShellPanel
+      action={
+        <Button colorScheme="green" size="xs" variant="link">
+          View all
+        </Button>
+      }
+      title="Trusted Vendors"
+    >
       <Table
         size="sm"
         sx={{
@@ -40,7 +63,12 @@ export function TrustedVendorsPanel() {
               <Td>
                 <HStack spacing={1}>
                   {vendor.serviceIcons.map((serviceIcon) => (
-                    <Circle bg="gray.100" fontSize="xs" key={serviceIcon} size="22px">
+                    <Circle
+                      bg="gray.100"
+                      fontSize="xs"
+                      key={serviceIcon}
+                      size="22px"
+                    >
                       {serviceIcon}
                     </Circle>
                   ))}

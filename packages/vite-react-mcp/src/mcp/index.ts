@@ -339,9 +339,7 @@ const findComponentSourceInProject = (
     }
 
     const lines = sourceText.split(/\r?\n/);
-    const matchIndex = lines.findIndex((line) =>
-      declarationPattern.test(line),
-    );
+    const matchIndex = lines.findIndex((line) => declarationPattern.test(line));
     const realFilePath = fs.realpathSync(filePath);
     const relativeFilePath = path
       .relative(normalizedRootDir, realFilePath)
@@ -359,6 +357,123 @@ const findComponentSourceInProject = (
   return matchedSource;
 };
 
+const stripCssEscapes = (value: string): string =>
+  value.replace(/\\([^\r\n])/g, '$1');
+
+const pushSourceHint = (hints: string[], hint: string | null | undefined) => {
+  if (!hint || hint.length < 3) {
+    return;
+  }
+  if (hints.includes(hint)) {
+    return;
+  }
+  hints.push(hint);
+};
+
+const extractSelectionSourceHints = (
+  selectionContext: SelectionContext,
+): string[] => {
+  const hints: string[] = [];
+  const selector = selectionContext.selector ?? '';
+  const idMatch = selector.match(/#((?:\\.|[^\s>+~.#:[\]])+)/);
+  if (idMatch?.[1]) {
+    pushSourceHint(hints, stripCssEscapes(idMatch[1]));
+  }
+
+  for (const attrMatch of selector.matchAll(
+    /\[[^\]=\s]+=(?:"([^"]*)"|'([^']*)'|([^\]\s]+))\]/g,
+  )) {
+    pushSourceHint(
+      hints,
+      stripCssEscapes(attrMatch[1] ?? attrMatch[2] ?? attrMatch[3]),
+    );
+  }
+
+  const domPreview = selectionContext.domPreview;
+  for (const attrName of [
+    'id',
+    'data-testid',
+    'data-test-id',
+    'data-test',
+    'data-cy',
+    'data-qa',
+    'aria-label',
+    'name',
+    'title',
+  ]) {
+    const attrPattern = new RegExp(`${attrName}=["']([^"']+)["']`, 'i');
+    const attrMatch = domPreview.match(attrPattern);
+    pushSourceHint(hints, attrMatch?.[1]);
+  }
+
+  return hints;
+};
+
+const refineLocalUsageSourceLine = (
+  rootDir: string,
+  selectionContext: SelectionContext,
+  localUsageSource: SelectionResolvedSource,
+): SelectionResolvedSource => {
+  const hints = extractSelectionSourceHints(selectionContext);
+  if (hints.length === 0) {
+    return localUsageSource;
+  }
+
+  const absoluteSourcePath = resolveAbsoluteSourcePath(
+    rootDir,
+    localUsageSource.filePath,
+  );
+  if (!absoluteSourcePath) {
+    return localUsageSource;
+  }
+
+  let sourceText: string;
+  try {
+    sourceText = fs.readFileSync(absoluteSourcePath, 'utf8');
+  } catch (_error) {
+    return localUsageSource;
+  }
+
+  const sourceLines = sourceText.split(/\r?\n/);
+  const searchStartIndex = Math.max(0, (localUsageSource.lineNumber ?? 1) - 1);
+  const searchRanges = [
+    sourceLines.slice(searchStartIndex).map((line, index) => ({
+      line,
+      lineIndex: searchStartIndex + index,
+    })),
+    sourceLines.slice(0, searchStartIndex).map((line, lineIndex) => ({
+      line,
+      lineIndex,
+    })),
+  ];
+
+  for (const hint of hints) {
+    for (const searchRange of searchRanges) {
+      const matchedLine = searchRange.find(({ line }) => line.includes(hint));
+      if (matchedLine) {
+        return {
+          ...localUsageSource,
+          lineNumber: matchedLine.lineIndex + 1,
+        };
+      }
+    }
+  }
+
+  return localUsageSource;
+};
+
+const placeResolvedSourceFirst = (
+  resolvedSources: SelectionResolvedSource[],
+  preferredSource: SelectionResolvedSource,
+): SelectionResolvedSource[] => [
+  preferredSource,
+  ...resolvedSources.filter(
+    (source) =>
+      source.filePath !== preferredSource.filePath ||
+      source.componentName !== preferredSource.componentName,
+  ),
+];
+
 const enrichExternalComponentUsage = (
   rootDir: string,
   selectionContext: SelectionContext,
@@ -366,37 +481,36 @@ const enrichExternalComponentUsage = (
   if (!selectionContext.externalComponent) {
     return selectionContext;
   }
-  if (selectionContext.externalComponent.usedBy) {
-    return selectionContext;
-  }
 
-  const localUsageComponentName =
-    inferLocalUsageComponentName(selectionContext);
-  if (!localUsageComponentName) {
-    return selectionContext;
-  }
-
-  const localUsageSource = findComponentSourceInProject(
-    rootDir,
-    localUsageComponentName,
-  );
+  const localUsageSource =
+    selectionContext.externalComponent.usedBy ??
+    (() => {
+      const localUsageComponentName =
+        inferLocalUsageComponentName(selectionContext);
+      if (!localUsageComponentName) {
+        return null;
+      }
+      return findComponentSourceInProject(rootDir, localUsageComponentName);
+    })();
   if (!localUsageSource) {
     return selectionContext;
   }
 
-  const nextResolvedSources = selectionContext.resolvedSources.some(
-    (source) =>
-      source.filePath === localUsageSource.filePath &&
-      source.componentName === localUsageSource.componentName,
-  )
-    ? selectionContext.resolvedSources
-    : [localUsageSource, ...selectionContext.resolvedSources];
+  const refinedLocalUsageSource = refineLocalUsageSourceLine(
+    rootDir,
+    selectionContext,
+    localUsageSource,
+  );
+  const nextResolvedSources = placeResolvedSourceFirst(
+    selectionContext.resolvedSources,
+    refinedLocalUsageSource,
+  );
 
   const nextSelectionContext = {
     ...selectionContext,
     externalComponent: {
       ...selectionContext.externalComponent,
-      usedBy: localUsageSource,
+      usedBy: refinedLocalUsageSource,
     },
     resolvedSources: nextResolvedSources,
   };
@@ -413,11 +527,14 @@ const enrichSelectionContextWithSnippets = (
   contextLines: number,
   maxFiles: number,
 ): SelectionContext => {
-  selectionContext = enrichExternalComponentUsage(rootDir, selectionContext);
+  const enrichedSelectionContext = enrichExternalComponentUsage(
+    rootDir,
+    selectionContext,
+  );
   const sourceSnippets: SelectionSourceSnippet[] = [];
   const seenFilePaths = new Set<string>();
 
-  for (const resolvedSource of selectionContext.resolvedSources) {
+  for (const resolvedSource of enrichedSelectionContext.resolvedSources) {
     const sourceFilePath = resolvedSource.filePath;
     if (!sourceFilePath || seenFilePaths.has(sourceFilePath)) {
       continue;
@@ -453,10 +570,10 @@ const enrichSelectionContextWithSnippets = (
   }
 
   return {
-    ...selectionContext,
+    ...enrichedSelectionContext,
     sourceSnippets,
     sourcePreview: buildSelectionSourcePreview({
-      ...selectionContext,
+      ...enrichedSelectionContext,
       sourceSnippets,
     }),
   };

@@ -9,7 +9,7 @@
     "start:profile": "nx run profile:serve",
     "build": "nx run-many --target=build --projects=catalog,profile,shell --configuration=production",
     "build:packages": "pnpm -C ../.. run build",
-    "test:e2e": "pnpm run build:packages && playwright test"
+    "test:e2e": "pnpm run build:packages && env -u NO_COLOR playwright test"
   },
   "dependencies": {
     "@chakra-ui/react": "2.10.9",
@@ -20,7 +20,7 @@
     "react": "18.2.0",
     "react-17-compat": "npm:react@17.0.2",
     "react-dom": "18.2.0",
-    "react-router-dom": "6.4.2",
+    "react-router-dom": "6.30.3",
     "webpack-react-mcp": "workspace:*"
   },
   "devDependencies": {
@@ -28,14 +28,14 @@
     "@babel/preset-env": "7.20.2",
     "@babel/preset-react": "7.18.6",
     "@babel/preset-typescript": "7.18.6",
-    "@modelcontextprotocol/sdk": "1.7.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@nrwl/devkit": "15.9.7",
     "@nrwl/eslint-plugin-nx": "15.9.7",
     "@nrwl/js": "15.9.7",
     "@nrwl/react": "15.9.7",
     "@nrwl/webpack": "15.9.7",
     "@nrwl/workspace": "15.9.7",
-    "@playwright/test": "1.52.0",
+    "@playwright/test": "^1.59.1",
     "@types/react": "18.3.23",
     "@types/react-dom": "18.3.7",
     "@typescript-eslint/eslint-plugin": "5.36.1",
@@ -46,9 +46,9 @@
     "nx": "15.9.7",
     "ts-loader": "9.4.1",
     "typescript": "4.8.4",
-    "webpack": "5.100.1",
+    "webpack": "5.107.1",
     "webpack-cli": "6.0.1",
-    "webpack-dev-server": "5.2.2",
+    "webpack-dev-server": "5.2.4",
     "webpack-merge": "5.8.0"
   }
 }

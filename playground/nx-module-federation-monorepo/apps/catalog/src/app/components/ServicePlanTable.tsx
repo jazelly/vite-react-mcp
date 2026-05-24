@@ -1,5 +1,19 @@
-import { Badge, Box, Button, HStack, Icon, Table, Tbody, Td, Text, Th, Thead, Tr } from '@chakra-ui/react';
-import { ArrowTopRightOnSquareIcon, CubeIcon } from '@heroicons/react/24/outline';
+import {
+  Badge,
+  Button,
+  Icon,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+} from '@chakra-ui/react';
+import {
+  ArrowTopRightOnSquareIcon,
+  CubeIcon,
+} from '@heroicons/react/24/outline';
 import { AppIcon, SectionCard, servicePlans } from '@mfplayground/hearthhub-ui';
 import { Link } from 'react-router-dom';
 
@@ -37,10 +51,18 @@ export function ServicePlanTable() {
               <Td>{plan.owner}</Td>
               <Td>{plan.price}</Td>
               <Td>
-                <Badge colorScheme={plan.status === 'Active' ? 'green' : 'orange'}>{plan.status}</Badge>
+                <Badge
+                  colorScheme={plan.status === 'Active' ? 'green' : 'orange'}
+                >
+                  {plan.status}
+                </Badge>
               </Td>
               <Td>
-                <Icon as={ArrowTopRightOnSquareIcon} boxSize={5} color="gray.500" />
+                <Icon
+                  as={ArrowTopRightOnSquareIcon}
+                  boxSize={5}
+                  color="gray.500"
+                />
               </Td>
             </Tr>
           ))}

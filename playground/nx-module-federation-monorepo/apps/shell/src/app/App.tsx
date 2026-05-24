@@ -21,7 +21,10 @@ export function App() {
             element={
               <Suspense
                 fallback={
-                  <SectionCard icon={TruckIcon} title="Loading services catalog...">
+                  <SectionCard
+                    icon={TruckIcon}
+                    title="Loading services catalog..."
+                  >
                     <Text>Loading services catalog...</Text>
                   </SectionCard>
                 }
@@ -35,7 +38,10 @@ export function App() {
             element={
               <Suspense
                 fallback={
-                  <SectionCard icon={PuzzlePieceIcon} title="Loading household profile...">
+                  <SectionCard
+                    icon={PuzzlePieceIcon}
+                    title="Loading household profile..."
+                  >
                     <Text>Loading household profile...</Text>
                   </SectionCard>
                 }

@@ -26,7 +26,8 @@ export function VisitTable() {
       <Tabs colorScheme="green" variant="line">
         <TabList>
           <Tab>
-            <AppIcon icon={CalendarDaysIcon} /> <Text ml={2}>Upcoming Visits</Text>
+            <AppIcon icon={CalendarDaysIcon} />{' '}
+            <Text ml={2}>Upcoming Visits</Text>
           </Tab>
           <Tab>Recent Activity</Tab>
           <Tab>Messages</Tab>
@@ -36,12 +37,22 @@ export function VisitTable() {
           <TabPanel px={0}>
             <HStack flexWrap="wrap" mb={3} spacing={2}>
               {['Next 7 Days', 'Next 30 Days', 'All'].map((filter, index) => (
-                <Button colorScheme={index === 0 ? 'green' : 'gray'} key={filter} size="sm" variant={index === 0 ? 'solid' : 'outline'}>
+                <Button
+                  colorScheme={index === 0 ? 'green' : 'gray'}
+                  key={filter}
+                  size="sm"
+                  variant={index === 0 ? 'solid' : 'outline'}
+                >
                   {filter}
                 </Button>
               ))}
               {['All Homes', 'All Services', 'All Vendors'].map((filter) => (
-                <Button key={filter} rightIcon={<Icon as={ChevronDownIcon} boxSize={4} />} size="sm" variant="outline">
+                <Button
+                  key={filter}
+                  rightIcon={<Icon as={ChevronDownIcon} boxSize={4} />}
+                  size="sm"
+                  variant="outline"
+                >
                   {filter}
                 </Button>
               ))}
@@ -73,19 +84,40 @@ export function VisitTable() {
                       </HStack>
                     </Td>
                     <Td>
-                      <Badge colorScheme={visit.status === 'Confirmed' ? 'green' : 'orange'}>{visit.status}</Badge>
+                      <Badge
+                        colorScheme={
+                          visit.status === 'Confirmed' ? 'green' : 'orange'
+                        }
+                      >
+                        {visit.status}
+                      </Badge>
                     </Td>
                   </Tr>
                 ))}
               </Tbody>
             </Table>
-            <Button colorScheme="green" mt={3} size="sm" variant="link" w="100%">
+            <Button
+              colorScheme="green"
+              mt={3}
+              size="sm"
+              variant="link"
+              w="100%"
+            >
               View All Visits
             </Button>
           </TabPanel>
-          <TabPanel color="gray.600">Recent service notes, remote deploys, and approval events appear here.</TabPanel>
-          <TabPanel color="gray.600">Unread homeowner and vendor messages are grouped by property and visit.</TabPanel>
-          <TabPanel color="gray.600">Invoices, inspection reports, and plan documents are attached to each route.</TabPanel>
+          <TabPanel color="gray.600">
+            Recent service notes, remote deploys, and approval events appear
+            here.
+          </TabPanel>
+          <TabPanel color="gray.600">
+            Unread homeowner and vendor messages are grouped by property and
+            visit.
+          </TabPanel>
+          <TabPanel color="gray.600">
+            Invoices, inspection reports, and plan documents are attached to
+            each route.
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </ShellPanel>

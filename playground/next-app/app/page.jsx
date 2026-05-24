@@ -27,7 +27,6 @@ import {
   Form,
   Input,
   Layout,
-  List,
   Menu,
   Progress,
   Row,
@@ -212,7 +211,7 @@ export default function HomePage() {
             onClick={({ key }) => setActiveNav(key)}
           />
             <Card size="small" style={{ marginTop: 'auto' }}>
-            <Space direction="vertical" size={4}>
+            <Space orientation="vertical" size={4}>
               <Text type="secondary">Runtime bridge</Text>
               <Badge status="processing" text="MCP connected" />
               <Text type="secondary" style={{ display: 'block' }}>
@@ -332,7 +331,7 @@ export default function HomePage() {
                         <Timeline
                           items={incidents.map((item, index) => ({
                             color: index === incidents.length - 1 ? 'green' : 'blue',
-                            children: item,
+                            content: item,
                           }))}
                         />
                       ),
@@ -360,29 +359,28 @@ export default function HomePage() {
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
             <Col xs={24} lg={10}>
               <SectionCard title="Release checklist" icon={<ShieldCheck size={20} weight="duotone" />}>
-                <List
-                  dataSource={[
+                <div role="list">
+                  {[
                     'Hydration stable on account overview, billing, and entitlement routes',
                     'Runtime globals injected before runbook replay begins',
                     'Copy context available for selectors used in release gates',
                     'Selection mode verified against source-owned narrative and action components',
-                  ]}
-                  renderItem={(item) => (
-                    <List.Item>
+                  ].map((item) => (
+                    <div key={item} role="listitem" style={{ padding: '6px 0' }}>
                       <Space>
                         <CheckCircle color="#16803c" size={18} weight="fill" />
-                        {item}
+                        <span>{item}</span>
                       </Space>
-                    </List.Item>
-                  )}
-                />
+                    </div>
+                  ))}
+                </div>
               </SectionCard>
             </Col>
             <Col xs={24} lg={14}>
               <Alert
                 showIcon
                 type="info"
-                message="Ant Design and Phosphor wrappers are intentionally nested."
+                title="Ant Design and Phosphor wrappers are intentionally nested."
                 description="This playground now resembles a production operations app, giving component selection and MCP source lookups a deeper library-heavy tree to inspect."
               />
               <Descriptions

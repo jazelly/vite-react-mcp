@@ -8,7 +8,11 @@ import { VisitTable } from '../components/dashboard/VisitTable';
 
 export function ShellHome() {
   return (
-    <Grid id="shell-workspace" gap={4} templateColumns={{ base: '1fr', xl: 'minmax(0, 1fr) 365px' }}>
+    <Grid
+      id="shell-workspace"
+      gap={4}
+      templateColumns={{ base: '1fr', xl: 'minmax(0, 1fr) 365px' }}
+    >
       <Stack spacing={4}>
         <HeroPanel />
         <StatsStrip />

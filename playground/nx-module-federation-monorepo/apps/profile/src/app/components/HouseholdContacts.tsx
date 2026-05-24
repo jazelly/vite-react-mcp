@@ -5,7 +5,12 @@ import { ProfileMemberCard } from './ProfileMemberCard';
 
 export function HouseholdContacts() {
   return (
-    <Card bg="white" borderColor="blackAlpha.200" borderWidth="1px" rounded="lg">
+    <Card
+      bg="white"
+      borderColor="blackAlpha.200"
+      borderWidth="1px"
+      rounded="lg"
+    >
       <CardBody>
         <HStack mb={4} spacing={3}>
           <IconBadge icon={UsersIcon} />
