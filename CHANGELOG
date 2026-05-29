@@ -1,3 +1,11 @@
+## 0.1.0
+
+Initial Agentic React release under `@jazelly/agentic-react`.
+
+- Publish a single package with Vite as the default export.
+- Expose Webpack and Next.js integrations through `@jazelly/agentic-react/webpack` and `@jazelly/agentic-react/next`.
+- Rename the browser runtime globals, generated files, and playground packages to Agentic React names.
+
 ## 0.3.0
 
 Introduce Custom Tools - where users can define custom functions and declare as MCP tools.

@@ -1,5 +1,5 @@
-export { RuntimeBridgeServer } from 'vite-react-mcp/bridge';
-export { initMcpServer, instrumentViteDevServer } from 'vite-react-mcp/mcp';
+export { RuntimeBridgeServer } from '@jazelly/agentic-react/bridge';
+export { initMcpServer, instrumentViteDevServer } from '@jazelly/agentic-react/mcp';
 export type {
   CustomTool,
   JsonValue,
@@ -8,4 +8,4 @@ export type {
   SelectionSourceSnippet,
   SelectionStackFrame,
   ToolResultValue,
-} from 'vite-react-mcp';
+} from '@jazelly/agentic-react';

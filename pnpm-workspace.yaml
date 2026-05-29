@@ -1,5 +1,5 @@
 packages:
-  # Publishable packages
+  # Workspace packages
   - 'packages/*'
   # Local examples and integration test apps
   - 'playground/*'
@@ -27,5 +27,5 @@ catalog:
   vite: ^6.4.2
   vite-dev-rpc: ^1.0.7
   vite-hot-client: ^2.0.4
-  vite-react-mcp: ^0.1.1
+  '@jazelly/agentic-react': ^0.1.0
   zod: ^3.24.2

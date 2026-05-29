@@ -30,29 +30,32 @@ const run = (command, args, cwd) =>
 
 const suites = [
   {
-    name: 'vite-react-app',
-    cwd: path.join(rootDir, 'playground/vite-react-app'),
+    name: 'agentic-react-vite-playground',
+    cwd: path.join(rootDir, 'playground/agentic-react-vite-playground'),
     command: ['pnpm', ['run', 'e2e', ...playwrightArgs]],
   },
   {
-    name: 'webpack-react-playground',
-    cwd: path.join(rootDir, 'playground/webpack-react-app'),
+    name: 'agentic-react-webpack-playground',
+    cwd: path.join(rootDir, 'playground/agentic-react-webpack-playground'),
     command: [
       'pnpm',
       ['exec', 'env', '-u', 'NO_COLOR', 'playwright', 'test', ...playwrightArgs],
     ],
   },
   {
-    name: 'next-app-playground',
-    cwd: path.join(rootDir, 'playground/next-app'),
+    name: 'agentic-react-next-playground',
+    cwd: path.join(rootDir, 'playground/agentic-react-next-playground'),
     command: [
       'pnpm',
       ['exec', 'env', '-u', 'NO_COLOR', 'playwright', 'test', ...playwrightArgs],
     ],
   },
   {
-    name: 'nx-module-federation-react-playground',
-    cwd: path.join(rootDir, 'playground/nx-module-federation-monorepo'),
+    name: 'agentic-react-nx-module-federation-playground',
+    cwd: path.join(
+      rootDir,
+      'playground/agentic-react-nx-module-federation-playground',
+    ),
     command: [
       'pnpm',
       ['exec', 'env', '-u', 'NO_COLOR', 'playwright', 'test', ...playwrightArgs],
@@ -64,6 +67,6 @@ await run('pnpm', ['run', 'build'], rootDir);
 
 for (const suite of suites) {
   const [command, args] = suite.command;
-  console.info(`\n[vite-react-mcp] running ${suite.name}`);
+  console.info(`\n[agentic-react] running ${suite.name}`);
   await run(command, args, suite.cwd);
 }
