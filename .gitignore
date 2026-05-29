@@ -64,6 +64,8 @@ typings/
 
 # next.js build output
 .next
+.vite-react-mcp-webpack/
+**/.vite-react-mcp-webpack/
 
 # Playwright output
 test-results/

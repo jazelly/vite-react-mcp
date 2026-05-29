@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "next dev -p 51424",
+    "start": "next dev -H 127.0.0.1 -p 51424",
     "build": "next build",
     "test:e2e": "pnpm -C ../.. run build && env -u NO_COLOR playwright test"
   },

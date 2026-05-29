@@ -11,7 +11,8 @@
     "format": "pnpm biome format --write",
     "lint": "pnpm biome lint --write",
     "check": "pnpm biome check --write",
-    "test": "pnpm -r --if-present run test"
+    "test": "pnpm run test:e2e",
+    "test:e2e": "node scripts/run-e2e.mjs"
   },
   "pnpm": {
     "overrides": {

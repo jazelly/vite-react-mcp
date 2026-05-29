@@ -5,6 +5,7 @@
     "start": "vite",
     "dev": "vite",
     "e2e": "env -u NO_COLOR playwright test",
+    "test:e2e": "pnpm -C ../.. run build && pnpm run e2e",
     "build": "vite build",
     "preview": "vite preview"
   },
