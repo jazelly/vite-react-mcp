@@ -3,9 +3,11 @@ import { URLSearchParams } from 'node:url';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { RuntimeBridgeServer, initMcpServer } from 'react-mcp';
 
-const port = Number(process.env.VITE_REACT_MCP_SERVER_PORT || 51426);
-const host = process.env.VITE_REACT_MCP_SERVER_HOST || '127.0.0.1';
-const rootDir = process.env.VITE_REACT_MCP_ROOT_DIR || process.cwd();
+const port = Number(
+  process.env.AGENTIC_REACT_SERVER_PORT || 51426,
+);
+const host = process.env.AGENTIC_REACT_SERVER_HOST || '127.0.0.1';
+const rootDir = process.env.AGENTIC_REACT_ROOT_DIR || process.cwd();
 
 const runtimeBridge = new RuntimeBridgeServer();
 const mcpServer = initMcpServer(runtimeBridge, rootDir, []);
@@ -64,5 +66,5 @@ const httpServer = http.createServer(async (req, res) => {
 
 runtimeBridge.attach(httpServer);
 httpServer.listen(port, host, () => {
-  console.log(`[vite-react-mcp] standalone MCP bridge listening on http://${host}:${port}`);
+  console.log(`[agentic-react] standalone MCP bridge listening on http://${host}:${port}`);
 });

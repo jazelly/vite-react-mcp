@@ -1,13 +1,13 @@
 {
-  "name": "react-mcp-workspace",
+  "name": "agentic-react-workspace",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node scripts/with-build-lock.mjs pnpm -r --filter './packages/**' run build",
-    "build:src": "pnpm --filter vite-react-mcp run build:src",
+    "build:src": "pnpm --filter @jazelly/agentic-react run build:src",
     "dev": "pnpm -r --parallel --if-present run start",
-    "playground": "pnpm --filter vite-react-app run start",
-    "playground:nx-mf": "pnpm -C playground/nx-module-federation-monorepo run start",
+    "playground": "pnpm --filter agentic-react-vite-playground run start",
+    "playground:nx-mf": "pnpm -C playground/agentic-react-nx-module-federation-playground run start",
     "format": "pnpm biome format --write",
     "lint": "pnpm biome lint --write",
     "check": "pnpm biome check --write",

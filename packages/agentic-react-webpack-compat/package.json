@@ -1,20 +1,22 @@
 {
-  "name": "react-mcp",
+  "name": "agentic-react-webpack-compat",
   "type": "module",
   "private": true,
-  "version": "0.3.0",
-  "description": "MCP server primitives for React runtime inspection",
+  "version": "0.1.0",
+  "description": "Private legacy wrapper for the Agentic React Webpack entrypoint",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "shx rm -rf dist && tsc"
   },
   "keywords": [
+    "webpack",
     "react",
     "mcp",
-    "model-context-protocol",
+    "visual-edit",
     "agents",
-    "devtools"
+    "devtools",
+    "plugin"
   ],
   "author": {
     "name": "jazelly",
@@ -24,6 +26,10 @@
     "dist"
   ],
   "license": "MIT",
+  "peerDependencies": {
+    "@babel/preset-react": ">=6",
+    "webpack": ">=5"
+  },
   "dependencies": {
     "@jazelly/agentic-react": "workspace:*"
   },

@@ -18,7 +18,7 @@ if (!command) {
 const workspaceKey = Buffer.from(process.cwd()).toString('base64url');
 const lockDir = path.join(
   os.tmpdir(),
-  `vite-react-mcp-workspace-build-${workspaceKey}.lock`,
+  `agentic-react-workspace-build-${workspaceKey}.lock`,
 );
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

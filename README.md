@@ -1,52 +1,47 @@
-# vite-react-mcp
+# @jazelly/agentic-react
 
 [![npm version][npm-version-src]][npm-version-href]
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 
-A Vite plugin that creates an MCP server to help LLMs understand your React App context
+A single dev-only React plugin that creates an MCP server to help LLMs understand your React app context across Vite, Webpack, and Next.js.
 
-## Workspace Packages
+## Package
 
-This repository is a pnpm workspace. Published plugin packages live under `packages/`:
+This repository publishes one npm package:
 
-- `vite-react-mcp`: Vite integration.
-- `webpack-react-mcp`: Webpack integration.
+- `@jazelly/agentic-react`: default Vite integration, with Webpack and Next.js available through subpath exports.
 
 ## Features
 
-- `highlight-component`
-  - description: Highlight React component based on the component name.
-  - params: 
-    - `componentName`: string
+- Single package for Vite, Webpack, and Next.js dev setups.
+- Local MCP server exposed from your dev server or local bridge at `/sse`.
+- Browser runtime globals for direct inspection: `window.__AGENTIC_REACT__` and `window.__AGENTIC_REACT_TOOLS__`.
+- React component highlighting by component name.
+- Live React component tree inspection.
+- Props, state, and context inspection for selected components.
+- Unnecessary re-render detection for the current page.
+- DOM selection to React source context lookup.
+- Custom browser tools that agents can call through MCP.
+
+### Built-in MCP Tools
+
+- `highlight-component`: highlight a React component by `componentName`.
 
   ![highlight-component](./playground/demo/demo_highlight_component.gif)
 
-- `get-component-states`
-  - description: Get the React component props, states, and contexts in JSON structure format.
-  - params:
-    - `componentName`: string
+- `get-component-states`: return props, state, and context for a React component.
 
   ![get-component-states](./playground/demo/demo_get_states.gif)
 
-- `get-component-tree`
-  - description: Get the React component tree of the current page in ASCII format.
-  - params:
-    - `allComponent`: boolean, if truthy, return a tree for all components instead of your self-defined components only.
+- `get-component-tree`: return the current page's React component tree.
 
   ![get-component-tree](./playground/demo/demo_get_component_tree.gif)
 
-- `get-unnecessary-rerenders`
-  - description: Get the wasted re-rendered components of the current page.
-  - params:
-    - `timeframe`: number, if present, only get unnecessary renders within the last `timeframe` seconds. If not, get all unnecessary renders happened on the current page.
-    - `allComponent`: boolean, if truthy, get unnecessary renders for all components instead of self-defined components only.
+- `get-unnecessary-rerenders`: return wasted re-renders, optionally scoped by `timeframe`.
 
   ![get-unnecessary-rerenders](./playground/demo/demo_unnecessary_renders.gif)
 
-- Custom Tools
-
-  You can now define your own tool functions in JS/TS in your Vite project, and inject it
-  to the plugin.
+- Custom tools: register your own browser-side functions as MCP tools.
 
   ![custom-tools](./playground/demo/demo_custom_tools.gif)
 
@@ -55,35 +50,96 @@ This repository is a pnpm workspace. Published plugin packages live under `packa
 ### Installation
 
 ```bash
-pnpm install vite-react-mcp -D
+pnpm install @jazelly/agentic-react -D
 ```
 
-You also need `@babel/preset-react` installed, as this plugins traverses AST to collect your React components names.
+You also need `@babel/preset-react` installed, as this plugin traverses AST to collect your React component names.
 
 ```bash
-pnpm install @babel/preset-react
+pnpm install @babel/preset-react -D
 ```
 
-### Usage
-
-#### Built-in tools
+### Vite
 
 ```ts
 // vite.config.ts
-import ReactMCP from 'vite-react-mcp'
+import { defineConfig } from 'vite';
+import AgenticReact from '@jazelly/agentic-react'
 
 export default defineConfig({
-  plugins: [ReactMCP()],
+  plugins: [AgenticReact()],
 })
 ```
 
-#### Custom tools
+Run your Vite app in development. Agentic React is served from the same dev server, and the MCP endpoint is available at:
+
+```text
+http://localhost:<vite-port>/sse
+```
+
+### Webpack
+
+```js
+// webpack.config.mjs
+import withAgenticReactWebpack from '@jazelly/agentic-react/webpack'
+
+export default (env, argv) =>
+  withAgenticReactWebpack(config, { mode: argv.mode })
+```
+
+Run your Webpack dev server. Agentic React adds the browser runtime entry and exposes MCP middleware from the same dev server:
+
+```text
+http://localhost:<webpack-dev-server-port>/sse
+```
+
+### Next.js
+
+```js
+// next.config.mjs
+import withAgenticReactNext from '@jazelly/agentic-react/next'
+
+export default withAgenticReactNext(nextConfig)
+```
+
+By default the Next.js adapter starts its local MCP bridge on:
+
+```text
+http://127.0.0.1:51426/sse
+```
+
+### MCP Client
+
+After adding the Vite, Webpack, or Next.js integration, point your MCP client at the matching `/sse` URL.
+
+Cursor example:
+
+```json
+{
+  "mcpServers": {
+    "@jazelly/agentic-react": {
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}
+```
+
+Replace `3000` with your app's dev server port. For Next.js, use `http://127.0.0.1:51426/sse` unless you configured a different bridge port.
+
+You can also access tools directly in the browser:
+
+```js
+window.__AGENTIC_REACT__
+window.__AGENTIC_REACT_TOOLS__
+```
+
+### Custom Tools
 
 Define your own tool in your Vite project, e.g.
 
 ```ts
 // any ts file in your Vite project
-import type { ToolResultValue } from 'vite-react-mcp';
+import type { ToolResultValue } from '@jazelly/agentic-react';
 
 export default function myCustomTool(args: { message: string }): ToolResultValue {
   const { message } = args;
@@ -97,11 +153,12 @@ export default function myCustomTool(args: { message: string }): ToolResultValue
 
 ```ts
 // vite.config.ts
-import ReactMCP from 'vite-react-mcp'
+import AgenticReact from '@jazelly/agentic-react'
 import log1 from 'path/to/your/module'
+import { z } from 'zod'
 
 export default defineConfig({
-  plugins: [ReactMCP({
+  plugins: [AgenticReact({
     customTools: [
       {
         name: 'log1',
@@ -117,34 +174,11 @@ export default defineConfig({
 ```
 
 Then run your app in dev.
-> Note: vite-react-mcp is meant to be used in dev environment only
-
-At this point, you already can access `window.__VITE_REACT_MCP_TOOLS__` to use the tools in Developer panel on your browser.
-
-To expose it as an MCP server, setup MCP configuration in your MCP client.
-
-- For Cursor, create a `./cursor/mcp.json` at the root level of your react project.
-
-  ```json
-  {
-    "mcpServers": {
-      "vite-react-mcp": {
-        "url": "http://localhost:3000/sse"
-      }
-    }
-  }
-  ```
-
-  Make sure the port is the same as your react app
-
-- For Claude Desktop, it requires a bit of workaround. If you are interested, you can take a look at [this thread](https://github.com/orgs/modelcontextprotocol/discussions/16).
-
-  The reason is Claude MCP Client does execution based on command, while what we have here is HTTP based API. You need to write a script acting as a bridge to make it look like execution based.
-
+> Note: @jazelly/agentic-react is meant to be used in dev environment only
 
 ### How it works
 
-This plugin bridges an MCP server with your React app's browser runtime, enabling LLMs to inspect and interact with your components in a live browser session. When an MCP client calls a tool, the MCP server forwards that request through the local runtime bridge into the browser, executes it against the live React tree, and returns the result back to the MCP client. Here's the full picture:
+This plugin injects a small browser runtime (`window.__AGENTIC_REACT__`) and bridges an MCP server with your React app, enabling LLMs to inspect and interact with your components in a live browser session. When an MCP client calls a tool, the MCP server forwards that request through the local runtime bridge into the browser, executes it against the live React tree, and returns the result back to the MCP client. Here's the full picture:
 
 #### Architecture overview
 
@@ -162,7 +196,7 @@ Vite Dev Server (Node.js)
       Browser
   ├── overlay.js (tool implementations + WebSocket listeners)
   ├── bippy (React fiber access via __REACT_DEVTOOLS_GLOBAL_HOOK__)
-  └── window.__VITE_REACT_MCP_TOOLS__ (tool registry)
+  └── window.__AGENTIC_REACT_TOOLS__ (tool registry)
 ```
 
 #### Step by step
@@ -172,7 +206,7 @@ Vite Dev Server (Node.js)
 2. **Browser-side injection (runtime)** — At dev startup, scripts are injected into the HTML `<head>`:
    - The collected component names are set on `window.__REACT_COMPONENTS__`.
    - `overlay.js` is loaded as a module. It uses [bippy](https://github.com/nicholascostadev/bippy) to install a `__REACT_DEVTOOLS_GLOBAL_HOOK__` on `window`, giving direct access to the React fiber tree **without requiring the React DevTools browser extension**. It also hooks into React's commit lifecycle (`onCommitFiberRoot`) to continuously track fiber roots and detect unnecessary re-renders.
-   - The overlay exposes all built-in tool functions (highlight, tree, states, re-renders) on `window.__VITE_REACT_MCP_TOOLS__` and registers Vite HMR listeners (`import.meta.hot.on(...)`) for each tool.
+   - The overlay exposes all built-in tool functions (highlight, tree, states, re-renders) on `window.__AGENTIC_REACT_TOOLS__` and registers Vite HMR listeners (`import.meta.hot.on(...)`) for each tool.
 
 3. **MCP server (SSE transport)** — When the Vite dev server starts, the plugin attaches two HTTP endpoints:
    - `GET /sse` — Establishes a long-lived Server-Sent Events connection with the MCP client.
@@ -205,7 +239,7 @@ pnpm run playground:nx-mf
 ```
 
 It lives in
-[`playground/nx-module-federation-monorepo`](./playground/nx-module-federation-monorepo)
+[`playground/agentic-react-nx-module-federation-playground`](./playground/agentic-react-nx-module-federation-playground)
 and models a pnpm-managed Nx 15 monorepo with one root `package.json`, a shell
 host, multiple remotes, app-level `project.json` files, app-level
 `module-federation.config.js` files, root `module-federation.js` project-graph
@@ -215,9 +249,9 @@ DOM 18.2.0, React Router DOM 6.4.2, TypeScript 4.8.4, Babel, ESLint, and a
 legacy React 17 dependency edge.
 
 For e2e automation, Playwright uses a fixed local dev port (`51423`) configured in
-[`playground/vite-react-app/vite.config.js`](./playground/vite-react-app/vite.config.js)
+[`playground/agentic-react-vite-playground/vite.config.js`](./playground/agentic-react-vite-playground/vite.config.js)
 and
-[`playground/vite-react-app/playwright.config.js`](./playground/vite-react-app/playwright.config.js).
+[`playground/agentic-react-vite-playground/playwright.config.js`](./playground/agentic-react-vite-playground/playwright.config.js).
 
 Dependency versions in this package intentionally keep semver ranges for integration libraries (for example `bippy`) and use the workspace lockfile (`pnpm-lock.yaml`) for reproducible installs.
 
@@ -230,7 +264,7 @@ This project is inspired by [vite-plugin-vue-mcp](https://github.com/webfansplz/
 
 MIT
 
-[npm-version-src]: https://img.shields.io/npm/v/vite-react-mcp?style=flat&colorA=080f12&colorB=1fa669
-[npm-version-href]: https://npmjs.com/package/vite-react-mcp
-[npm-downloads-src]: https://img.shields.io/npm/dm/vite-react-mcp?style=flat&colorA=080f12&colorB=1fa669
-[npm-downloads-href]: https://npmjs.com/package/vite-react-mcp
+[npm-version-src]: https://img.shields.io/npm/v/@jazelly/agentic-react?style=flat&colorA=080f12&colorB=1fa669
+[npm-version-href]: https://npmjs.com/package/@jazelly/agentic-react
+[npm-downloads-src]: https://img.shields.io/npm/dm/@jazelly/agentic-react?style=flat&colorA=080f12&colorB=1fa669
+[npm-downloads-href]: https://npmjs.com/package/@jazelly/agentic-react

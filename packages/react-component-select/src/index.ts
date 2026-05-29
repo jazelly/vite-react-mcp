@@ -7,7 +7,7 @@ export {
   createSelectionToolkit,
   getSelectableElementAtPosition,
   isSelectableElement,
-} from 'vite-react-mcp/select';
+} from '@jazelly/agentic-react/select';
 export type {
   SelectionContext,
   SelectionResolvedSource,
@@ -16,4 +16,4 @@ export type {
   ToolkitConfig,
   ToolkitOffset,
   ToolkitPosition,
-} from 'vite-react-mcp/select';
+} from '@jazelly/agentic-react/select';
