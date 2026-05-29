@@ -317,6 +317,19 @@ const handleBridgeRequest = async (event, payload) => {
       };
     }
 
+    case 'custom-tool': {
+      if (typeof payload?.name !== 'string') {
+        throw new Error('Invalid args: missing custom tool name');
+      }
+
+      const handler = customToolHandlers.get(payload.name);
+      if (typeof handler !== 'function') {
+        throw new Error(`Custom tool "${payload.name}" is not registered`);
+      }
+
+      return await handler(payload.args);
+    }
+
     default:
       throw new Error(`Unsupported bridge event: ${event}`);
   }

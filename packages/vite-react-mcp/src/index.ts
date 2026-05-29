@@ -12,6 +12,7 @@ import {
   __VITE_REACT_MCP_BRIDGE_URL__,
   __VITE_REACT_MCP_CONFIG__,
 } from './shared/const.js';
+import { generateCustomToolsScript } from './shared/custom_tools_script.js';
 import { BRIDGE_WS_PATH } from './shared/protocol.js';
 import { store } from './shared/store.js';
 import type { CustomTool, ToolkitConfig } from './shared/types.js';
@@ -198,7 +199,10 @@ function ReactMCP(options: ReactMCPOptions = {}): Plugin {
         })();
       `;
 
-      const customToolsScript = generateCustomToolsScript(customTools, config);
+      const customToolsScript = generateCustomToolsScript(
+        customTools,
+        (specifier) => toClientImportSpecifier(specifier, config),
+      );
 
       return [
         {
@@ -268,65 +272,6 @@ function toClientImportSpecifier(
   }
 
   return `/@id/${normalized}`;
-}
-
-function generateCustomToolsScript(
-  customTools: CustomTool[],
-  resolvedConfig: ResolvedConfig,
-): string {
-  const toolRegistrations = customTools
-    .map((tool) => {
-      const safeToolName = JSON.stringify(tool.name);
-      if (typeof tool.clientFunction === 'function') {
-        const functionSource = tool.clientFunction.toString();
-        if (functionSource.includes('[native code]')) {
-          return `
-            console.error('[vite-react-mcp] Unable to register custom tool ${tool.name}: native functions are not supported as clientFunction');
-          `;
-        }
-        return `
-          registerTool(${safeToolName}, (${functionSource}));
-        `;
-      }
-
-      const importSpecifier = toClientImportSpecifier(
-        tool.clientFunction,
-        resolvedConfig,
-      );
-      const safeSpecifier = JSON.stringify(importSpecifier);
-      return `
-        import(${safeSpecifier})
-          .then((module) => {
-            const handler = module.default ?? module;
-            registerTool(${safeToolName}, handler);
-          })
-          .catch((error) => {
-            console.error('[vite-react-mcp] Failed to load custom tool ${tool.name}:', error);
-          });
-      `;
-    })
-    .join('\n');
-
-  return `
-    const registerTool = (name, handler) => {
-      const tryRegister = (attempt = 0) => {
-        const registry = window.__VITE_REACT_MCP_TOOLS__;
-        if (registry?.registerCustomTool) {
-          registry.registerCustomTool(name, handler);
-          return;
-        }
-        if (attempt >= 40) {
-          console.warn('[vite-react-mcp] Custom tool registration timed out for', name);
-          return;
-        }
-        setTimeout(() => tryRegister(attempt + 1), 50);
-      };
-
-      tryRegister();
-    };
-
-    ${toolRegistrations}
-  `;
 }
 
 export default ReactMCP;

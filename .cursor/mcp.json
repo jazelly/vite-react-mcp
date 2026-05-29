@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "vite-react-app": {
-      "url": "http://localhost:3000/sse"
+      "url": "http://127.0.0.1:51423/sse"
     }
   }
 }

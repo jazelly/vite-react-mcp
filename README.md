@@ -144,7 +144,7 @@ To expose it as an MCP server, setup MCP configuration in your MCP client.
 
 ### How it works
 
-This plugin bridges an MCP server with your React app's runtime, enabling LLMs to inspect and interact with your components in a live browser session. Here's the full picture:
+This plugin bridges an MCP server with your React app's browser runtime, enabling LLMs to inspect and interact with your components in a live browser session. When an MCP client calls a tool, the MCP server forwards that request through the local runtime bridge into the browser, executes it against the live React tree, and returns the result back to the MCP client. Here's the full picture:
 
 #### Architecture overview
 
@@ -187,7 +187,7 @@ Vite Dev Server (Node.js)
    4. The browser-side HMR listener picks up the event, executes the tool function against the live React fiber tree, and sends the result back via another HMR event (e.g. `highlight-component-response`).
    5. The MCP server awaits this response, wraps it in a JSON-RPC result, and streams it back to the MCP client over SSE.
 
-5. **Custom tools** — User-defined tools follow the same WebSocket round-trip. Their handler functions are registered in the browser at startup via dynamic `import()` or inline injection, and corresponding HMR listeners are created automatically.
+5. **Custom tools** — User-defined tools follow the same browser-runtime round trip, so browser-only handlers run in the page instead of the Node dev server. Their handler functions are registered in the browser at startup via dynamic `import()` or inline injection, and corresponding runtime listeners are created automatically.
 
 ### Test
 

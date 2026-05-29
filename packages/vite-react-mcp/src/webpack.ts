@@ -1,9 +1,19 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { RuntimeBridgeServer } from './bridge/server.js';
 import { initMcpServer } from './mcp/index.js';
+import {
+  __VITE_REACT_MCP_BRIDGE_URL__,
+  __VITE_REACT_MCP_CONFIG__,
+} from './shared/const.js';
+import {
+  generateCustomToolsScript,
+  toBundledClientImportSpecifier,
+  toRelativeImportSpecifier,
+} from './shared/custom_tools_script.js';
 import type { CustomTool } from './shared/types.js';
 
 interface WebpackEnv {
@@ -19,10 +29,71 @@ type WebpackDevServer = {
   server?: unknown;
 };
 
-const getClientEntryPath = () => {
+const getPackageDistPath = () => {
   const currentFilePath = fileURLToPath(import.meta.url);
-  const currentDirPath = path.dirname(currentFilePath);
-  return path.join(currentDirPath, 'next_client_entry.js');
+  return path.dirname(currentFilePath);
+};
+
+const writeWebpackClientEntry = (
+  rootDir: string,
+  customTools: CustomTool[],
+): string => {
+  const packageDistPath = getPackageDistPath();
+  const generatedDirectory = path.join(rootDir, '.vite-react-mcp-webpack');
+  const generatedEntryPath = path.join(generatedDirectory, 'client-entry.mjs');
+  const constSpecifier = toRelativeImportSpecifier(
+    generatedDirectory,
+    path.join(packageDistPath, 'shared/const.js'),
+  );
+  const protocolSpecifier = toRelativeImportSpecifier(
+    generatedDirectory,
+    path.join(packageDistPath, 'shared/protocol.js'),
+  );
+  const overlaySpecifier = toRelativeImportSpecifier(
+    generatedDirectory,
+    path.join(packageDistPath, 'overlay.js'),
+  );
+  const customToolsScript = generateCustomToolsScript(
+    customTools,
+    (specifier) =>
+      toBundledClientImportSpecifier(rootDir, generatedDirectory, specifier),
+  );
+
+  const entrySource = `
+import {
+  ${__VITE_REACT_MCP_BRIDGE_URL__},
+  ${__VITE_REACT_MCP_CONFIG__},
+} from ${JSON.stringify(constSpecifier)};
+import { BRIDGE_WS_PATH } from ${JSON.stringify(protocolSpecifier)};
+
+if (typeof window !== 'undefined') {
+  if (!window[${__VITE_REACT_MCP_CONFIG__}]) {
+    window[${__VITE_REACT_MCP_CONFIG__}] = {
+      sourceRoot: ${JSON.stringify(rootDir)},
+    };
+  }
+
+  if (!window[${__VITE_REACT_MCP_BRIDGE_URL__}]) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    window[${__VITE_REACT_MCP_BRIDGE_URL__}] =
+      \`\${protocol}//\${window.location.host}\${BRIDGE_WS_PATH}\`;
+  }
+}
+
+void import(${JSON.stringify(overlaySpecifier)});
+
+${customToolsScript}
+`;
+
+  fs.mkdirSync(generatedDirectory, { recursive: true });
+  if (
+    !fs.existsSync(generatedEntryPath) ||
+    fs.readFileSync(generatedEntryPath, 'utf8') !== entrySource
+  ) {
+    fs.writeFileSync(generatedEntryPath, entrySource);
+  }
+
+  return generatedEntryPath;
 };
 
 const prependWebpackEntry = (
@@ -110,12 +181,12 @@ export const withReactMcpWebpack = (
   }
 
   const nextConfig = { ...config };
-  const entryPath = getClientEntryPath();
   const rootDir =
     options.rootDir ||
     (typeof nextConfig.context === 'string'
       ? nextConfig.context
       : process.cwd());
+  const entryPath = writeWebpackClientEntry(rootDir, options.customTools || []);
   const runtimeBridge = new RuntimeBridgeServer();
   const mcpServer = initMcpServer(
     runtimeBridge,

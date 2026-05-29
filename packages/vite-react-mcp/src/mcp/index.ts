@@ -823,14 +823,14 @@ export function initMcpServer(
         );
         if (customTool) {
           const parsedArgs = customTool.schema.parse(request.params.arguments);
-
-          if (typeof customTool.clientFunction !== 'function') {
-            throw new Error(
-              `Custom tool "${customTool.name}" must provide a function clientFunction for MCP execution.`,
-            );
-          }
-
-          const result = await customTool.clientFunction(parsedArgs);
+          const result = await requestRuntime<ToolResultValue>(
+            bridge,
+            'custom-tool',
+            {
+              args: parsedArgs,
+              name: customTool.name,
+            },
+          );
           return {
             content: [{ type: 'text', text: formatToolResult(result) }],
           };

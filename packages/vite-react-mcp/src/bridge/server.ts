@@ -13,6 +13,7 @@ interface PendingRequest {
 }
 
 const DEFAULT_TIMEOUT_MS = 10000;
+const BRIDGE_CONNECT_POLL_MS = 50;
 
 const isBridgeMessage = (value: unknown): value is BridgeMessage => {
   if (!value || typeof value !== 'object') {
@@ -110,12 +111,7 @@ export class RuntimeBridgeServer {
     payload: unknown,
     timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ): Promise<unknown> {
-    if (
-      !this.activeSocket ||
-      this.activeSocket.readyState !== this.activeSocket.OPEN
-    ) {
-      throw new Error('No active runtime bridge connection');
-    }
+    const socket = await this.waitForActiveSocket(timeoutMs);
 
     const requestId = randomUUID();
 
@@ -138,7 +134,43 @@ export class RuntimeBridgeServer {
         payload,
       };
 
-      this.activeSocket?.send(JSON.stringify(message));
+      try {
+        socket.send(JSON.stringify(message));
+      } catch (error) {
+        this.pendingRequests.delete(requestId);
+        clearTimeout(timeoutId);
+        reject(
+          error instanceof Error ? error : new Error('Bridge send failed'),
+        );
+      }
+    });
+  }
+
+  private async waitForActiveSocket(timeoutMs: number): Promise<WebSocket> {
+    if (
+      this.activeSocket &&
+      this.activeSocket.readyState === this.activeSocket.OPEN
+    ) {
+      return this.activeSocket;
+    }
+
+    return new Promise((resolve, reject) => {
+      const startedAt = Date.now();
+      const intervalId = setInterval(() => {
+        if (
+          this.activeSocket &&
+          this.activeSocket.readyState === this.activeSocket.OPEN
+        ) {
+          clearInterval(intervalId);
+          resolve(this.activeSocket);
+          return;
+        }
+
+        if (Date.now() - startedAt >= timeoutMs) {
+          clearInterval(intervalId);
+          reject(new Error('No active runtime bridge connection'));
+        }
+      }, BRIDGE_CONNECT_POLL_MS);
     });
   }
 }

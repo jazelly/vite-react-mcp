@@ -7,7 +7,8 @@ export type BridgeRequestEvent =
   | 'get-last-selection-context'
   | 'copy-last-selection-context'
   | 'get-html-elements'
-  | 'get-react-source-code';
+  | 'get-react-source-code'
+  | 'custom-tool';
 
 export type BridgeMessage =
   | {

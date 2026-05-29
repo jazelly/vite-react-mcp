@@ -455,3 +455,30 @@ test('MCP built-in tooling endpoints all return expected outcomes', async ({
     await transport.close();
   }
 });
+
+test('MCP custom tools execute inside the browser runtime', async ({ page }) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__VITE_REACT_MCP__);
+
+  const { client, transport } = await createMcpClient();
+  try {
+    const customToolRaw = await client.callTool({
+      name: 'log1',
+      arguments: { message: 'browser-runtime-check' },
+    });
+    const customToolResult = parseToolResponse(customToolRaw);
+
+    expect(customToolResult.success).toBe(true);
+    expect(customToolResult.runtime).toBe('browser');
+    expect(customToolResult.message).toBe(
+      'Log1 received: browser-runtime-check',
+    );
+
+    const browserCalls = await page.evaluate(
+      () => window.__VITE_REACT_MCP_CUSTOM_TOOL_CALLS__ || [],
+    );
+    expect(browserCalls).toContain('browser-runtime-check');
+  } finally {
+    await transport.close();
+  }
+});
