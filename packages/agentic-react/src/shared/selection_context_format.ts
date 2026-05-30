@@ -2,6 +2,7 @@ import type {
   SelectionContext,
   SelectionResolvedSource,
   SelectionSourceSnippet,
+  SelectionSourceTraceFrame,
 } from './types.js';
 
 const formatDisplayFilePath = (filePath: string): string =>
@@ -46,6 +47,41 @@ const formatSourceSnippet = (sourceSnippet: SelectionSourceSnippet): string =>
     sourceSnippet.snippet,
   ].join('\n');
 
+const formatTraceFrameLine = (
+  traceFrame: SelectionSourceTraceFrame,
+  index: number,
+): string => {
+  const arrow = index === 0 ? '  ' : '  -> ';
+  const location = formatSourceLocation(traceFrame);
+  const componentName = traceFrame.componentName
+    ? `<${traceFrame.componentName}>`
+    : '<unknown>';
+
+  if (traceFrame.kind === 'external') {
+    const packageName = traceFrame.packageName
+      ? ` from ${traceFrame.packageName}`
+      : '';
+    return `${arrow}${componentName}${packageName} at ${location}`;
+  }
+
+  return traceFrame.componentName
+    ? `${arrow}${traceFrame.componentName} at ${location}`
+    : `${arrow}${location}`;
+};
+
+const buildSourceTracePreview = (
+  sourceTrace: SelectionSourceTraceFrame[],
+): string => {
+  if (sourceTrace.length === 0) return '';
+
+  return [
+    'source trace:',
+    ...sourceTrace.map((traceFrame, index) =>
+      formatTraceFrameLine(traceFrame, index),
+    ),
+  ].join('\n');
+};
+
 export const buildComponentSourceChain = (
   resolvedSources: SelectionResolvedSource[],
 ): string => {
@@ -78,8 +114,15 @@ export const buildSelectionSourcePreview = (
   const sourceChain = buildComponentSourceChain(
     selectionContext.resolvedSources,
   );
+  const sourceTrace = buildSourceTracePreview(
+    selectionContext.sourceTrace ?? [],
+  );
   const externalComponentLine = formatExternalComponentLine(selectionContext);
-  const preview = [snippetText, externalComponentLine, sourceChain]
+  const preview = [
+    snippetText,
+    externalComponentLine,
+    sourceTrace || sourceChain,
+  ]
     .filter(Boolean)
     .join('\n');
 

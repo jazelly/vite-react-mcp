@@ -22,6 +22,7 @@ import type {
   SelectionContext,
   SelectionExternalComponent,
   SelectionResolvedSource,
+  SelectionSourceTraceFrame,
   SelectionStackFrame,
 } from '../../shared/types.js';
 import { getDisplayNameForFiber } from '../../shared/util.js';
@@ -36,6 +37,7 @@ const NON_COMPONENT_PREFIXES = [
   '$',
   'motion.',
   'styled.',
+  'Styled(',
   'chakra.',
   'ark.',
   'Primitive.',
@@ -429,7 +431,9 @@ const enrichServerFrameLocations = (
   });
 };
 
-const getComponentDisplayName = (element: Element): string | null => {
+export const getSelectionElementComponentName = (
+  element: Element,
+): string | null => {
   if (!isInstrumentationActive()) return null;
   const resolvedElement = findNearestFiberElement(element);
   if (!resolvedElement) return null;
@@ -660,6 +664,94 @@ const resolveExternalComponent = (
   };
 };
 
+const formatTraceFrameKey = (
+  frame: Pick<
+    SelectionSourceTraceFrame,
+    'kind' | 'componentName' | 'filePath' | 'lineNumber' | 'columnNumber'
+  >,
+): string =>
+  `${frame.kind}:${frame.componentName ?? ''}:${frame.filePath}:${frame.lineNumber ?? ''}:${frame.columnNumber ?? ''}`;
+
+const mapStackFrameToTraceFrame = (
+  stackFrame: SelectionStackFrame,
+): SelectionSourceTraceFrame | null => {
+  if (!stackFrame.fileName) return null;
+
+  if (isExternalSourceFrame(stackFrame.fileName)) {
+    return {
+      kind: 'external',
+      componentName:
+        normalizeDisplayComponentName(stackFrame.functionName) ?? null,
+      packageName: extractPackageNameFromFilePath(stackFrame.fileName),
+      filePath: normalizeSourceFilePath(stackFrame.fileName),
+      lineNumber: stackFrame.lineNumber,
+      columnNumber: stackFrame.columnNumber,
+    };
+  }
+
+  if (!isProjectSourceFrame(stackFrame.fileName)) {
+    return null;
+  }
+
+  const filePath = normalizeSourceFilePath(stackFrame.fileName);
+  return {
+    kind: 'project',
+    componentName: inferComponentNameFromSource(
+      filePath,
+      stackFrame.functionName,
+    ),
+    packageName: null,
+    filePath,
+    lineNumber: stackFrame.lineNumber,
+    columnNumber: stackFrame.columnNumber,
+  };
+};
+
+const buildSourceTrace = (
+  stackFrames: SelectionStackFrame[],
+  resolvedSources: SelectionResolvedSource[],
+): SelectionSourceTraceFrame[] => {
+  const traceFrames: SelectionSourceTraceFrame[] = [];
+  const seenTraceFrameKeys = new Set<string>();
+
+  const addTraceFrame = (frame: SelectionSourceTraceFrame | null) => {
+    if (!frame?.filePath) return;
+
+    const traceFrameKey = formatTraceFrameKey(frame);
+    if (seenTraceFrameKeys.has(traceFrameKey)) return;
+
+    seenTraceFrameKeys.add(traceFrameKey);
+    traceFrames.push(frame);
+  };
+
+  for (const stackFrame of stackFrames) {
+    const traceFrame = mapStackFrameToTraceFrame(stackFrame);
+    if (traceFrame?.kind === 'external') {
+      addTraceFrame(traceFrame);
+    }
+  }
+
+  for (const resolvedSource of resolvedSources) {
+    addTraceFrame({
+      kind: 'project',
+      componentName: resolvedSource.componentName,
+      packageName: null,
+      filePath: resolvedSource.filePath,
+      lineNumber: resolvedSource.lineNumber,
+      columnNumber: resolvedSource.columnNumber,
+    });
+  }
+
+  for (const stackFrame of stackFrames) {
+    const traceFrame = mapStackFrameToTraceFrame(stackFrame);
+    if (traceFrame?.kind === 'project') {
+      addTraceFrame(traceFrame);
+    }
+  }
+
+  return traceFrames.slice(0, MAX_SOURCE_FRAMES);
+};
+
 const getComponentName = (
   stackFrames: SelectionStackFrame[],
 ): string | null => {
@@ -690,7 +782,8 @@ export const buildSelectionContextForElement = async (
     ? await buildStackFrames(nearestFiberElement)
     : [];
   const componentRankByName = getFiberComponentRankByName(selectedElement);
-  const displayComponentName = getComponentDisplayName(selectedElement);
+  const displayComponentName =
+    getSelectionElementComponentName(selectedElement);
   const stackComponentName = getComponentName(stackFrames);
   const fallbackComponentName = stackComponentName || displayComponentName;
   const resolvedSources = resolveSourceFrames(
@@ -708,6 +801,7 @@ export const buildSelectionContextForElement = async (
     componentName,
     resolvedSources,
   );
+  const sourceTrace = buildSourceTrace(stackFrames, resolvedSources);
   const selectionContext = {
     domPreview: getDomPreview(selectedElement),
     sourcePreview: null,
@@ -716,6 +810,7 @@ export const buildSelectionContextForElement = async (
     externalComponent,
     stackFrames,
     resolvedSources,
+    sourceTrace,
     sourceSnippets: [],
     capturedAt: Date.now(),
   };
