@@ -138,14 +138,27 @@ test('webpack selection captures the primary CTA as userland AppContent source',
   );
 
   const hoverLabel = page.locator('[data-agentic-react-hover-label="true"]');
-  await expect(hoverLabel).toContainText('AppContent');
-  await expect(hoverLabel).toContainText('App.jsx');
+  await expect(hoverLabel).toHaveText('<AppContent> in App.jsx:489');
+  const hoverLabelBox = await hoverLabel.boundingBox();
+  expect(hoverLabelBox).toBeTruthy();
+  expect(hoverLabelBox.y + hoverLabelBox.height).toBeLessThanOrEqual(
+    ctaBox.y,
+  );
 
   await primaryCta.click();
   await page.waitForFunction(
     () =>
       window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
       '.hero > .hero-copy > .primary-cta',
+  );
+  const selectedLabel = page.locator(
+    '[data-agentic-react-selected-label="true"]',
+  );
+  await expect(selectedLabel).toHaveText('<AppContent> in App.jsx:489');
+  const selectedLabelBox = await selectedLabel.boundingBox();
+  expect(selectedLabelBox).toBeTruthy();
+  expect(selectedLabelBox.y + selectedLabelBox.height).toBeLessThanOrEqual(
+    ctaBox.y,
   );
 
   const runtimeContext = await page.evaluate(() =>

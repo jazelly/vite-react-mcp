@@ -1,5 +1,6 @@
 import { target } from '../../shared/const.js';
 import { DEFAULT_TOOLKIT_ICON_DATA_URL } from '../../shared/default_toolkit_icon.js';
+import { SOURCE_LOOKUP_PATH } from '../../shared/protocol.js';
 import {
   buildSelectionContextSummary,
   buildSelectionSourcePreview,
@@ -9,7 +10,6 @@ import {
   isAllowedProjectSourcePath,
   normalizeSourceRoot,
 } from '../../shared/source_path.js';
-import { SOURCE_LOOKUP_PATH } from '../../shared/protocol.js';
 import type {
   SelectionContext,
   SelectionResolvedSource,
@@ -343,6 +343,18 @@ const formatSourceLocationLabel = (
   return source.lineNumber ? `${fileName}:${source.lineNumber}` : fileName;
 };
 
+const formatComponentLocationLabel = (
+  componentName?: string | null,
+  sourceLocationLabel?: string | null,
+): string => {
+  if (!componentName) return sourceLocationLabel || '';
+
+  const componentLabel = `<${componentName}>`;
+  return sourceLocationLabel
+    ? `${componentLabel} in ${sourceLocationLabel}`
+    : componentLabel;
+};
+
 const buildSelectedElementLabel = (
   element: Element,
   selectionContext?: SelectionContext | null,
@@ -353,10 +365,10 @@ const buildSelectedElementLabel = (
     selectionContext?.componentName ||
     selectionContext?.externalComponent?.componentName;
   const sourceLocationLabel = formatSourceLocationLabel(selectionContext);
-  const componentLocationLabel =
-    componentName && sourceLocationLabel
-      ? `${componentName} ${sourceLocationLabel}`
-      : componentName;
+  const componentLocationLabel = formatComponentLocationLabel(
+    componentName,
+    sourceLocationLabel,
+  );
 
   const labelCandidates = [
     componentLocationLabel,
@@ -584,6 +596,11 @@ export const createSelectionToolkit = (
   const selectButtonElement = document.createElement('button');
   const multiselectButtonElement = document.createElement('button');
   const doneButtonElement = document.createElement('button');
+  const clearAllButtonElement = document.createElement('button');
+  const clearAllIconElement = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'svg',
+  );
   const statusElement = document.createElement('div');
   const hoverElement = document.createElement('div');
   const hoverLabelElement = document.createElement('div');
@@ -598,6 +615,13 @@ export const createSelectionToolkit = (
   let hoverLabelRequestId = 0;
   let dimHideTimeout: number | null = null;
   let selectedPulseTimeout: number | null = null;
+  let multiSelectedOverlays: Array<{
+    element: Element;
+    overlayElement: HTMLDivElement;
+    labelElement: HTMLDivElement;
+    selectionContext: SelectionContext;
+    pulseTimeout: number | null;
+  }> = [];
 
   toolkitRootElement.setAttribute('data-agentic-react-toolkit', 'true');
   toolkitRootElement.style.position = 'fixed';
@@ -663,9 +687,45 @@ export const createSelectionToolkit = (
     buttonElement.style.minWidth = '96px';
   };
 
+  const createTrashIconButton = () => {
+    clearAllButtonElement.setAttribute('type', 'button');
+    clearAllButtonElement.setAttribute('aria-label', 'Clear all selections');
+    clearAllButtonElement.setAttribute('title', 'Clear all selections');
+    clearAllButtonElement.setAttribute(
+      'data-agentic-react-clear-all',
+      'true',
+    );
+    clearAllButtonElement.style.padding = '8px 12px';
+    clearAllButtonElement.style.borderRadius = '8px';
+    clearAllButtonElement.style.border = '1px solid rgba(255,255,255,0.2)';
+    clearAllButtonElement.style.background = '#334155';
+    clearAllButtonElement.style.color = '#ffffff';
+    clearAllButtonElement.style.cursor = 'pointer';
+    clearAllButtonElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
+    clearAllButtonElement.style.minWidth = '42px';
+    clearAllButtonElement.style.height = '34px';
+    clearAllButtonElement.style.display = 'none';
+    clearAllButtonElement.style.alignItems = 'center';
+    clearAllButtonElement.style.justifyContent = 'center';
+
+    clearAllIconElement.setAttribute('viewBox', '0 0 24 24');
+    clearAllIconElement.setAttribute('width', '16');
+    clearAllIconElement.setAttribute('height', '16');
+    clearAllIconElement.setAttribute('fill', 'none');
+    clearAllIconElement.setAttribute('stroke', 'currentColor');
+    clearAllIconElement.setAttribute('stroke-width', '2');
+    clearAllIconElement.setAttribute('stroke-linecap', 'round');
+    clearAllIconElement.setAttribute('stroke-linejoin', 'round');
+    clearAllIconElement.setAttribute('aria-hidden', 'true');
+    clearAllIconElement.innerHTML =
+      '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>';
+    clearAllButtonElement.appendChild(clearAllIconElement);
+  };
+
   createButton(selectButtonElement, 'Select');
   createButton(multiselectButtonElement, 'Multiselect');
   createButton(doneButtonElement, 'Done');
+  createTrashIconButton();
 
   doneButtonElement.style.background = '#dc2626';
   doneButtonElement.style.color = '#ffffff';
@@ -683,6 +743,7 @@ export const createSelectionToolkit = (
   panelElement.appendChild(selectButtonElement);
   panelElement.appendChild(multiselectButtonElement);
   panelElement.appendChild(doneButtonElement);
+  panelElement.appendChild(clearAllButtonElement);
   panelElement.appendChild(statusElement);
 
   toolkitRootElement.appendChild(panelElement);
@@ -752,23 +813,25 @@ export const createSelectionToolkit = (
           0 0 0 9px var(--agentic-react-selection-accent, #111827),
           0 16px 38px rgba(15, 23, 42, 0.22);
         transform-origin: center;
+        animation: agentic-react-selected-idle-pulse 1500ms ease-in-out infinite;
+        will-change: transform, box-shadow;
       }
 
       [data-agentic-react-selected-label="true"],
       [data-agentic-react-hover-label="true"] {
         box-sizing: border-box;
-        right: 6px;
-        top: 6px;
-        padding: 5px 8px;
+        right: 0;
+        bottom: calc(100% + 6px);
+        padding: 4px 6px;
         border: 1px solid rgba(255, 255, 255, 0.86);
-        border-radius: 7px;
+        border-radius: 6px;
         background: rgba(15, 23, 42, 0.96);
         color: #ffffff;
         box-shadow:
           0 0 0 1px rgba(15, 23, 42, 0.72),
           0 10px 24px rgba(15, 23, 42, 0.28);
         font-family: ui-sans-serif, system-ui, sans-serif;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
         line-height: 1.2;
         letter-spacing: 0;
@@ -784,7 +847,7 @@ export const createSelectionToolkit = (
       [data-agentic-react-selected-label="true"][data-align="left"],
       [data-agentic-react-hover-label="true"][data-align="left"] {
         right: auto;
-        left: 6px;
+        left: 0;
       }
 
       [data-agentic-react-hover="true"] {
@@ -797,6 +860,9 @@ export const createSelectionToolkit = (
           inset 0 0 0 1px rgba(255, 255, 255, 0.18),
           0 12px 30px rgba(15, 23, 42, 0.2);
         transform: translateZ(0);
+        transform-origin: center;
+        animation: agentic-react-hover-pulse 1300ms ease-in-out infinite;
+        will-change: transform, box-shadow;
       }
 
       [data-agentic-react-launcher="true"] {
@@ -824,25 +890,89 @@ export const createSelectionToolkit = (
       }
 
       [data-agentic-react-selected="true"].agentic-react-selection-pulse {
-        animation: agentic-react-selection-pulse ${SELECTION_CONFIRMATION_MS}ms ease-out;
+        animation: agentic-react-selection-pulse ${SELECTION_CONFIRMATION_MS}ms cubic-bezier(0.2, 0.9, 0.2, 1);
       }
 
-      @keyframes agentic-react-selection-pulse {
-        0% {
-          transform: scale(0.985);
+      @keyframes agentic-react-selected-idle-pulse {
+        0%,
+        100% {
+          transform: scale(1);
           box-shadow:
             0 0 0 2px rgba(15, 23, 42, 0.96),
             0 0 0 6px rgba(255, 255, 255, 0.96),
             0 0 0 9px var(--agentic-react-selection-accent, #111827),
             0 16px 38px rgba(15, 23, 42, 0.22);
         }
-        46% {
-          transform: scale(1.012);
+        45% {
+          transform: scale(1.014);
+          box-shadow:
+            0 0 0 3px rgba(15, 23, 42, 0.98),
+            0 0 0 7px rgba(255, 255, 255, 0.98),
+            0 0 0 12px var(--agentic-react-selection-accent, #111827),
+            0 18px 42px rgba(15, 23, 42, 0.26);
+        }
+        72% {
+          transform: scale(0.996);
+          box-shadow:
+            0 0 0 2px rgba(15, 23, 42, 0.96),
+            0 0 0 5px rgba(255, 255, 255, 0.92),
+            0 0 0 8px var(--agentic-react-selection-accent, #111827),
+            0 14px 34px rgba(15, 23, 42, 0.2);
+        }
+      }
+
+      @keyframes agentic-react-hover-pulse {
+        0%,
+        100% {
+          transform: translateZ(0) scale(1);
+          box-shadow:
+            0 0 0 2px var(--agentic-react-hover-outer, rgba(255, 255, 255, 0.98)),
+            0 0 0 5px var(--agentic-react-selection-accent, #111827),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+            0 12px 30px rgba(15, 23, 42, 0.2);
+        }
+        42% {
+          transform: translateZ(0) scale(1.018);
+          box-shadow:
+            0 0 0 3px var(--agentic-react-hover-outer, rgba(255, 255, 255, 0.98)),
+            0 0 0 8px var(--agentic-react-selection-accent, #111827),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+            0 16px 36px rgba(15, 23, 42, 0.24);
+        }
+        68% {
+          transform: translateZ(0) scale(0.994);
+          box-shadow:
+            0 0 0 2px var(--agentic-react-hover-outer, rgba(255, 255, 255, 0.98)),
+            0 0 0 4px var(--agentic-react-selection-accent, #111827),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+            0 10px 26px rgba(15, 23, 42, 0.18);
+        }
+      }
+
+      @keyframes agentic-react-selection-pulse {
+        0% {
+          transform: scale(1);
+          box-shadow:
+            0 0 0 2px rgba(15, 23, 42, 0.96),
+            0 0 0 6px rgba(255, 255, 255, 0.96),
+            0 0 0 9px var(--agentic-react-selection-accent, #111827),
+            0 16px 38px rgba(15, 23, 42, 0.22);
+        }
+        36% {
+          transform: scale(1.026);
           box-shadow:
             0 0 0 3px rgba(15, 23, 42, 0.98),
             0 0 0 8px rgba(255, 255, 255, 0.98),
             0 0 0 15px var(--agentic-react-selection-accent, #111827),
             0 20px 46px rgba(15, 23, 42, 0.28);
+        }
+        68% {
+          transform: scale(0.992);
+          box-shadow:
+            0 0 0 2px rgba(15, 23, 42, 0.96),
+            0 0 0 5px rgba(255, 255, 255, 0.92),
+            0 0 0 7px var(--agentic-react-selection-accent, #111827),
+            0 14px 34px rgba(15, 23, 42, 0.2);
         }
         100% {
           transform: scale(1);
@@ -862,7 +992,24 @@ export const createSelectionToolkit = (
     statusElement.style.display = shouldDisplay ? 'block' : 'none';
   };
 
+  const renderMultiSelectionControls = () => {
+    const hasSelections = multiSelectionContexts.length > 0;
+    doneButtonElement.style.display = isMultiSelectionMode ? 'block' : 'none';
+    clearAllButtonElement.style.display = isMultiSelectionMode
+      ? 'flex'
+      : 'none';
+    clearAllButtonElement.disabled = !hasSelections;
+    clearAllButtonElement.style.opacity = hasSelections ? '1' : '0.45';
+    clearAllButtonElement.style.cursor = hasSelections
+      ? 'pointer'
+      : 'not-allowed';
+    clearAllButtonElement.style.background = hasSelections
+      ? '#334155'
+      : '#64748b';
+  };
+
   const renderPanelVisibility = () => {
+    renderMultiSelectionControls();
     panelElement.style.display = isPanelOpen ? 'flex' : 'none';
   };
 
@@ -904,6 +1051,7 @@ export const createSelectionToolkit = (
     doneButtonElement.style.background = '#dc2626';
     doneButtonElement.style.color = '#ffffff';
     doneButtonElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
+    clearAllButtonElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
 
     hoverElement.style.zIndex = String(Math.max(0, toolkitConfig.zIndex - 2));
     hoverElement.style.setProperty(
@@ -917,6 +1065,15 @@ export const createSelectionToolkit = (
       '--agentic-react-selection-accent',
       toolkitConfig.accentColor,
     );
+    for (const { overlayElement } of multiSelectedOverlays) {
+      overlayElement.style.zIndex = String(
+        Math.max(0, toolkitConfig.zIndex - 1),
+      );
+      overlayElement.style.setProperty(
+        '--agentic-react-selection-accent',
+        toolkitConfig.accentColor,
+      );
+    }
     for (const dimElement of dimElements) {
       dimElement.style.zIndex = String(Math.max(0, toolkitConfig.zIndex - 3));
     }
@@ -1083,6 +1240,120 @@ export const createSelectionToolkit = (
     }
   };
 
+  const createMultiSelectedOverlay = (
+    element: Element,
+    selectionContext: SelectionContext,
+  ) => {
+    const overlayElement = document.createElement('div');
+    const labelElement = document.createElement('div');
+
+    overlayElement.setAttribute('data-agentic-react-selected', 'true');
+    overlayElement.setAttribute('data-agentic-react-multi-selected', 'true');
+    overlayElement.style.position = 'fixed';
+    overlayElement.style.pointerEvents = 'none';
+    overlayElement.style.display = 'none';
+    overlayElement.style.background = 'transparent';
+    overlayElement.style.zIndex = String(Math.max(0, toolkitConfig.zIndex - 1));
+    overlayElement.style.setProperty(
+      '--agentic-react-selection-accent',
+      toolkitConfig.accentColor,
+    );
+
+    labelElement.setAttribute('data-agentic-react-selected-label', 'true');
+    labelElement.style.position = 'absolute';
+    labelElement.style.pointerEvents = 'none';
+    labelElement.style.maxWidth = 'min(260px, calc(100vw - 24px))';
+    labelElement.style.overflow = 'hidden';
+    labelElement.style.textOverflow = 'ellipsis';
+    labelElement.style.whiteSpace = 'nowrap';
+
+    overlayElement.appendChild(labelElement);
+    document.body.appendChild(overlayElement);
+
+    return {
+      element,
+      overlayElement,
+      labelElement,
+      selectionContext,
+      pulseTimeout: null,
+    };
+  };
+
+  const updateMultiSelectedOverlay = (
+    overlay: (typeof multiSelectedOverlays)[number],
+  ) => {
+    const rect = overlay.element.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(overlay.element);
+    overlay.overlayElement.style.display = 'block';
+    overlay.overlayElement.style.borderRadius =
+      computedStyle.borderRadius || '6px';
+    updateOverlayLabelForElement(
+      overlay.labelElement,
+      overlay.element,
+      rect,
+      overlay.selectionContext,
+    );
+    applyElementRect(overlay.overlayElement, rect);
+  };
+
+  const pulseMultiSelectedOverlay = (
+    overlay: (typeof multiSelectedOverlays)[number],
+  ) => {
+    overlay.overlayElement.classList.remove('agentic-react-selection-pulse');
+    void overlay.overlayElement.offsetWidth;
+    overlay.overlayElement.classList.add('agentic-react-selection-pulse');
+
+    if (overlay.pulseTimeout !== null) {
+      window.clearTimeout(overlay.pulseTimeout);
+    }
+    overlay.pulseTimeout = window.setTimeout(() => {
+      overlay.overlayElement.classList.remove('agentic-react-selection-pulse');
+      overlay.pulseTimeout = null;
+    }, SELECTION_CONFIRMATION_MS);
+  };
+
+  const showMultiSelectedForElement = (
+    element: Element,
+    selectionContext: SelectionContext,
+    shouldPulse = false,
+  ) => {
+    if (toolkitRootElement.contains(element)) {
+      return;
+    }
+
+    let overlay = multiSelectedOverlays.find(
+      (candidateOverlay) => candidateOverlay.element === element,
+    );
+    if (!overlay) {
+      overlay = createMultiSelectedOverlay(element, selectionContext);
+      multiSelectedOverlays.push(overlay);
+    } else {
+      overlay.selectionContext = selectionContext;
+    }
+
+    updateMultiSelectedOverlay(overlay);
+
+    if (shouldPulse) {
+      pulseMultiSelectedOverlay(overlay);
+    }
+  };
+
+  const clearMultiSelectedOverlays = () => {
+    for (const overlay of multiSelectedOverlays) {
+      if (overlay.pulseTimeout !== null) {
+        window.clearTimeout(overlay.pulseTimeout);
+      }
+      overlay.overlayElement.remove();
+    }
+    multiSelectedOverlays = [];
+  };
+
+  const clearMultiSelections = () => {
+    multiSelectionContexts = [];
+    clearMultiSelectedOverlays();
+    renderMultiSelectionControls();
+  };
+
   const showSelectedForElement = (
     element: Element,
     shouldPulse = false,
@@ -1130,6 +1401,19 @@ export const createSelectionToolkit = (
       hideSelectedOverlay();
     }
 
+    multiSelectedOverlays = multiSelectedOverlays.filter((overlay) => {
+      if (!overlay.element.isConnected) {
+        if (overlay.pulseTimeout !== null) {
+          window.clearTimeout(overlay.pulseTimeout);
+        }
+        overlay.overlayElement.remove();
+        return false;
+      }
+
+      updateMultiSelectedOverlay(overlay);
+      return true;
+    });
+
     if (dimTargetElement?.isConnected) {
       showDimForElement(dimTargetElement);
     } else if (dimTargetElement) {
@@ -1141,6 +1425,9 @@ export const createSelectionToolkit = (
     toolkitRootElement.contains(element) ||
     hoverElement.contains(element) ||
     selectedElement.contains(element) ||
+    multiSelectedOverlays.some(({ overlayElement }) =>
+      overlayElement.contains(element),
+    ) ||
     dimElements.some((dimElement) => dimElement.contains(element));
 
   const getSelectableElement = (clientX: number, clientY: number) =>
@@ -1195,7 +1482,12 @@ export const createSelectionToolkit = (
         await buildSelectionContextForElement(selectedTarget),
       );
       lastSelectionContext = selectionContext;
-      showSelectedForElement(selectedTarget, true, selectionContext);
+      if (isMultiSelectionMode) {
+        hideSelectedOverlay();
+        showMultiSelectedForElement(selectedTarget, selectionContext, true);
+      } else {
+        showSelectedForElement(selectedTarget, true, selectionContext);
+      }
       showDimForElement(selectedTarget);
       scheduleDimHide();
       didCaptureSelection = true;
@@ -1206,6 +1498,7 @@ export const createSelectionToolkit = (
       }`;
       if (isMultiSelectionMode) {
         multiSelectionContexts.push(selectionContext);
+        renderMultiSelectionControls();
         updateStatus(
           `Added ${capturedSelectionLabel}. ${multiSelectionContexts.length} selected. Click Done to copy all.`,
         );
@@ -1252,7 +1545,7 @@ export const createSelectionToolkit = (
   const enterSelectionMode = () => {
     isSelectionMode = true;
     isMultiSelectionMode = false;
-    multiSelectionContexts = [];
+    clearMultiSelections();
     clearSelectableElementCache();
     hideSelectedOverlay();
     isPanelOpen = true;
@@ -1272,7 +1565,7 @@ export const createSelectionToolkit = (
   const enterMultiSelectionMode = () => {
     isSelectionMode = true;
     isMultiSelectionMode = true;
-    multiSelectionContexts = [];
+    clearMultiSelections();
     clearSelectableElementCache();
     hideSelectedOverlay();
     isPanelOpen = true;
@@ -1290,7 +1583,7 @@ export const createSelectionToolkit = (
   const exitSelectionMode = () => {
     isSelectionMode = false;
     isMultiSelectionMode = false;
-    multiSelectionContexts = [];
+    clearMultiSelections();
     selectButtonElement.textContent = 'Select';
     multiselectButtonElement.textContent = 'Multiselect';
     doneButtonElement.style.display = 'none';
@@ -1527,6 +1820,21 @@ export const createSelectionToolkit = (
     } else {
       enterMultiSelectionMode();
     }
+  });
+
+  clearAllButtonElement.addEventListener('click', () => {
+    if (!isMultiSelectionMode) {
+      return;
+    }
+
+    if (multiSelectionContexts.length === 0) {
+      updateStatus('No selections to clear.');
+      return;
+    }
+
+    clearMultiSelections();
+    hideDimOverlay();
+    updateStatus('Cleared all selections. Continue selecting or click Done.');
   });
 
   doneButtonElement.addEventListener('click', () => {

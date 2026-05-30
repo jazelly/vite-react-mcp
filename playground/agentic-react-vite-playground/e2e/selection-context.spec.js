@@ -170,7 +170,13 @@ test('toolkit multiselect appends selections and copies all on done', async ({
     name: 'Done',
     exact: true,
   });
+  const clearAllButton = toolkitRoot.getByRole('button', {
+    name: 'Clear all selections',
+    exact: true,
+  });
   await expect(doneButton).toBeVisible();
+  await expect(clearAllButton).toBeVisible();
+  await expect(clearAllButton).toBeDisabled();
 
   const doneStyles = await doneButton.evaluate((element) => {
     const styles = window.getComputedStyle(element);
@@ -188,14 +194,47 @@ test('toolkit multiselect appends selections and copies all on done', async ({
       window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
       '#profile-display-email-value',
   );
+  await expect(
+    page.locator('[data-agentic-react-multi-selected="true"]'),
+  ).toHaveCount(1);
   await page.locator('#profile-header-occupation-value').click();
   await page.waitForFunction(
     () =>
       window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
       '#profile-header-occupation-value',
   );
+  await expect(
+    page.locator('[data-agentic-react-multi-selected="true"]'),
+  ).toHaveCount(2);
+  await expect(clearAllButton).toBeEnabled();
+
+  await clearAllButton.click();
+  await expect(
+    page.locator('[data-agentic-react-multi-selected="true"]'),
+  ).toHaveCount(0);
+  await expect(clearAllButton).toBeDisabled();
+  await expect(toolkitRoot).toContainText('Cleared all selections');
+
+  await page.locator('#profile-display-email-value').click();
+  await page.waitForFunction(
+    () =>
+      window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
+      '#profile-display-email-value',
+  );
+  await page.locator('#profile-header-occupation-value').click();
+  await page.waitForFunction(
+    () =>
+      window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
+      '#profile-header-occupation-value',
+  );
+  await expect(
+    page.locator('[data-agentic-react-multi-selected="true"]'),
+  ).toHaveCount(2);
 
   await doneButton.click();
+  await expect(
+    page.locator('[data-agentic-react-multi-selected="true"]'),
+  ).toHaveCount(0);
 
   const clipboardText = await page.evaluate(() =>
     navigator.clipboard.readText(),
