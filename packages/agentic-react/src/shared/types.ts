@@ -51,6 +51,15 @@ export interface SelectionResolvedSource {
   componentName: string | null;
 }
 
+export interface SelectionSourceTraceFrame {
+  kind: 'external' | 'project';
+  componentName: string | null;
+  packageName: string | null;
+  filePath: string;
+  lineNumber: number | null;
+  columnNumber: number | null;
+}
+
 export interface SelectionExternalComponent {
   componentName: string;
   packageName: string | null;
@@ -73,6 +82,7 @@ export interface SelectionContext {
   externalComponent: SelectionExternalComponent | null;
   stackFrames: SelectionStackFrame[];
   resolvedSources: SelectionResolvedSource[];
+  sourceTrace: SelectionSourceTraceFrame[];
   sourceSnippets: SelectionSourceSnippet[];
   capturedAt: number;
 }

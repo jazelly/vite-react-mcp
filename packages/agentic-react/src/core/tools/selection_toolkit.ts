@@ -14,7 +14,10 @@ import type {
   ToolkitConfig,
   ToolkitPosition,
 } from '../../shared/types.js';
-import { buildSelectionContextForElement } from './selection_context.js';
+import {
+  buildSelectionContextForElement,
+  getSelectionElementComponentName,
+} from './selection_context.js';
 import {
   clearSelectableElementCache,
   getSelectableElementAtPosition,
@@ -64,6 +67,7 @@ const SELECTION_CONFIRMATION_MS = 1100;
 const SELECTION_STYLE_ID = 'agentic-react-selection-styles';
 const CONTRAST_LIGHT = 'rgba(255, 255, 255, 0.98)';
 const CONTRAST_DARK = 'rgba(15, 23, 42, 0.98)';
+const SELECTED_LABEL_MAX_LENGTH = 64;
 
 interface RgbaColor {
   r: number;
@@ -263,6 +267,132 @@ const applyHoverContrastForElement = (
   );
 };
 
+const normalizeElementLabel = (value: string | null | undefined): string => {
+  if (!value) return '';
+  return value.replace(/\s+/g, ' ').trim();
+};
+
+const truncateElementLabel = (
+  value: string,
+  maxLength = SELECTED_LABEL_MAX_LENGTH,
+): string => {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1).trimEnd()}...`;
+};
+
+const getLabelledByText = (element: Element): string => {
+  const labelledBy = element.getAttribute('aria-labelledby');
+  if (!labelledBy) return '';
+
+  const labelText = labelledBy
+    .split(/\s+/)
+    .map((id) => document.getElementById(id)?.textContent)
+    .filter(Boolean)
+    .join(' ');
+  return normalizeElementLabel(labelText);
+};
+
+const getAssociatedFormLabelText = (element: Element): string => {
+  if (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLSelectElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLButtonElement
+  ) {
+    const labels = Array.from(element.labels ?? []);
+    return normalizeElementLabel(
+      labels.map((labelElement) => labelElement.textContent).join(' '),
+    );
+  }
+
+  return '';
+};
+
+const getMeaningfulVisibleText = (element: Element): string => {
+  const textContent = normalizeElementLabel(element.textContent);
+  if (!textContent) return '';
+
+  const repeatedWhitespaceText = textContent.replace(/\s+/g, '');
+  if (repeatedWhitespaceText.length < 2) return '';
+  return textContent;
+};
+
+const formatDomElementLabel = (element: Element, label: string): string => {
+  const tagName = element.tagName.toLowerCase();
+  if (!label) return tagName;
+
+  if (/^(button|a|input|select|textarea|img)$/i.test(tagName)) {
+    return `${tagName}: ${label}`;
+  }
+
+  return label;
+};
+
+const formatSourceLocationLabel = (
+  selectionContext?: SelectionContext | null,
+): string => {
+  const source =
+    selectionContext?.resolvedSources[0] ??
+    selectionContext?.externalComponent?.usedBy ??
+    selectionContext?.sourceTrace.find((frame) => frame.kind === 'project');
+  if (!source?.filePath) return '';
+
+  const fileName = source.filePath.split('/').pop() || source.filePath;
+  return source.lineNumber ? `${fileName}:${source.lineNumber}` : fileName;
+};
+
+const buildSelectedElementLabel = (
+  element: Element,
+  selectionContext?: SelectionContext | null,
+  componentNameOverride?: string | null,
+): string => {
+  const componentName =
+    componentNameOverride ||
+    selectionContext?.componentName ||
+    selectionContext?.externalComponent?.componentName;
+  const sourceLocationLabel = formatSourceLocationLabel(selectionContext);
+
+  const labelCandidates = [
+    componentName,
+    element.getAttribute('aria-label'),
+    getLabelledByText(element),
+    getAssociatedFormLabelText(element),
+    element.getAttribute('alt'),
+    element.getAttribute('title'),
+    element.getAttribute('placeholder'),
+    element.getAttribute('name'),
+    element.id ? `#${element.id}` : '',
+  ];
+
+  for (const labelCandidate of labelCandidates) {
+    const normalizedLabel = normalizeElementLabel(labelCandidate);
+    if (!normalizedLabel) continue;
+
+    if (normalizedLabel === componentName) {
+      return truncateElementLabel(normalizedLabel);
+    }
+
+    return truncateElementLabel(
+      formatDomElementLabel(element, normalizedLabel),
+    );
+  }
+
+  if (sourceLocationLabel) {
+    return truncateElementLabel(sourceLocationLabel);
+  }
+
+  const visibleTextLabel = getMeaningfulVisibleText(element);
+  if (visibleTextLabel) {
+    return truncateElementLabel(
+      formatDomElementLabel(element, visibleTextLabel),
+    );
+  }
+
+  return truncateElementLabel(
+    sourceLocationLabel || element.tagName.toLowerCase(),
+  );
+};
+
 const toTextContext = (selectionContext: SelectionContext): string =>
   buildSelectionContextSummary(selectionContext);
 
@@ -391,12 +521,16 @@ export const createSelectionToolkit = (
   const copyButtonElement = document.createElement('button');
   const statusElement = document.createElement('div');
   const hoverElement = document.createElement('div');
+  const hoverLabelElement = document.createElement('div');
   const selectedElement = document.createElement('div');
+  const selectedLabelElement = document.createElement('div');
   const dimElements = Array.from({ length: 4 }, () =>
     document.createElement('div'),
   );
   let selectedTargetElement: Element | null = null;
   let dimTargetElement: Element | null = null;
+  let hoverLabelTargetElement: Element | null = null;
+  let hoverLabelRequestId = 0;
   let dimHideTimeout: number | null = null;
   let selectedPulseTimeout: number | null = null;
 
@@ -414,18 +548,23 @@ export const createSelectionToolkit = (
     'aria-label',
     'Open Agentic React toolkit',
   );
+  launcherButtonElement.setAttribute('data-agentic-react-launcher', 'true');
   launcherButtonElement.style.width = `${LAUNCHER_SIZE}px`;
   launcherButtonElement.style.height = `${LAUNCHER_SIZE}px`;
   launcherButtonElement.style.borderRadius = '999px';
   launcherButtonElement.style.border = 'none';
   launcherButtonElement.style.background = 'transparent';
-  launcherButtonElement.style.boxShadow = '0 12px 28px rgba(15, 23, 42, 0.38)';
+  launcherButtonElement.style.boxShadow =
+    'var(--agentic-react-launcher-shadow)';
   launcherButtonElement.style.cursor = 'pointer';
   launcherButtonElement.style.display = 'flex';
   launcherButtonElement.style.alignItems = 'center';
   launcherButtonElement.style.justifyContent = 'center';
   launcherButtonElement.style.padding = '0';
   launcherButtonElement.style.overflow = 'hidden';
+  launcherButtonElement.style.transition =
+    'transform 140ms ease, box-shadow 140ms ease, filter 140ms ease, background-color 140ms ease';
+  launcherButtonElement.style.willChange = 'transform, box-shadow, filter';
 
   launcherIconElement.style.width = '100%';
   launcherIconElement.style.height = '100%';
@@ -493,12 +632,33 @@ export const createSelectionToolkit = (
     '--agentic-react-hover-fill',
     'rgba(15, 23, 42, 0.08)',
   );
+  hoverElement.appendChild(hoverLabelElement);
+
+  hoverLabelElement.setAttribute('data-agentic-react-hover-label', 'true');
+  hoverLabelElement.style.position = 'absolute';
+  hoverLabelElement.style.pointerEvents = 'none';
+  hoverLabelElement.style.maxWidth = 'min(260px, calc(100vw - 24px))';
+  hoverLabelElement.style.overflow = 'hidden';
+  hoverLabelElement.style.textOverflow = 'ellipsis';
+  hoverLabelElement.style.whiteSpace = 'nowrap';
 
   selectedElement.setAttribute('data-agentic-react-selected', 'true');
   selectedElement.style.position = 'fixed';
   selectedElement.style.pointerEvents = 'none';
   selectedElement.style.display = 'none';
   selectedElement.style.background = 'transparent';
+  selectedElement.appendChild(selectedLabelElement);
+
+  selectedLabelElement.setAttribute(
+    'data-agentic-react-selected-label',
+    'true',
+  );
+  selectedLabelElement.style.position = 'absolute';
+  selectedLabelElement.style.pointerEvents = 'none';
+  selectedLabelElement.style.maxWidth = 'min(260px, calc(100vw - 24px))';
+  selectedLabelElement.style.overflow = 'hidden';
+  selectedLabelElement.style.textOverflow = 'ellipsis';
+  selectedLabelElement.style.whiteSpace = 'nowrap';
 
   for (const dimElement of dimElements) {
     dimElement.setAttribute('data-agentic-react-dim', 'true');
@@ -528,6 +688,39 @@ export const createSelectionToolkit = (
         transform-origin: center;
       }
 
+      [data-agentic-react-selected-label="true"],
+      [data-agentic-react-hover-label="true"] {
+        box-sizing: border-box;
+        right: 6px;
+        top: 6px;
+        padding: 5px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.86);
+        border-radius: 7px;
+        background: rgba(15, 23, 42, 0.96);
+        color: #ffffff;
+        box-shadow:
+          0 0 0 1px rgba(15, 23, 42, 0.72),
+          0 10px 24px rgba(15, 23, 42, 0.28);
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      [data-agentic-react-hover-label="true"] {
+        background: rgba(15, 23, 42, 0.9);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.44),
+          0 8px 18px rgba(15, 23, 42, 0.24);
+      }
+
+      [data-agentic-react-selected-label="true"][data-align="left"],
+      [data-agentic-react-hover-label="true"][data-align="left"] {
+        right: auto;
+        left: 6px;
+      }
+
       [data-agentic-react-hover="true"] {
         box-sizing: border-box;
         border: 2px solid var(--agentic-react-hover-inner, rgba(15, 23, 42, 0.98));
@@ -538,6 +731,30 @@ export const createSelectionToolkit = (
           inset 0 0 0 1px rgba(255, 255, 255, 0.18),
           0 12px 30px rgba(15, 23, 42, 0.2);
         transform: translateZ(0);
+      }
+
+      [data-agentic-react-launcher="true"] {
+        box-sizing: border-box;
+        transform: translateZ(0);
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      [data-agentic-react-launcher="true"]:hover {
+        background: rgba(255, 255, 255, 0.16) !important;
+        box-shadow: var(--agentic-react-launcher-hover-shadow) !important;
+        filter: brightness(1.08) saturate(1.08);
+        transform: translateY(-2px) scale(1.035) !important;
+      }
+
+      [data-agentic-react-launcher="true"]:focus-visible {
+        box-shadow: var(--agentic-react-launcher-focus-shadow) !important;
+        outline: none;
+        transform: translateY(-1px) scale(1.02) !important;
+      }
+
+      [data-agentic-react-launcher="true"]:active {
+        filter: brightness(0.98) saturate(1.02);
+        transform: translateY(0) scale(0.99) !important;
       }
 
       [data-agentic-react-selected="true"].agentic-react-selection-pulse {
@@ -598,7 +815,18 @@ export const createSelectionToolkit = (
     );
 
     panelElement.style.borderColor = `${toolkitConfig.accentColor}33`;
-    launcherButtonElement.style.boxShadow = `0 12px 28px ${toolkitConfig.accentColor}66`;
+    launcherButtonElement.style.setProperty(
+      '--agentic-react-launcher-shadow',
+      `0 18px 38px rgba(15, 23, 42, 0.34), 0 8px 18px ${toolkitConfig.accentColor}3d, 0 0 0 1px rgba(255, 255, 255, 0.2)`,
+    );
+    launcherButtonElement.style.setProperty(
+      '--agentic-react-launcher-hover-shadow',
+      `0 24px 48px rgba(15, 23, 42, 0.42), 0 12px 28px ${toolkitConfig.accentColor}66, 0 0 0 4px ${toolkitConfig.accentColor}24, 0 0 0 1px rgba(255, 255, 255, 0.42)`,
+    );
+    launcherButtonElement.style.setProperty(
+      '--agentic-react-launcher-focus-shadow',
+      `0 20px 42px rgba(15, 23, 42, 0.38), 0 10px 24px ${toolkitConfig.accentColor}5c, 0 0 0 4px ${toolkitConfig.accentColor}33, 0 0 0 1px rgba(255, 255, 255, 0.5)`,
+    );
 
     const buttons = [selectButtonElement, copyButtonElement];
     for (const buttonElement of buttons) {
@@ -632,6 +860,31 @@ export const createSelectionToolkit = (
     overlayElement.style.top = `${rect.top}px`;
     overlayElement.style.width = `${rect.width}px`;
     overlayElement.style.height = `${rect.height}px`;
+  };
+
+  const updateOverlayLabelForElement = (
+    labelElement: HTMLElement,
+    element: Element,
+    rect: DOMRect,
+    selectionContext?: SelectionContext | null,
+  ) => {
+    const componentNameOverride = selectionContext
+      ? null
+      : getSelectionElementComponentName(element);
+    labelElement.textContent = buildSelectedElementLabel(
+      element,
+      selectionContext,
+      componentNameOverride,
+    );
+    labelElement.dataset.align = rect.right < 140 ? 'left' : 'right';
+    labelElement.style.maxWidth = `${Math.max(
+      80,
+      Math.min(
+        260,
+        window.innerWidth - 24,
+        rect.right < 140 ? window.innerWidth - rect.left - 12 : rect.right - 12,
+      ),
+    )}px`;
   };
 
   const hideDimOverlay = () => {
@@ -700,6 +953,9 @@ export const createSelectionToolkit = (
 
   const hideHoverOverlay = () => {
     hoverElement.style.display = 'none';
+    hoverLabelElement.textContent = '';
+    hoverLabelTargetElement = null;
+    hoverLabelRequestId += 1;
   };
 
   const showHoverForElement = (element: Element | null) => {
@@ -715,6 +971,32 @@ export const createSelectionToolkit = (
     const computedStyle = window.getComputedStyle(element);
     hoverElement.style.display = 'block';
     hoverElement.style.borderRadius = computedStyle.borderRadius || '6px';
+    updateOverlayLabelForElement(hoverLabelElement, element, rect);
+    if (hoverLabelTargetElement !== element) {
+      hoverLabelTargetElement = element;
+      hoverLabelRequestId += 1;
+      const requestId = hoverLabelRequestId;
+      void buildSelectionContextForElement(element)
+        .then((selectionContext) => {
+          if (
+            requestId !== hoverLabelRequestId ||
+            hoverLabelTargetElement !== element ||
+            hoverElement.style.display === 'none'
+          ) {
+            return;
+          }
+
+          updateOverlayLabelForElement(
+            hoverLabelElement,
+            element,
+            element.getBoundingClientRect(),
+            selectionContext,
+          );
+        })
+        .catch(() => {
+          // Best effort only; the immediate DOM label remains visible.
+        });
+    }
     applyHoverContrastForElement(hoverElement, element);
     applyElementRect(hoverElement, rect);
     showDimForElement(element);
@@ -723,6 +1005,7 @@ export const createSelectionToolkit = (
   const hideSelectedOverlay = () => {
     selectedTargetElement = null;
     selectedElement.style.display = 'none';
+    selectedLabelElement.textContent = '';
     selectedElement.classList.remove('agentic-react-selection-pulse');
     if (selectedPulseTimeout !== null) {
       window.clearTimeout(selectedPulseTimeout);
@@ -730,7 +1013,11 @@ export const createSelectionToolkit = (
     }
   };
 
-  const showSelectedForElement = (element: Element, shouldPulse = false) => {
+  const showSelectedForElement = (
+    element: Element,
+    shouldPulse = false,
+    selectionContext: SelectionContext | null = lastSelectionContext,
+  ) => {
     if (toolkitRootElement.contains(element)) {
       hideSelectedOverlay();
       return;
@@ -741,6 +1028,12 @@ export const createSelectionToolkit = (
     selectedTargetElement = element;
     selectedElement.style.display = 'block';
     selectedElement.style.borderRadius = computedStyle.borderRadius || '6px';
+    updateOverlayLabelForElement(
+      selectedLabelElement,
+      element,
+      rect,
+      selectionContext,
+    );
     applyElementRect(selectedElement, rect);
 
     if (!shouldPulse) {
@@ -828,14 +1121,20 @@ export const createSelectionToolkit = (
       copyButtonElement.style.opacity = '1';
       copyButtonElement.style.cursor = 'pointer';
       copyButtonElement.style.background = toolkitConfig.accentColor;
-      showSelectedForElement(selectedTarget, true);
+      showSelectedForElement(selectedTarget, true, selectionContext);
       showDimForElement(selectedTarget);
       scheduleDimHide();
       didCaptureSelection = true;
       isPanelOpen = true;
       renderPanelVisibility();
+      const capturedSelectionLabel = `${selectionContext.componentName || 'selection'}${
+        selectionContext.selector ? ` (${selectionContext.selector})` : ''
+      }`;
+      const copyResult = await copyLastSelectionContext('text');
       updateStatus(
-        `Captured ${selectionContext.componentName || 'selection'}${selectionContext.selector ? ` (${selectionContext.selector})` : ''}`,
+        copyResult.success
+          ? `Captured and copied ${capturedSelectionLabel}`
+          : `Captured ${capturedSelectionLabel}. ${copyResult.error || 'Failed to copy context.'}`,
       );
     } catch (error) {
       const message =

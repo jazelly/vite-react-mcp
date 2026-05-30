@@ -38,12 +38,20 @@ const selectProfileEmailField = async (page) => {
   await page.evaluate(() => window.__AGENTIC_REACT__.setSelectionMode(true));
   await page.locator('#profile-field-email').click();
 
-  const didCapture = await page.evaluate(() =>
-    Boolean(window.__AGENTIC_REACT__?.getLastSelectionContext()),
-  );
+  const didCapture = await page
+    .waitForFunction(
+      () => Boolean(window.__AGENTIC_REACT__?.getLastSelectionContext()),
+      null,
+      { timeout: 1000 },
+    )
+    .then(() => true)
+    .catch(() => false);
   if (!didCapture) {
     await page.evaluate(() => window.__AGENTIC_REACT__.setSelectionMode(true));
     await page.locator('#profile-field-email').click();
+    await page.waitForFunction(() =>
+      Boolean(window.__AGENTIC_REACT__?.getLastSelectionContext()),
+    );
   }
 };
 
@@ -79,6 +87,12 @@ const captureWithToolkitUi = async (page, selector) => {
   await openToolkitPanel(page);
   await toolkitRoot.getByRole('button', { name: 'Select', exact: true }).click();
   await page.locator(selector).click();
+  await page.waitForFunction(
+    (selectedSelector) =>
+      window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
+      selectedSelector,
+    selector,
+  );
   await expect(
     toolkitRoot.getByText('Captured', { exact: false }),
   ).toBeVisible();
@@ -122,6 +136,21 @@ test('selecting a profile field captures its React source context', async ({
   );
 });
 
+test('toolkit select copies the selected context automatically', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
+
+  await captureWithToolkitUi(page, '#profile-field-email');
+
+  const clipboardText = await page.evaluate(() =>
+    navigator.clipboard.readText(),
+  );
+  expect(clipboardText).toContain('component: ProfileField');
+  expect(clipboardText).toContain('selector: #profile-field-email');
+});
+
 test('copying the selected context includes a playground source snippet', async ({
   page,
 }) => {
@@ -144,13 +173,16 @@ test('copying the selected context includes a playground source snippet', async 
     }),
   );
   expect(copyResult.context.sourcePreview).toContain('profile-field-${name}');
+  expect(copyResult.context.sourcePreview).toContain('source trace:');
   expect(copyResult.context.sourcePreview).toContain(
-    'in ProfileField (at src/components/UserProfile/ProfileField.jsx',
+    'ProfileField at src/components/UserProfile/ProfileField.jsx',
   );
   expect(copyResult.context.sourcePreview).toContain(
     'src/components/UserProfile/ProfileContent.jsx',
   );
-  expect(copyResult.context.sourcePreview).not.toContain('node_modules');
+  expect(
+    copyResult.context.sourceSnippets.map(({ filePath }) => filePath).join('\n'),
+  ).not.toContain('node_modules');
 });
 
 test('selecting an element without an id still returns a usable fallback selector', async ({
