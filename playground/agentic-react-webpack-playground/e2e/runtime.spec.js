@@ -119,3 +119,73 @@ test('webpack playground MCP tools return expected outcomes', async ({
     await transport.close();
   }
 });
+
+test('webpack selection captures the primary CTA as userland AppContent source', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__AGENTIC_REACT__);
+
+  await page.evaluate(() => window.__AGENTIC_REACT__.setSelectionMode(true));
+
+  const primaryCta = page.locator('.primary-cta');
+  await expect(primaryCta).toBeVisible();
+  const ctaBox = await primaryCta.boundingBox();
+  expect(ctaBox).toBeTruthy();
+  await page.mouse.move(
+    ctaBox.x + ctaBox.width / 2,
+    ctaBox.y + ctaBox.height / 2,
+  );
+
+  const hoverLabel = page.locator('[data-agentic-react-hover-label="true"]');
+  await expect(hoverLabel).toContainText('AppContent');
+  await expect(hoverLabel).toContainText('App.jsx');
+
+  await primaryCta.click();
+  await page.waitForFunction(
+    () =>
+      window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
+      '.hero > .hero-copy > .primary-cta',
+  );
+
+  const runtimeContext = await page.evaluate(() =>
+    window.__AGENTIC_REACT__.getLastSelectionContext(),
+  );
+  expect(runtimeContext.componentName).toBe('AppContent');
+  expect(runtimeContext.externalComponent).toBeNull();
+  expect(runtimeContext.resolvedSources).toContainEqual(
+    expect.objectContaining({
+      componentName: 'AppContent',
+      filePath: expect.stringContaining('src/App.jsx'),
+      lineNumber: 489,
+    }),
+  );
+
+  const { client, transport } = await createMcpClient();
+  try {
+    const selectedContextRaw = await client.callTool({
+      name: 'get-last-selection-context',
+      arguments: {
+        includeSourceSnippets: true,
+        contextLines: 3,
+        maxFiles: 2,
+      },
+    });
+    const selectedContext = parseToolResponse(selectedContextRaw);
+    expect(selectedContext.success).toBe(true);
+    expect(selectedContext.summary).toContain('component: AppContent');
+    expect(selectedContext.summary).toContain('src/App.jsx:489');
+    expect(selectedContext.summary).not.toContain(
+      'selected external component:',
+    );
+    expect(selectedContext.summary).not.toContain('component: a');
+    expect(selectedContext.context.sourceSnippets).toContainEqual(
+      expect.objectContaining({
+        filePath: 'src/App.jsx',
+        snippet: expect.stringContaining('className="primary-cta"'),
+      }),
+    );
+  } finally {
+    await transport.close();
+  }
+});

@@ -27,7 +27,12 @@ const baseConfig = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: [['@babel/preset-react', { runtime: 'automatic' }]],
+            presets: [
+              [
+                '@babel/preset-react',
+                { runtime: 'automatic', development: true },
+              ],
+            ],
           },
         },
       },

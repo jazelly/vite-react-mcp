@@ -26,5 +26,6 @@ export type BridgeMessage =
     };
 
 export const BRIDGE_WS_PATH = '/__agentic_react_bridge';
+export const SOURCE_LOOKUP_PATH = '/__agentic_react_source';
 
 export const BRIDGE_GLOBAL_CONFIG_KEY = '__AGENTIC_REACT_BRIDGE_URL__';

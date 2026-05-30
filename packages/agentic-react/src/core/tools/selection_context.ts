@@ -84,9 +84,134 @@ const INTERNAL_COMPONENT_NAMES = new Set([
 
 const SERVER_COMPONENT_URL_PREFIXES = ['about://React/', 'rsc://React/'];
 const SYMBOLICATION_TIMEOUT_MS = 5000;
+const NODE_MODULES_PATTERN = /(?:^|[/\\])node_modules[/\\]/g;
+const VITE_OPTIMIZED_DEPS_PATTERN = /[/\\]\.vite[/\\]deps[^/\\]*[/\\]/g;
+const FILE_EXTENSION_PATTERN = /\.[mc]?[jt]sx?$/i;
+const VITE_INTERNAL_CHUNK_PATTERN = /^chunk-[A-Za-z0-9_-]+$/;
+const PATH_SEPARATOR_PATTERN = /[/\\]/;
+const NAME_AT_VERSION_PATTERN = /^(.+?)@v?\d/;
+const INTRINSIC_ELEMENT_NAMES = new Set([
+  'a',
+  'abbr',
+  'address',
+  'area',
+  'article',
+  'aside',
+  'audio',
+  'b',
+  'base',
+  'bdi',
+  'bdo',
+  'blockquote',
+  'body',
+  'br',
+  'button',
+  'canvas',
+  'caption',
+  'cite',
+  'code',
+  'col',
+  'colgroup',
+  'data',
+  'datalist',
+  'dd',
+  'del',
+  'details',
+  'dfn',
+  'dialog',
+  'div',
+  'dl',
+  'dt',
+  'em',
+  'embed',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'head',
+  'header',
+  'hgroup',
+  'hr',
+  'html',
+  'i',
+  'iframe',
+  'img',
+  'input',
+  'ins',
+  'kbd',
+  'label',
+  'legend',
+  'li',
+  'link',
+  'main',
+  'map',
+  'mark',
+  'menu',
+  'meta',
+  'meter',
+  'nav',
+  'noscript',
+  'object',
+  'ol',
+  'optgroup',
+  'option',
+  'output',
+  'p',
+  'picture',
+  'pre',
+  'progress',
+  'q',
+  'rp',
+  'rt',
+  'ruby',
+  's',
+  'samp',
+  'script',
+  'search',
+  'section',
+  'select',
+  'slot',
+  'small',
+  'source',
+  'span',
+  'strong',
+  'style',
+  'sub',
+  'summary',
+  'sup',
+  'svg',
+  'table',
+  'tbody',
+  'td',
+  'template',
+  'textarea',
+  'tfoot',
+  'th',
+  'thead',
+  'time',
+  'title',
+  'tr',
+  'track',
+  'u',
+  'ul',
+  'var',
+  'video',
+  'wbr',
+]);
+
+const isIntrinsicElementName = (name: string | null): boolean =>
+  Boolean(name && INTRINSIC_ELEMENT_NAMES.has(name));
 
 const isUsefulComponentName = (name: string | null): boolean => {
   if (!name) return false;
+  if (isIntrinsicElementName(name)) return false;
   if (INTERNAL_COMPONENT_NAMES.has(name)) return false;
   for (const prefix of NON_COMPONENT_PREFIXES) {
     if (name.startsWith(prefix)) return false;
@@ -131,6 +256,17 @@ const normalizeSourceFilePath = (fileName: string): string => {
   return normalizedFileName.replace(/\?.*$/, '');
 };
 
+const safeDecodeUriComponent = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch (_error) {
+    return value;
+  }
+};
+
+const splitPathSegments = (path: string): string[] =>
+  path.split(PATH_SEPARATOR_PATTERN).filter(Boolean);
+
 const isProjectSourceFrame = (fileName: string): boolean => {
   if (!isSourceFile(fileName)) {
     return false;
@@ -173,36 +309,98 @@ const normalizeDisplayComponentName = (name: string | null): string | null => {
 };
 
 const extractPackageNameFromFilePath = (filePath: string): string | null => {
+  const readNodeModulesPackage = (afterMarker: string): string | null => {
+    const [firstSegment, secondSegment] = splitPathSegments(afterMarker);
+    if (!firstSegment || firstSegment.startsWith('.')) return null;
+    if (!firstSegment.startsWith('@')) return firstSegment;
+    return secondSegment ? `${firstSegment}/${secondSegment}` : null;
+  };
+
+  const readViteOptimizedDependencyPackage = (
+    afterMarker: string,
+  ): string | null => {
+    const firstSegment = splitPathSegments(afterMarker)[0];
+    if (!firstSegment) return null;
+
+    const packageStem = firstSegment.replace(FILE_EXTENSION_PATTERN, '');
+    if (VITE_INTERNAL_CHUNK_PATTERN.test(packageStem)) return null;
+    if (!packageStem.startsWith('@')) return packageStem;
+
+    const scopeBoundaryIndex = packageStem.indexOf('_');
+    if (scopeBoundaryIndex === -1) return null;
+    return `${packageStem.slice(0, scopeBoundaryIndex)}/${packageStem.slice(
+      scopeBoundaryIndex + 1,
+    )}`;
+  };
+
+  const extractAfterLastMarker = (
+    input: string,
+    pattern: RegExp,
+    read: (afterMarker: string) => string | null,
+  ): string | null => {
+    pattern.lastIndex = 0;
+    let lastMatch: RegExpExecArray | null = null;
+    let match = pattern.exec(input);
+    while (match !== null) {
+      lastMatch = match;
+      match = pattern.exec(input);
+    }
+    pattern.lastIndex = 0;
+    if (!lastMatch) return null;
+    return read(input.slice(lastMatch.index + lastMatch[0].length));
+  };
+
+  const extractNameAtVersion = (segment: string | undefined): string | null =>
+    segment?.match(NAME_AT_VERSION_PATTERN)?.[1] ?? null;
+
+  const extractVersionedPackageFromUrl = (
+    rawFilePath: string,
+  ): string | null => {
+    let url: URL;
+    try {
+      url = new URL(rawFilePath);
+    } catch (_error) {
+      return null;
+    }
+
+    const segments = splitPathSegments(url.pathname).map(
+      safeDecodeUriComponent,
+    );
+    for (const [index, segment] of segments.entries()) {
+      if (segment.startsWith('@')) {
+        const name = extractNameAtVersion(segments[index + 1]);
+        if (name) return `${segment}/${name}`;
+        continue;
+      }
+
+      const name = extractNameAtVersion(segment);
+      if (name) return name;
+    }
+    return null;
+  };
+
   const normalizedFileName = normalizeSourceFilePath(filePath);
-  const pathSegments = normalizedFileName.split('/').filter(Boolean);
+  const decodedFileName = safeDecodeUriComponent(normalizedFileName);
 
-  for (let index = pathSegments.length - 1; index >= 0; index--) {
-    if (pathSegments[index] !== 'node_modules') {
-      continue;
-    }
-
-    const packageStartIndex = index + 1;
-    const packageName = pathSegments[packageStartIndex];
-    if (!packageName) {
-      continue;
-    }
-
-    if (packageName.startsWith('@')) {
-      const scopedPackageName = pathSegments[packageStartIndex + 1];
-      return scopedPackageName ? `${packageName}/${scopedPackageName}` : null;
-    }
-
-    return packageName;
-  }
-
-  const viteDependencyMatch = normalizedFileName.match(
-    /(?:^|\/)(?:deps\/)?((?:@[^/]+\/)?[^/@][^/]*)\.js$/,
+  const vitePackage = extractAfterLastMarker(
+    decodedFileName,
+    VITE_OPTIMIZED_DEPS_PATTERN,
+    readViteOptimizedDependencyPackage,
   );
-  if (viteDependencyMatch) {
-    return viteDependencyMatch[1].replace(/_/g, '/');
+  if (vitePackage) {
+    return vitePackage;
   }
 
-  return null;
+  const nodeModulesPackage = extractAfterLastMarker(
+    decodedFileName,
+    NODE_MODULES_PATTERN,
+    readNodeModulesPackage,
+  );
+  if (nodeModulesPackage) {
+    return nodeModulesPackage;
+  }
+
+  return extractVersionedPackageFromUrl(filePath);
 };
 
 const isServerComponentUrl = (url: string): boolean =>
@@ -481,7 +679,9 @@ const getFiberComponentRankByName = (element: Element): Map<string, number> => {
   return rankByName;
 };
 
-const buildStackFrames = async (
+const stackFrameCache = new WeakMap<Element, Promise<SelectionStackFrame[]>>();
+
+const buildStackFramesForElement = async (
   nearestFiberElement: Element,
 ): Promise<SelectionStackFrame[]> => {
   const fiber = getFiberFromHostInstance(nearestFiberElement);
@@ -518,6 +718,11 @@ const buildStackFrames = async (
       .slice(0, MAX_STACK_FRAMES)
       .map(mapOwnerStackFrame);
     const fiberStackFrames = await buildFiberStackFrames();
+    const unresolvedOwnerFrameNames = new Set(
+      ownerStackFrames
+        .filter((stackFrame) => !stackFrame.fileName && stackFrame.functionName)
+        .map((stackFrame) => stackFrame.functionName as string),
+    );
     const seenFrameKeys = new Set(
       ownerStackFrames.map(
         (stackFrame) =>
@@ -525,6 +730,15 @@ const buildStackFrames = async (
       ),
     );
     const supplementalFiberFrames = fiberStackFrames.filter((stackFrame) => {
+      if (
+        stackFrame.fileName &&
+        isExternalSourceFrame(stackFrame.fileName) &&
+        stackFrame.functionName &&
+        unresolvedOwnerFrameNames.has(stackFrame.functionName)
+      ) {
+        return false;
+      }
+
       const frameKey = `${stackFrame.functionName ?? ''}:${stackFrame.fileName ?? ''}:${stackFrame.lineNumber ?? ''}:${stackFrame.columnNumber ?? ''}`;
       if (seenFrameKeys.has(frameKey)) {
         return false;
@@ -540,6 +754,19 @@ const buildStackFrames = async (
   } catch (_error) {
     return buildFiberStackFrames();
   }
+};
+
+const buildStackFrames = (
+  nearestFiberElement: Element,
+): Promise<SelectionStackFrame[]> => {
+  const cachedStackFrames = stackFrameCache.get(nearestFiberElement);
+  if (cachedStackFrames) {
+    return cachedStackFrames;
+  }
+
+  const stackFrames = buildStackFramesForElement(nearestFiberElement);
+  stackFrameCache.set(nearestFiberElement, stackFrames);
+  return stackFrames;
 };
 
 const resolveSourceFrames = (
@@ -644,13 +871,12 @@ const resolveExternalComponent = (
     return null;
   }
 
-  const selectedExternalFrame =
-    externalFrames.find(
-      (stackFrame) =>
-        normalizeDisplayComponentName(stackFrame.functionName) ===
-        selectedDisplayName,
-    ) ?? externalFrames[0];
-  if (!selectedExternalFrame.fileName) {
+  const selectedExternalFrame = externalFrames.find(
+    (stackFrame) =>
+      normalizeDisplayComponentName(stackFrame.functionName) ===
+      selectedDisplayName,
+  );
+  if (!selectedExternalFrame?.fileName) {
     return null;
   }
 
@@ -713,43 +939,56 @@ const buildSourceTrace = (
 ): SelectionSourceTraceFrame[] => {
   const traceFrames: SelectionSourceTraceFrame[] = [];
   const seenTraceFrameKeys = new Set<string>();
+  let previousExternalPackageName: string | null = null;
 
   const addTraceFrame = (frame: SelectionSourceTraceFrame | null) => {
     if (!frame?.filePath) return;
+
+    if (
+      frame.kind === 'external' &&
+      frame.packageName &&
+      frame.packageName === previousExternalPackageName
+    ) {
+      return;
+    }
 
     const traceFrameKey = formatTraceFrameKey(frame);
     if (seenTraceFrameKeys.has(traceFrameKey)) return;
 
     seenTraceFrameKeys.add(traceFrameKey);
     traceFrames.push(frame);
+    previousExternalPackageName =
+      frame.kind === 'external' ? frame.packageName : null;
   };
 
   for (const stackFrame of stackFrames) {
-    const traceFrame = mapStackFrameToTraceFrame(stackFrame);
-    if (traceFrame?.kind === 'external') {
-      addTraceFrame(traceFrame);
+    addTraceFrame(mapStackFrameToTraceFrame(stackFrame));
+    if (traceFrames.length >= MAX_SOURCE_FRAMES) {
+      break;
     }
   }
 
-  for (const resolvedSource of resolvedSources) {
-    addTraceFrame({
-      kind: 'project',
-      componentName: resolvedSource.componentName,
-      packageName: null,
-      filePath: resolvedSource.filePath,
-      lineNumber: resolvedSource.lineNumber,
-      columnNumber: resolvedSource.columnNumber,
-    });
-  }
+  const hasProjectFrame = traceFrames.some(
+    (traceFrame) => traceFrame.kind === 'project',
+  );
 
-  for (const stackFrame of stackFrames) {
-    const traceFrame = mapStackFrameToTraceFrame(stackFrame);
-    if (traceFrame?.kind === 'project') {
-      addTraceFrame(traceFrame);
+  if (!hasProjectFrame) {
+    for (const resolvedSource of resolvedSources) {
+      addTraceFrame({
+        kind: 'project',
+        componentName: resolvedSource.componentName,
+        packageName: null,
+        filePath: resolvedSource.filePath,
+        lineNumber: resolvedSource.lineNumber,
+        columnNumber: resolvedSource.columnNumber,
+      });
+      if (traceFrames.length >= MAX_SOURCE_FRAMES) {
+        break;
+      }
     }
   }
 
-  return traceFrames.slice(0, MAX_SOURCE_FRAMES);
+  return traceFrames;
 };
 
 const getComponentName = (

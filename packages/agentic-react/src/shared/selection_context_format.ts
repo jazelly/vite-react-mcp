@@ -61,7 +61,8 @@ const formatTraceFrameLine = (
     const packageName = traceFrame.packageName
       ? ` from ${traceFrame.packageName}`
       : '';
-    return `${arrow}${componentName}${packageName} at ${location}`;
+    const sourceLocation = traceFrame.packageName ? '' : ` at ${location}`;
+    return `${arrow}${componentName}${packageName}${sourceLocation}`;
   }
 
   return traceFrame.componentName
@@ -118,10 +119,17 @@ export const buildSelectionSourcePreview = (
     selectionContext.sourceTrace ?? [],
   );
   const externalComponentLine = formatExternalComponentLine(selectionContext);
+  const shouldUseSourceTrace =
+    Boolean(externalComponentLine) ||
+    Boolean(
+      selectionContext.sourceTrace?.some(
+        (traceFrame) => traceFrame.kind === 'project',
+      ),
+    );
   const preview = [
     snippetText,
     externalComponentLine,
-    sourceTrace || sourceChain,
+    shouldUseSourceTrace && sourceTrace ? sourceTrace : sourceChain,
   ]
     .filter(Boolean)
     .join('\n');
