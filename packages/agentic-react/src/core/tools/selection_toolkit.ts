@@ -9,8 +9,10 @@ import {
   isAllowedProjectSourcePath,
   normalizeSourceRoot,
 } from '../../shared/source_path.js';
+import { SOURCE_LOOKUP_PATH } from '../../shared/protocol.js';
 import type {
   SelectionContext,
+  SelectionResolvedSource,
   ToolkitConfig,
   ToolkitPosition,
 } from '../../shared/types.js';
@@ -351,9 +353,13 @@ const buildSelectedElementLabel = (
     selectionContext?.componentName ||
     selectionContext?.externalComponent?.componentName;
   const sourceLocationLabel = formatSourceLocationLabel(selectionContext);
+  const componentLocationLabel =
+    componentName && sourceLocationLabel
+      ? `${componentName} ${sourceLocationLabel}`
+      : componentName;
 
   const labelCandidates = [
-    componentName,
+    componentLocationLabel,
     element.getAttribute('aria-label'),
     getLabelledByText(element),
     getAssociatedFormLabelText(element),
@@ -368,7 +374,7 @@ const buildSelectedElementLabel = (
     const normalizedLabel = normalizeElementLabel(labelCandidate);
     if (!normalizedLabel) continue;
 
-    if (normalizedLabel === componentName) {
+    if (normalizedLabel === componentLocationLabel) {
       return truncateElementLabel(normalizedLabel);
     }
 
@@ -474,6 +480,62 @@ const normalizeSourceTextFromViteResponse = (
   return responseText;
 };
 
+const placeResolvedSourceFirst = (
+  resolvedSources: SelectionResolvedSource[],
+  preferredSource: SelectionResolvedSource,
+): SelectionResolvedSource[] => [
+  preferredSource,
+  ...resolvedSources.filter(
+    (source) =>
+      source.filePath !== preferredSource.filePath ||
+      source.componentName !== preferredSource.componentName,
+  ),
+];
+
+const enrichSelectionContextSourceLocation = async (
+  selectionContext: SelectionContext,
+): Promise<SelectionContext> => {
+  if (!selectionContext.componentName || !selectionContext.selector) {
+    return selectionContext;
+  }
+
+  try {
+    const lookupUrl = new URL(SOURCE_LOOKUP_PATH, window.location.origin);
+    lookupUrl.searchParams.set('component', selectionContext.componentName);
+    lookupUrl.searchParams.set('selector', selectionContext.selector);
+    const response = await fetch(lookupUrl, { cache: 'no-store' });
+    if (!response.ok) {
+      return selectionContext;
+    }
+
+    const source = (await response.json()) as SelectionResolvedSource;
+    if (!source.filePath || !source.componentName) {
+      return selectionContext;
+    }
+
+    const nextSelectionContext = {
+      ...selectionContext,
+      externalComponent: selectionContext.externalComponent
+        ? {
+            ...selectionContext.externalComponent,
+            usedBy: source,
+          }
+        : null,
+      resolvedSources: placeResolvedSourceFirst(
+        selectionContext.resolvedSources,
+        source,
+      ),
+    };
+
+    return {
+      ...nextSelectionContext,
+      sourcePreview: buildSelectionSourcePreview(nextSelectionContext),
+    };
+  } catch (_error) {
+    return selectionContext;
+  }
+};
+
 const buildSourceSnippet = (
   sourceText: string,
   lineNumber: number,
@@ -510,7 +572,9 @@ export const createSelectionToolkit = (
   let isToolkitVisible = toolkitConfig.defaultVisible && toolkitConfig.enabled;
   let isPanelOpen = toolkitConfig.defaultExpanded;
   let isSelectionMode = false;
+  let isMultiSelectionMode = false;
   let lastSelectionContext: SelectionContext | null = null;
+  let multiSelectionContexts: SelectionContext[] = [];
 
   const toolkitRootElement = document.createElement('div');
   const launcherButtonElement = document.createElement('button');
@@ -518,7 +582,8 @@ export const createSelectionToolkit = (
 
   const panelElement = document.createElement('div');
   const selectButtonElement = document.createElement('button');
-  const copyButtonElement = document.createElement('button');
+  const multiselectButtonElement = document.createElement('button');
+  const doneButtonElement = document.createElement('button');
   const statusElement = document.createElement('div');
   const hoverElement = document.createElement('div');
   const hoverLabelElement = document.createElement('div');
@@ -599,12 +664,12 @@ export const createSelectionToolkit = (
   };
 
   createButton(selectButtonElement, 'Select');
-  createButton(copyButtonElement, 'Copy');
+  createButton(multiselectButtonElement, 'Multiselect');
+  createButton(doneButtonElement, 'Done');
 
-  copyButtonElement.style.background = '#1f2937';
-  copyButtonElement.disabled = true;
-  copyButtonElement.style.opacity = '0.6';
-  copyButtonElement.style.cursor = 'not-allowed';
+  doneButtonElement.style.background = '#dc2626';
+  doneButtonElement.style.color = '#ffffff';
+  doneButtonElement.style.display = 'none';
 
   statusElement.style.fontSize = '11px';
   statusElement.style.color = '#111827';
@@ -616,7 +681,8 @@ export const createSelectionToolkit = (
   statusElement.style.display = 'none';
 
   panelElement.appendChild(selectButtonElement);
-  panelElement.appendChild(copyButtonElement);
+  panelElement.appendChild(multiselectButtonElement);
+  panelElement.appendChild(doneButtonElement);
   panelElement.appendChild(statusElement);
 
   toolkitRootElement.appendChild(panelElement);
@@ -702,7 +768,7 @@ export const createSelectionToolkit = (
           0 0 0 1px rgba(15, 23, 42, 0.72),
           0 10px 24px rgba(15, 23, 42, 0.28);
         font-family: ui-sans-serif, system-ui, sans-serif;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
         line-height: 1.2;
         letter-spacing: 0;
@@ -828,13 +894,16 @@ export const createSelectionToolkit = (
       `0 20px 42px rgba(15, 23, 42, 0.38), 0 10px 24px ${toolkitConfig.accentColor}5c, 0 0 0 4px ${toolkitConfig.accentColor}33, 0 0 0 1px rgba(255, 255, 255, 0.5)`,
     );
 
-    const buttons = [selectButtonElement, copyButtonElement];
+    const buttons = [selectButtonElement, multiselectButtonElement];
     for (const buttonElement of buttons) {
       if (!buttonElement.disabled) {
         buttonElement.style.background = toolkitConfig.accentColor;
       }
       buttonElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
     }
+    doneButtonElement.style.background = '#dc2626';
+    doneButtonElement.style.color = '#ffffff';
+    doneButtonElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
 
     hoverElement.style.zIndex = String(Math.max(0, toolkitConfig.zIndex - 2));
     hoverElement.style.setProperty(
@@ -977,6 +1046,7 @@ export const createSelectionToolkit = (
       hoverLabelRequestId += 1;
       const requestId = hoverLabelRequestId;
       void buildSelectionContextForElement(element)
+        .then(enrichSelectionContextSourceLocation)
         .then((selectionContext) => {
           if (
             requestId !== hoverLabelRequestId ||
@@ -1085,8 +1155,8 @@ export const createSelectionToolkit = (
   };
 
   const onSelect = async (mouseEvent: MouseEvent) => {
+    const clickTarget = mouseEvent.target;
     if (!isSelectionMode) {
-      const clickTarget = mouseEvent.target;
       if (
         isPanelOpen &&
         clickTarget instanceof Node &&
@@ -1095,6 +1165,13 @@ export const createSelectionToolkit = (
         isPanelOpen = false;
         renderPanelVisibility();
       }
+      return;
+    }
+
+    if (
+      clickTarget instanceof Node &&
+      toolkitRootElement.contains(clickTarget)
+    ) {
       return;
     }
 
@@ -1114,13 +1191,10 @@ export const createSelectionToolkit = (
     let didCaptureSelection = false;
 
     try {
-      const selectionContext =
-        await buildSelectionContextForElement(selectedTarget);
+      const selectionContext = await enrichSelectionContextSourceLocation(
+        await buildSelectionContextForElement(selectedTarget),
+      );
       lastSelectionContext = selectionContext;
-      copyButtonElement.disabled = false;
-      copyButtonElement.style.opacity = '1';
-      copyButtonElement.style.cursor = 'pointer';
-      copyButtonElement.style.background = toolkitConfig.accentColor;
       showSelectedForElement(selectedTarget, true, selectionContext);
       showDimForElement(selectedTarget);
       scheduleDimHide();
@@ -1130,12 +1204,19 @@ export const createSelectionToolkit = (
       const capturedSelectionLabel = `${selectionContext.componentName || 'selection'}${
         selectionContext.selector ? ` (${selectionContext.selector})` : ''
       }`;
-      const copyResult = await copyLastSelectionContext('text');
-      updateStatus(
-        copyResult.success
-          ? `Captured and copied ${capturedSelectionLabel}`
-          : `Captured ${capturedSelectionLabel}. ${copyResult.error || 'Failed to copy context.'}`,
-      );
+      if (isMultiSelectionMode) {
+        multiSelectionContexts.push(selectionContext);
+        updateStatus(
+          `Added ${capturedSelectionLabel}. ${multiSelectionContexts.length} selected. Click Done to copy all.`,
+        );
+      } else {
+        const copyResult = await copyLastSelectionContext('text');
+        updateStatus(
+          copyResult.success
+            ? `Captured and copied ${capturedSelectionLabel}`
+            : `Captured ${capturedSelectionLabel}. ${copyResult.error || 'Failed to copy context.'}`,
+        );
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -1143,12 +1224,23 @@ export const createSelectionToolkit = (
           : 'Failed to capture selection context';
       updateStatus(message);
     } finally {
-      isSelectionMode = false;
-      selectButtonElement.textContent = 'Select';
-      launcherButtonElement.setAttribute(
-        'aria-label',
-        'Open Agentic React toolkit',
-      );
+      if (isMultiSelectionMode && didCaptureSelection) {
+        isSelectionMode = true;
+        multiselectButtonElement.textContent = 'Selecting...';
+        launcherButtonElement.setAttribute(
+          'aria-label',
+          'Multiselect mode active for Agentic React toolkit',
+        );
+      } else {
+        isSelectionMode = false;
+        selectButtonElement.textContent = 'Select';
+        multiselectButtonElement.textContent = 'Multiselect';
+        doneButtonElement.style.display = 'none';
+        launcherButtonElement.setAttribute(
+          'aria-label',
+          'Open Agentic React toolkit',
+        );
+      }
       hideHoverOverlay();
       if (!didCaptureSelection) {
         hideDimOverlay();
@@ -1159,11 +1251,15 @@ export const createSelectionToolkit = (
 
   const enterSelectionMode = () => {
     isSelectionMode = true;
+    isMultiSelectionMode = false;
+    multiSelectionContexts = [];
     clearSelectableElementCache();
     hideSelectedOverlay();
     isPanelOpen = true;
     renderPanelVisibility();
     selectButtonElement.textContent = 'Selecting...';
+    multiselectButtonElement.textContent = 'Multiselect';
+    doneButtonElement.style.display = 'none';
     launcherButtonElement.setAttribute(
       'aria-label',
       'Selection mode active for Agentic React toolkit',
@@ -1173,9 +1269,31 @@ export const createSelectionToolkit = (
     );
   };
 
+  const enterMultiSelectionMode = () => {
+    isSelectionMode = true;
+    isMultiSelectionMode = true;
+    multiSelectionContexts = [];
+    clearSelectableElementCache();
+    hideSelectedOverlay();
+    isPanelOpen = true;
+    renderPanelVisibility();
+    selectButtonElement.textContent = 'Select';
+    multiselectButtonElement.textContent = 'Selecting...';
+    doneButtonElement.style.display = 'block';
+    launcherButtonElement.setAttribute(
+      'aria-label',
+      'Multiselect mode active for Agentic React toolkit',
+    );
+    updateStatus('Multiselect enabled. Select elements, then click Done.');
+  };
+
   const exitSelectionMode = () => {
     isSelectionMode = false;
+    isMultiSelectionMode = false;
+    multiSelectionContexts = [];
     selectButtonElement.textContent = 'Select';
+    multiselectButtonElement.textContent = 'Multiselect';
+    doneButtonElement.style.display = 'none';
     launcherButtonElement.setAttribute(
       'aria-label',
       'Open Agentic React toolkit',
@@ -1222,6 +1340,128 @@ export const createSelectionToolkit = (
     return lastSelectionContext;
   };
 
+  const enrichSelectionContextSourceSnippets = async (
+    selectionContext: SelectionContext,
+  ): Promise<SelectionContext> => {
+    let enrichedSelectionContext =
+      await enrichSelectionContextSourceLocation(selectionContext);
+
+    if (enrichedSelectionContext.sourceSnippets.length > 0) {
+      return enrichedSelectionContext;
+    }
+
+    const sourceSnippets: SelectionContext['sourceSnippets'] = [];
+    const resolvedSources = enrichedSelectionContext.resolvedSources.slice(
+      0,
+      DEFAULT_MAX_SNIPPET_FILES,
+    );
+    const normalizedSourceRoot = getNormalizedSourceRoot();
+
+    for (const resolvedSource of resolvedSources) {
+      if (
+        !isAllowedProjectSourcePath(
+          resolvedSource.filePath,
+          normalizedSourceRoot,
+        )
+      ) {
+        continue;
+      }
+
+      if (!resolvedSource.lineNumber || resolvedSource.lineNumber < 1) {
+        continue;
+      }
+
+      const candidateUrls = buildBrowserSourceCandidates(
+        resolvedSource.filePath,
+        normalizedSourceRoot,
+      );
+      if (candidateUrls.length === 0) {
+        continue;
+      }
+
+      for (const candidateUrl of candidateUrls) {
+        try {
+          const response = await fetch(candidateUrl, { cache: 'no-store' });
+          if (!response.ok) {
+            continue;
+          }
+
+          const sourceTextResponse = await response.text();
+          const sourceText =
+            normalizeSourceTextFromViteResponse(sourceTextResponse);
+          if (!sourceText) {
+            continue;
+          }
+          const snippetPayload = buildSourceSnippet(
+            sourceText,
+            resolvedSource.lineNumber,
+            DEFAULT_SNIPPET_CONTEXT_LINES,
+          );
+
+          if (!snippetPayload) {
+            continue;
+          }
+
+          sourceSnippets.push({
+            filePath: resolvedSource.filePath,
+            startLine: snippetPayload.startLine,
+            endLine: snippetPayload.endLine,
+            snippet: snippetPayload.snippet,
+          });
+          break;
+        } catch (_error) {
+          // best effort only
+        }
+      }
+    }
+
+    if (sourceSnippets.length === 0) {
+      return enrichedSelectionContext;
+    }
+
+    enrichedSelectionContext = {
+      ...enrichedSelectionContext,
+      sourceSnippets,
+    };
+    return {
+      ...enrichedSelectionContext,
+      sourcePreview: buildSelectionSourcePreview(enrichedSelectionContext),
+    };
+  };
+
+  const copySelectionContexts = async (
+    selectionContexts: SelectionContext[],
+  ): Promise<{
+    success: boolean;
+    copied: boolean;
+    contexts: SelectionContext[];
+    error?: string;
+  }> => {
+    if (selectionContexts.length === 0) {
+      return {
+        success: false,
+        copied: false,
+        contexts: [],
+        error: 'No selections found',
+      };
+    }
+
+    const textToCopy = selectionContexts
+      .map(
+        (selectionContext, index) =>
+          `Selection ${index + 1}\n${toTextContext(selectionContext)}`,
+      )
+      .join('\n\n---\n\n');
+    const copied = await copyText(textToCopy);
+
+    return {
+      success: copied,
+      copied,
+      contexts: selectionContexts,
+      error: copied ? undefined : 'Failed to copy selections to clipboard',
+    };
+  };
+
   const copyLastSelectionContext = async (
     format: 'text' | 'json' = 'text',
   ): Promise<{
@@ -1240,83 +1480,8 @@ export const createSelectionToolkit = (
       };
     }
 
-    if (lastSelectionContext.sourceSnippets.length === 0) {
-      const sourceSnippets: SelectionContext['sourceSnippets'] = [];
-      const resolvedSources = lastSelectionContext.resolvedSources.slice(
-        0,
-        DEFAULT_MAX_SNIPPET_FILES,
-      );
-      const normalizedSourceRoot = getNormalizedSourceRoot();
-
-      for (const resolvedSource of resolvedSources) {
-        if (
-          !isAllowedProjectSourcePath(
-            resolvedSource.filePath,
-            normalizedSourceRoot,
-          )
-        ) {
-          continue;
-        }
-
-        if (!resolvedSource.lineNumber || resolvedSource.lineNumber < 1) {
-          continue;
-        }
-
-        const candidateUrls = buildBrowserSourceCandidates(
-          resolvedSource.filePath,
-          normalizedSourceRoot,
-        );
-        if (candidateUrls.length === 0) {
-          continue;
-        }
-
-        for (const candidateUrl of candidateUrls) {
-          try {
-            const response = await fetch(candidateUrl, { cache: 'no-store' });
-            if (!response.ok) {
-              continue;
-            }
-
-            const sourceTextResponse = await response.text();
-            const sourceText =
-              normalizeSourceTextFromViteResponse(sourceTextResponse);
-            if (!sourceText) {
-              continue;
-            }
-            const snippetPayload = buildSourceSnippet(
-              sourceText,
-              resolvedSource.lineNumber,
-              DEFAULT_SNIPPET_CONTEXT_LINES,
-            );
-
-            if (!snippetPayload) {
-              continue;
-            }
-
-            sourceSnippets.push({
-              filePath: resolvedSource.filePath,
-              startLine: snippetPayload.startLine,
-              endLine: snippetPayload.endLine,
-              snippet: snippetPayload.snippet,
-            });
-            break;
-          } catch (_error) {
-            // best effort only
-          }
-        }
-      }
-
-      if (sourceSnippets.length > 0) {
-        const enrichedSelectionContext = {
-          ...lastSelectionContext,
-          sourceSnippets,
-        };
-        lastSelectionContext = {
-          ...enrichedSelectionContext,
-          sourcePreview: buildSelectionSourcePreview(enrichedSelectionContext),
-        };
-      }
-    }
+    lastSelectionContext =
+      await enrichSelectionContextSourceSnippets(lastSelectionContext);
 
     const textToCopy =
       format === 'json'
@@ -1356,8 +1521,35 @@ export const createSelectionToolkit = (
     }
   });
 
-  copyButtonElement.addEventListener('click', () => {
-    void copyLastSelectionContext('text');
+  multiselectButtonElement.addEventListener('click', () => {
+    if (isMultiSelectionMode) {
+      exitSelectionMode();
+    } else {
+      enterMultiSelectionMode();
+    }
+  });
+
+  doneButtonElement.addEventListener('click', () => {
+    void (async () => {
+      const selectionContextsToCopy = multiSelectionContexts.slice();
+      const copyResult = await copySelectionContexts(selectionContextsToCopy);
+      const copiedMessage = `Copied ${copyResult.contexts.length} selected ${
+        copyResult.contexts.length === 1 ? 'context' : 'contexts'
+      }`;
+      if (copyResult.success) {
+        lastSelectionContext =
+          copyResult.contexts[copyResult.contexts.length - 1] ??
+          lastSelectionContext;
+      } else {
+        updateStatus(copyResult.error || 'Failed to copy selections');
+      }
+      exitSelectionMode();
+      isPanelOpen = true;
+      renderPanelVisibility();
+      if (copyResult.success) {
+        updateStatus(copiedMessage);
+      }
+    })();
   });
 
   const mountToolkit = () => {

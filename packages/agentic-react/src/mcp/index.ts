@@ -380,6 +380,14 @@ const extractSelectionSourceHints = (
     pushSourceHint(hints, stripCssEscapes(idMatch[1]));
   }
 
+  const classHints = Array.from(
+    selector.matchAll(/\.((?:\\.|[^\s>+~.#:[\]])+)/g),
+    (match) => stripCssEscapes(match[1]),
+  );
+  for (const classHint of classHints.reverse()) {
+    pushSourceHint(hints, classHint);
+  }
+
   for (const attrMatch of selector.matchAll(
     /\[[^\]=\s]+=(?:"([^"]*)"|'([^']*)'|([^\]\s]+))\]/g,
   )) {
@@ -398,6 +406,7 @@ const extractSelectionSourceHints = (
     'data-cy',
     'data-qa',
     'aria-label',
+    'class',
     'name',
     'title',
   ]) {
@@ -474,24 +483,40 @@ const placeResolvedSourceFirst = (
   ),
 ];
 
-const enrichExternalComponentUsage = (
+const findLocalSelectionSource = (
+  rootDir: string,
+  selectionContext: SelectionContext,
+): SelectionResolvedSource | null => {
+  const directProjectSource = selectionContext.resolvedSources.find(
+    (source) => source.filePath && !isExternalPath(source.filePath),
+  );
+  if (directProjectSource) {
+    return directProjectSource;
+  }
+
+  const externalUsageSource = selectionContext.externalComponent?.usedBy;
+  if (externalUsageSource) {
+    return externalUsageSource;
+  }
+
+  const componentName =
+    selectionContext.componentName &&
+    LOCAL_COMPONENT_NAME_PATTERN.test(selectionContext.componentName) &&
+    !IGNORED_LOCAL_USAGE_COMPONENTS.has(selectionContext.componentName)
+      ? selectionContext.componentName
+      : inferLocalUsageComponentName(selectionContext);
+  if (!componentName) {
+    return null;
+  }
+
+  return findComponentSourceInProject(rootDir, componentName);
+};
+
+const enrichSelectionContextSourceLocations = (
   rootDir: string,
   selectionContext: SelectionContext,
 ): SelectionContext => {
-  if (!selectionContext.externalComponent) {
-    return selectionContext;
-  }
-
-  const localUsageSource =
-    selectionContext.externalComponent.usedBy ??
-    (() => {
-      const localUsageComponentName =
-        inferLocalUsageComponentName(selectionContext);
-      if (!localUsageComponentName) {
-        return null;
-      }
-      return findComponentSourceInProject(rootDir, localUsageComponentName);
-    })();
+  const localUsageSource = findLocalSelectionSource(rootDir, selectionContext);
   if (!localUsageSource) {
     return selectionContext;
   }
@@ -508,10 +533,12 @@ const enrichExternalComponentUsage = (
 
   const nextSelectionContext = {
     ...selectionContext,
-    externalComponent: {
-      ...selectionContext.externalComponent,
-      usedBy: refinedLocalUsageSource,
-    },
+    externalComponent: selectionContext.externalComponent
+      ? {
+          ...selectionContext.externalComponent,
+          usedBy: refinedLocalUsageSource,
+        }
+      : null,
     resolvedSources: nextResolvedSources,
   };
 
@@ -527,7 +554,7 @@ const enrichSelectionContextWithSnippets = (
   contextLines: number,
   maxFiles: number,
 ): SelectionContext => {
-  const enrichedSelectionContext = enrichExternalComponentUsage(
+  const enrichedSelectionContext = enrichSelectionContextSourceLocations(
     rootDir,
     selectionContext,
   );
@@ -739,7 +766,10 @@ export function initMcpServer(
                     args.contextLines,
                     args.maxFiles,
                   )
-                : enrichExternalComponentUsage(rootDir, selectionContext);
+                : enrichSelectionContextSourceLocations(
+                    rootDir,
+                    selectionContext,
+                  );
 
               return toTextResponse({
                 success: true,
@@ -803,7 +833,7 @@ export function initMcpServer(
                     args.contextLines,
                     args.maxFiles,
                   )
-                : enrichExternalComponentUsage(rootDir, response.context);
+                : enrichSelectionContextSourceLocations(rootDir, response.context);
 
               return toTextResponse({
                 success: true,

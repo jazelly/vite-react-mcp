@@ -151,6 +151,61 @@ test('toolkit select copies the selected context automatically', async ({
   expect(clipboardText).toContain('selector: #profile-field-email');
 });
 
+test('toolkit multiselect appends selections and copies all on done', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__AGENTIC_REACT__);
+
+  const toolkitRoot = getToolkitRoot(page);
+  await openToolkitPanel(page);
+  await expect(
+    toolkitRoot.getByRole('button', { name: 'Copy', exact: true }),
+  ).toHaveCount(0);
+
+  await toolkitRoot
+    .getByRole('button', { name: 'Multiselect', exact: true })
+    .click();
+  const doneButton = toolkitRoot.getByRole('button', {
+    name: 'Done',
+    exact: true,
+  });
+  await expect(doneButton).toBeVisible();
+
+  const doneStyles = await doneButton.evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    return {
+      backgroundColor: styles.backgroundColor,
+      color: styles.color,
+    };
+  });
+  expect(doneStyles.backgroundColor).toBe('rgb(220, 38, 38)');
+  expect(doneStyles.color).toBe('rgb(255, 255, 255)');
+
+  await page.locator('#profile-display-email-value').click();
+  await page.waitForFunction(
+    () =>
+      window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
+      '#profile-display-email-value',
+  );
+  await page.locator('#profile-header-occupation-value').click();
+  await page.waitForFunction(
+    () =>
+      window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
+      '#profile-header-occupation-value',
+  );
+
+  await doneButton.click();
+
+  const clipboardText = await page.evaluate(() =>
+    navigator.clipboard.readText(),
+  );
+  expect(clipboardText).toContain('Selection 1');
+  expect(clipboardText).toContain('selector: #profile-display-email-value');
+  expect(clipboardText).toContain('Selection 2');
+  expect(clipboardText).toContain('selector: #profile-header-occupation-value');
+});
+
 test('copying the selected context includes a playground source snippet', async ({
   page,
 }) => {
@@ -190,6 +245,7 @@ test('selecting an element without an id still returns a usable fallback selecto
 }) => {
   await page.goto('/profile/1');
   await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
+  await expect(page.locator('#profile-field-email')).toBeVisible();
   await page.waitForFunction(() => window.__AGENTIC_REACT__);
 
   await page.evaluate(() => window.__AGENTIC_REACT__.enterSelectionMode());
@@ -246,6 +302,7 @@ test('MCP tools return no-selection and selected-context responses', async ({
   await page.waitForFunction(() => window.__AGENTIC_REACT__);
 
   const { client, transport } = await createMcpClient();
+  let transportClosed = false;
   try {
     const noSelectionRaw = await client.callTool({
       name: 'get-last-selection-context',
@@ -258,26 +315,36 @@ test('MCP tools return no-selection and selected-context responses', async ({
     expect(noSelection.context).toBeNull();
     expect(noSelection.message).toContain('No selection context');
 
+    await transport.close();
+    transportClosed = true;
+
     await selectProfileEmailField(page);
     await page.waitForFunction(() =>
       window.__AGENTIC_REACT__?.getLastSelectionContext(),
     );
 
-    const selectedContextRaw = await client.callTool({
-      name: 'get-last-selection-context',
-      arguments: {
-        includeSourceSnippets: true,
-        contextLines: 3,
-        maxFiles: 2,
-      },
-    });
-    const selectedContext = parseToolResponse(selectedContextRaw);
-    expect(selectedContext.success).toBe(true);
-    expect(selectedContext.context.componentName).toBe('ProfileField');
-    expect(selectedContext.context.sourceSnippets.length).toBeGreaterThan(0);
-    expect(selectedContext.summary).toContain('ProfileField');
+    const selectionMcp = await createMcpClient();
+    try {
+      const selectedContextRaw = await selectionMcp.client.callTool({
+        name: 'get-last-selection-context',
+        arguments: {
+          includeSourceSnippets: true,
+          contextLines: 3,
+          maxFiles: 2,
+        },
+      });
+      const selectedContext = parseToolResponse(selectedContextRaw);
+      expect(selectedContext.success).toBe(true);
+      expect(selectedContext.context.componentName).toBe('ProfileField');
+      expect(selectedContext.context.sourceSnippets.length).toBeGreaterThan(0);
+      expect(selectedContext.summary).toContain('ProfileField');
+    } finally {
+      await selectionMcp.transport.close();
+    }
   } finally {
-    await transport.close();
+    if (!transportClosed) {
+      await transport.close();
+    }
   }
 });
 
@@ -373,12 +440,11 @@ test('toolkit bottom-right UI can capture reusable component source context acro
   expect(toolkitPosition.right).toBe('20px');
   expect(toolkitPosition.bottom).toBe('20px');
 
-  const { client, transport } = await createMcpClient();
-  try {
-    await captureWithToolkitUi(page, '#profile-display-email-value');
-    await toolkitRoot.getByRole('button', { name: 'Copy', exact: true }).click();
+  await captureWithToolkitUi(page, '#profile-display-email-value');
 
-    const profileFieldContextRaw = await client.callTool({
+  const profileFieldMcp = await createMcpClient();
+  try {
+    const profileFieldContextRaw = await profileFieldMcp.client.callTool({
       name: 'get-last-selection-context',
       arguments: {
         includeSourceSnippets: true,
@@ -399,9 +465,15 @@ test('toolkit bottom-right UI can capture reusable component source context acro
         filePath: expect.stringContaining('src/components/UserProfile/ProfileField.jsx'),
       }),
     );
+  } finally {
+    await profileFieldMcp.transport.close();
+  }
 
-    await captureWithToolkitUi(page, '#profile-header-occupation-value');
-    const profileHeaderContextRaw = await client.callTool({
+  await captureWithToolkitUi(page, '#profile-header-occupation-value');
+
+  const profileHeaderMcp = await createMcpClient();
+  try {
+    const profileHeaderContextRaw = await profileHeaderMcp.client.callTool({
       name: 'get-last-selection-context',
       arguments: {
         includeSourceSnippets: true,
@@ -425,7 +497,7 @@ test('toolkit bottom-right UI can capture reusable component source context acro
       }),
     );
   } finally {
-    await transport.close();
+    await profileHeaderMcp.transport.close();
   }
 });
 
@@ -436,6 +508,7 @@ test('MCP built-in tooling endpoints all return expected outcomes', async ({
   await page.waitForFunction(() => window.__AGENTIC_REACT__);
 
   const { client, transport } = await createMcpClient();
+  let transportClosed = false;
   try {
     const highlightRaw = await client.callTool({
       name: 'highlight-component',
@@ -470,21 +543,39 @@ test('MCP built-in tooling endpoints all return expected outcomes', async ({
     const rerenders = JSON.parse(rerendersText);
     expect(Array.isArray(rerenders)).toBe(true);
 
-    await selectProfileEmailField(page);
-    const copiedRaw = await client.callTool({
-      name: 'copy-last-selection-context',
-      arguments: { format: 'json' },
-    });
-    const copied = parseToolResponse(copiedRaw);
-    expect(typeof copied.success).toBe('boolean');
-    expect(typeof copied.copied).toBe('boolean');
-    expect(copied.format).toBe('json');
-    expect(copied.context).toBeTruthy();
-    if (!copied.success) {
-      expect(copied.error).toContain('Failed to copy context');
+    await transport.close();
+    transportClosed = true;
+
+    await page.getByRole('button', { name: 'Edit Profile', exact: true }).click();
+    await expect(page.locator('#profile-field-email')).toBeVisible();
+    await page.evaluate(() => window.__AGENTIC_REACT__.setSelectionMode(true));
+    await page.locator('#profile-field-email').click();
+    await page.waitForFunction(
+      () =>
+        window.__AGENTIC_REACT__?.getLastSelectionContext()?.selector ===
+        '#profile-field-email',
+    );
+    const selectionMcp = await createMcpClient();
+    try {
+      const copiedRaw = await selectionMcp.client.callTool({
+        name: 'copy-last-selection-context',
+        arguments: { format: 'json' },
+      });
+      const copied = parseToolResponse(copiedRaw);
+      expect(typeof copied.success).toBe('boolean');
+      expect(typeof copied.copied).toBe('boolean');
+      expect(copied.format).toBe('json');
+      expect(copied.context).toBeTruthy();
+      if (!copied.success) {
+        expect(copied.error).toContain('Failed to copy context');
+      }
+    } finally {
+      await selectionMcp.transport.close();
     }
   } finally {
-    await transport.close();
+    if (!transportClosed) {
+      await transport.close();
+    }
   }
 });
 
