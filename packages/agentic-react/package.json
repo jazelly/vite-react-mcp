@@ -34,7 +34,6 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "@babel/preset-react": ">=6",
     "vite": ">=4",
     "webpack": ">=5",
     "next": ">=13"
@@ -51,9 +50,6 @@
     }
   },
   "devDependencies": {
-    "@babel/core": "^7.26.10",
-    "@babel/types": "^7.27.0",
-    "@rollup/pluginutils": "^5.1.4",
     "@types/react-reconciler": "0.26.7",
     "vite": "^6.4.2"
   },

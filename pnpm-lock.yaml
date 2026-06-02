@@ -78,9 +78,6 @@ importers:
 
   packages/agentic-react:
     dependencies:
-      '@babel/preset-react':
-        specifier: '>=6'
-        version: 7.27.1(@babel/core@7.27.4)
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@3.25.76)
@@ -89,7 +86,7 @@ importers:
         version: 0.5.39(react@19.1.1)
       next:
         specifier: 15.5.18
-        version: 15.5.18(@babel/core@7.27.4)(@playwright/test@1.59.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(sass@1.99.0)
+        version: 15.5.18(@playwright/test@1.59.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(sass@1.99.0)
       webpack:
         specifier: 5.107.1
         version: 5.107.1(webpack-cli@6.0.1)
@@ -103,15 +100,6 @@ importers:
         specifier: ^3.23.5
         version: 3.25.2(zod@3.25.76)
     devDependencies:
-      '@babel/core':
-        specifier: ^7.26.10
-        version: 7.27.4
-      '@babel/types':
-        specifier: ^7.27.0
-        version: 7.29.0
-      '@rollup/pluginutils':
-        specifier: ^5.1.4
-        version: 5.2.0(rollup@4.60.4)
       '@types/react-reconciler':
         specifier: 0.26.7
         version: 0.26.7
@@ -121,9 +109,6 @@ importers:
 
   packages/agentic-react-webpack-compat:
     dependencies:
-      '@babel/preset-react':
-        specifier: '>=6'
-        version: 7.27.1(@babel/core@7.28.0)
       '@jazelly/agentic-react':
         specifier: workspace:*
         version: link:../agentic-react
@@ -156,7 +141,7 @@ importers:
         version: 6.3.7(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       next:
         specifier: 15.5.18
-        version: 15.5.18(@babel/core@7.27.4)(@playwright/test@1.59.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(sass@1.99.0)
+        version: 15.5.18(@playwright/test@1.59.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(sass@1.99.0)
       react:
         specifier: 19.1.1
         version: 19.1.1
@@ -456,10 +441,6 @@ packages:
 
   '@babel/core@7.27.4':
     resolution: {integrity: sha512-bXYxrXFubeYdvB0NhD/NBB3Qi6aZeV20GOWVI47t2dkecCEoneR4NPVcb7abpXDEvejgrUfFtG6vG/zxAKmg+g==}
-    engines: {node: '>=6.9.0'}
-
-  '@babel/core@7.28.0':
-    resolution: {integrity: sha512-UlLAnTPrFdNGoFtbSXwcGFQBtQZJCNjaN6hQNP3UPvuNXT1i82N26KL3dZeIpNalWywr9IuQuncaAfUaS1g6sQ==}
     engines: {node: '>=6.9.0'}
 
   '@babel/generator@7.28.0':
@@ -2508,15 +2489,6 @@ packages:
   '@rolldown/pluginutils@1.0.0-beta.19':
     resolution: {integrity: sha512-3FL3mnMbPu0muGOCaKAhhFEYmqv9eTfPSJRJmANrCwtgK8VuxpsZDGK+m0LYAGoyO8+0j5uRe4PeyPDK1yA/hA==}
 
-  '@rollup/pluginutils@5.2.0':
-    resolution: {integrity: sha512-qWJ2ZTbmumwiLFomfzTyt5Kng4hwPi9rwCYN4SHb6eaRU1KNO4ccxINHr/VhH4GgPlt1XfSTLX2LBTme8ne4Zw==}
-    engines: {node: '>=14.0.0'}
-    peerDependencies:
-      rollup: 4.60.4
-    peerDependenciesMeta:
-      rollup:
-        optional: true
-
   '@rollup/rollup-android-arm-eabi@4.60.4':
     resolution: {integrity: sha512-F5QXMSiFebS9hKZj02XhWLLnRpJ3B3AROP0tWbFBSj+6kCbg5m9j5JoHKd4mmSVy5mS/IMQloYgYxCuJC0fxEQ==}
     cpu: [arm]
@@ -4002,9 +3974,6 @@ packages:
   estraverse@5.3.0:
     resolution: {integrity: sha512-MMdARuVEQziNTeJD8DgMqmhwR11BRQ/cBP+pLtYdSTnf3MIO8fFeiINEbX36ZdNlfU/7A9f3gUw49B3oQsvwBA==}
     engines: {node: '>=4.0'}
-
-  estree-walker@2.0.2:
-    resolution: {integrity: sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w==}
 
   esutils@2.0.3:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
@@ -6737,26 +6706,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@babel/core@7.28.0':
-    dependencies:
-      '@ampproject/remapping': 2.3.0
-      '@babel/code-frame': 7.29.0
-      '@babel/generator': 7.29.1
-      '@babel/helper-compilation-targets': 7.28.6
-      '@babel/helper-module-transforms': 7.28.6(@babel/core@7.28.0)
-      '@babel/helpers': 7.29.2
-      '@babel/parser': 7.29.3
-      '@babel/template': 7.28.6
-      '@babel/traverse': 7.29.0
-      '@babel/types': 7.29.0
-      convert-source-map: 2.0.0
-      debug: 4.4.3
-      gensync: 1.0.0-beta.2
-      json5: 2.2.3
-      semver: 6.3.1
-    transitivePeerDependencies:
-      - supports-color
-
   '@babel/generator@7.28.0':
     dependencies:
       '@babel/parser': 7.28.0
@@ -6916,15 +6865,6 @@ snapshots:
   '@babel/helper-module-transforms@7.28.6(@babel/core@7.27.4)':
     dependencies:
       '@babel/core': 7.27.4
-      '@babel/helper-module-imports': 7.28.6
-      '@babel/helper-validator-identifier': 7.28.5
-      '@babel/traverse': 7.29.0
-    transitivePeerDependencies:
-      - supports-color
-
-  '@babel/helper-module-transforms@7.28.6(@babel/core@7.28.0)':
-    dependencies:
-      '@babel/core': 7.28.0
       '@babel/helper-module-imports': 7.28.6
       '@babel/helper-validator-identifier': 7.28.5
       '@babel/traverse': 7.29.0
@@ -7360,11 +7300,6 @@ snapshots:
       '@babel/core': 7.27.4
       '@babel/helper-plugin-utils': 7.28.6
 
-  '@babel/plugin-syntax-jsx@7.27.1(@babel/core@7.28.0)':
-    dependencies:
-      '@babel/core': 7.28.0
-      '@babel/helper-plugin-utils': 7.28.6
-
   '@babel/plugin-syntax-logical-assignment-operators@7.10.4(@babel/core@7.20.2)':
     dependencies:
       '@babel/core': 7.20.2
@@ -7798,11 +7733,6 @@ snapshots:
       '@babel/core': 7.27.4
       '@babel/helper-plugin-utils': 7.27.1
 
-  '@babel/plugin-transform-react-display-name@7.28.0(@babel/core@7.28.0)':
-    dependencies:
-      '@babel/core': 7.28.0
-      '@babel/helper-plugin-utils': 7.27.1
-
   '@babel/plugin-transform-react-jsx-development@7.27.1(@babel/core@7.20.2)':
     dependencies:
       '@babel/core': 7.20.2
@@ -7814,13 +7744,6 @@ snapshots:
     dependencies:
       '@babel/core': 7.27.4
       '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.27.4)
-    transitivePeerDependencies:
-      - supports-color
-
-  '@babel/plugin-transform-react-jsx-development@7.27.1(@babel/core@7.28.0)':
-    dependencies:
-      '@babel/core': 7.28.0
-      '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.28.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -7856,17 +7779,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@babel/plugin-transform-react-jsx@7.27.1(@babel/core@7.28.0)':
-    dependencies:
-      '@babel/core': 7.28.0
-      '@babel/helper-annotate-as-pure': 7.27.3
-      '@babel/helper-module-imports': 7.27.1
-      '@babel/helper-plugin-utils': 7.27.1
-      '@babel/plugin-syntax-jsx': 7.27.1(@babel/core@7.28.0)
-      '@babel/types': 7.29.0
-    transitivePeerDependencies:
-      - supports-color
-
   '@babel/plugin-transform-react-pure-annotations@7.27.1(@babel/core@7.20.2)':
     dependencies:
       '@babel/core': 7.20.2
@@ -7876,12 +7788,6 @@ snapshots:
   '@babel/plugin-transform-react-pure-annotations@7.27.1(@babel/core@7.27.4)':
     dependencies:
       '@babel/core': 7.27.4
-      '@babel/helper-annotate-as-pure': 7.27.3
-      '@babel/helper-plugin-utils': 7.27.1
-
-  '@babel/plugin-transform-react-pure-annotations@7.27.1(@babel/core@7.28.0)':
-    dependencies:
-      '@babel/core': 7.28.0
       '@babel/helper-annotate-as-pure': 7.27.3
       '@babel/helper-plugin-utils': 7.27.1
 
@@ -8218,18 +8124,6 @@ snapshots:
       '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.27.4)
       '@babel/plugin-transform-react-jsx-development': 7.27.1(@babel/core@7.27.4)
       '@babel/plugin-transform-react-pure-annotations': 7.27.1(@babel/core@7.27.4)
-    transitivePeerDependencies:
-      - supports-color
-
-  '@babel/preset-react@7.27.1(@babel/core@7.28.0)':
-    dependencies:
-      '@babel/core': 7.28.0
-      '@babel/helper-plugin-utils': 7.27.1
-      '@babel/helper-validator-option': 7.27.1
-      '@babel/plugin-transform-react-display-name': 7.28.0(@babel/core@7.28.0)
-      '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.28.0)
-      '@babel/plugin-transform-react-jsx-development': 7.27.1(@babel/core@7.28.0)
-      '@babel/plugin-transform-react-pure-annotations': 7.27.1(@babel/core@7.28.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -9865,14 +9759,6 @@ snapshots:
   '@remix-run/router@1.23.2': {}
 
   '@rolldown/pluginutils@1.0.0-beta.19': {}
-
-  '@rollup/pluginutils@5.2.0(rollup@4.60.4)':
-    dependencies:
-      '@types/estree': 1.0.8
-      estree-walker: 2.0.2
-      picomatch: 4.0.4
-    optionalDependencies:
-      rollup: 4.60.4
 
   '@rollup/rollup-android-arm-eabi@4.60.4':
     optional: true
@@ -11598,8 +11484,6 @@ snapshots:
 
   estraverse@5.3.0: {}
 
-  estree-walker@2.0.2: {}
-
   esutils@2.0.3: {}
 
   etag@1.8.1: {}
@@ -12599,7 +12483,7 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next@15.5.18(@babel/core@7.27.4)(@playwright/test@1.59.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(sass@1.99.0):
+  next@15.5.18(@playwright/test@1.59.1)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)(sass@1.99.0):
     dependencies:
       '@next/env': 15.5.18
       '@swc/helpers': 0.5.15
@@ -12607,7 +12491,7 @@ snapshots:
       postcss: 8.5.15
       react: 19.1.1
       react-dom: 19.1.1(react@19.1.1)
-      styled-jsx: 5.1.6(@babel/core@7.27.4)(react@19.1.1)
+      styled-jsx: 5.1.6(react@19.1.1)
     optionalDependencies:
       '@next/swc-darwin-arm64': 15.5.18
       '@next/swc-darwin-x64': 15.5.18
@@ -13859,12 +13743,10 @@ snapshots:
     dependencies:
       webpack: 5.107.1(webpack-cli@6.0.1)
 
-  styled-jsx@5.1.6(@babel/core@7.27.4)(react@19.1.1):
+  styled-jsx@5.1.6(react@19.1.1):
     dependencies:
       client-only: 0.0.1
       react: 19.1.1
-    optionalDependencies:
-      '@babel/core': 7.27.4
 
   stylehacks@5.1.1(postcss@8.5.15):
     dependencies:

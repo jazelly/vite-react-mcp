@@ -149,6 +149,14 @@ test('toolkit select copies the selected context automatically', async ({
   );
   expect(clipboardText).toContain('component: ProfileField');
   expect(clipboardText).toContain('selector: #profile-field-email');
+  expect(clipboardText).toContain(
+    '<web_context type="react_component_location">',
+  );
+  expect(clipboardText).toContain('</web_context>');
+  expect(clipboardText).toContain('source: ');
+  expect(clipboardText).toContain(
+    '/playground/agentic-react-vite-playground/src/components/UserProfile/ProfileField.jsx',
+  );
 });
 
 test('toolkit multiselect appends selections and copies all on done', async ({
@@ -264,6 +272,10 @@ test('toolkit multiselect appends selections and copies all on done', async ({
     navigator.clipboard.readText(),
   );
   expect(clipboardText).toContain('Selection 1');
+  expect(clipboardText).toContain(
+    '<web_context type="react_component_location">',
+  );
+  expect(clipboardText).toContain('</web_context>');
   expect(clipboardText).toContain('selector: #profile-display-email-value');
   expect(clipboardText).toContain('tuning prompts:');
   expect(clipboardText).toContain('text color to rgb(51, 102, 153).');

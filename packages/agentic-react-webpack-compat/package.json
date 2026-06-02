@@ -27,7 +27,6 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@babel/preset-react": ">=6",
     "webpack": ">=5"
   },
   "dependencies": {

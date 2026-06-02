@@ -1,0 +1,38 @@
+# Workspace-only files. The publishable package lives under
+# packages/agentic-react and uses its own package.json "files" allowlist.
+playground/
+packages/
+scripts/
+
+# Local dependencies and generated artifacts
+node_modules/
+dist/
+coverage/
+.nyc_output/
+.turbo/
+.vite-inspect/
+test-results/
+playwright-report/
+blob-report/
+
+# Local app/tooling state
+.cursor/
+.idea/
+.cache/
+.npm/
+.yalc/
+**/.yalc/
+yalc.lock
+**/yalc.lock
+
+# Logs and packed tarballs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tgz
+
+# Environment and OS files
+.env
+.DS_Store
+*.timestamp-*.*

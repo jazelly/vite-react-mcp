@@ -14,6 +14,7 @@ import {
   getNearestFiberWithStateNode,
   isReactElement,
 } from '../../shared/util.js';
+import { isProjectOwnedFiber } from './source_ownership.js';
 import { flashStateNode } from './util.js';
 
 const stringifyValueExceptObject = (value: any): string | null => {
@@ -329,7 +330,7 @@ export const collectUnnecessaryRender = (fiber: Fiber) => {
   }
 };
 
-export const queryWastedRender = (
+export const queryWastedRender = async (
   timeframe: number,
   {
     allComponents = false,
@@ -343,11 +344,15 @@ export const queryWastedRender = (
     start = Date.now() - timeframe * 1000;
 
   for (const wastedRender of wastedRenderFiberInfo.values()) {
+    const isWithinTimeframe =
+      wastedRender.collectedAt >= start && wastedRender.collectedAt <= end;
+    const isIncludedComponent =
+      allComponents || (await isProjectOwnedFiber(wastedRender.fiber));
+
     if (
-      wastedRender.collectedAt >= start &&
-      wastedRender.collectedAt <= end &&
+      isWithinTimeframe &&
       wastedRender.fiber.return &&
-      (allComponents || window.__REACT_COMPONENTS__.includes(wastedRender.name))
+      isIncludedComponent
     ) {
       result.push(wastedRender);
     }

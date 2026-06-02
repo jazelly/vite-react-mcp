@@ -18,7 +18,6 @@ A dev-only React plugin that creates an MCP server so coding agents can inspect 
 
 ```bash
 pnpm install @jazelly/agentic-react -D
-pnpm install @babel/preset-react -D
 ```
 
 ## Vite

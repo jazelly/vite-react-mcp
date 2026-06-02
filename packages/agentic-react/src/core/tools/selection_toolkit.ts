@@ -1,14 +1,15 @@
-import { target } from '../../shared/const.js';
+import { __AGENTIC_REACT_CONFIG__, target } from '../../shared/const.js';
 import { DEFAULT_TOOLKIT_ICON_DATA_URL } from '../../shared/default_toolkit_icon.js';
 import { SOURCE_LOOKUP_PATH } from '../../shared/protocol.js';
 import {
-  buildSelectionContextSummary,
   buildSelectionSourcePreview,
+  buildWebContextText,
 } from '../../shared/selection_context_format.js';
 import {
   buildBrowserSourceCandidates,
   isAllowedProjectSourcePath,
   normalizeSourceRoot,
+  toAbsoluteSourcePath,
 } from '../../shared/source_path.js';
 import type {
   SelectionContext,
@@ -69,7 +70,7 @@ const SELECTION_CONFIRMATION_MS = 1100;
 const SELECTION_STYLE_ID = 'agentic-react-selection-styles';
 const CONTRAST_LIGHT = 'rgba(255, 255, 255, 0.98)';
 const CONTRAST_DARK = 'rgba(15, 23, 42, 0.98)';
-const SELECTED_LABEL_MAX_LENGTH = 64;
+const SELECTED_LABEL_MAX_LENGTH = 96;
 
 interface RgbaColor {
   r: number;
@@ -475,8 +476,13 @@ const buildSelectedElementLabel = (
   );
 };
 
+const getSourceRoot = (): string | undefined =>
+  target[__AGENTIC_REACT_CONFIG__]?.sourceRoot;
+
 const toTextContext = (selectionContext: SelectionContext): string =>
-  buildSelectionContextSummary(selectionContext);
+  buildWebContextText(selectionContext, {
+    sourceRoot: getSourceRoot(),
+  });
 
 const copyText = async (text: string): Promise<boolean> => {
   if (target.navigator?.clipboard?.writeText) {
@@ -573,7 +579,7 @@ const createOverlayActions = (): OverlayActionElements => {
 };
 
 const getNormalizedSourceRoot = (): string =>
-  normalizeSourceRoot(target.__AGENTIC_REACT_CONFIG__?.sourceRoot);
+  normalizeSourceRoot(getSourceRoot());
 
 const extractRawSourceFromViteModule = (moduleText: string): string | null => {
   const trimmedText = moduleText.trim();
@@ -912,7 +918,7 @@ export const createSelectionToolkit = (
   hoverLabelElement.setAttribute('data-agentic-react-hover-label', 'true');
   hoverLabelElement.style.position = 'absolute';
   hoverLabelElement.style.pointerEvents = 'none';
-  hoverLabelElement.style.maxWidth = 'min(260px, calc(100vw - 24px))';
+  hoverLabelElement.style.maxWidth = 'min(420px, calc(100vw - 24px))';
   hoverLabelElement.style.overflow = 'hidden';
   hoverLabelElement.style.textOverflow = 'ellipsis';
   hoverLabelElement.style.whiteSpace = 'nowrap';
@@ -1303,8 +1309,8 @@ export const createSelectionToolkit = (
     labelElement.dataset.align = 'left';
     labelElement.style.maxWidth = `${Math.max(
       80,
-      Math.min(260, window.innerWidth - 24, window.innerWidth - rect.left - 12),
-    )}px`;
+        Math.min(420, window.innerWidth - 24, window.innerWidth - rect.left - 12),
+      )}px`;
   };
 
   const closeTuningModal = () => {
@@ -1524,8 +1530,29 @@ export const createSelectionToolkit = (
       hoverLabelRequestId += 1;
       const requestId = hoverLabelRequestId;
       void buildSelectionContextForElement(element)
-        .then(enrichSelectionContextSourceLocation)
         .then((selectionContext) => {
+          if (
+            requestId !== hoverLabelRequestId ||
+            hoverLabelTargetElement !== element ||
+            hoverElement.style.display === 'none'
+          ) {
+            return null;
+          }
+
+          updateOverlayLabelForElement(
+            hoverLabelElement,
+            element,
+            element.getBoundingClientRect(),
+            selectionContext,
+          );
+
+          return enrichSelectionContextSourceLocation(selectionContext);
+        })
+        .then((selectionContext) => {
+          if (!selectionContext) {
+            return;
+          }
+
           if (
             requestId !== hoverLabelRequestId ||
             hoverLabelTargetElement !== element ||
@@ -2084,7 +2111,11 @@ export const createSelectionToolkit = (
           }
 
           sourceSnippets.push({
-            filePath: resolvedSource.filePath,
+            filePath:
+              toAbsoluteSourcePath(
+                resolvedSource.filePath,
+                normalizedSourceRoot,
+              ) ?? resolvedSource.filePath,
             startLine: snippetPayload.startLine,
             endLine: snippetPayload.endLine,
             snippet: snippetPayload.snippet,
