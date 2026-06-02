@@ -219,7 +219,7 @@ const handleBridgeRequest = async (event, payload) => {
 
     case 'get-component-tree': {
       return JSON.stringify(
-        target.__AGENTIC_REACT_TOOLS__.getComponentTree(payload || {}),
+        await target.__AGENTIC_REACT_TOOLS__.getComponentTree(payload || {}),
       );
     }
 
@@ -236,7 +236,7 @@ const handleBridgeRequest = async (event, payload) => {
 
     case 'get-unnecessary-rerenders': {
       const wastedRenders =
-        target.__AGENTIC_REACT_TOOLS__.getUnnecessaryRenderedComponents(
+        await target.__AGENTIC_REACT_TOOLS__.getUnnecessaryRenderedComponents(
           payload?.timeframe,
           {
             allComponents: Boolean(payload?.allComponents),

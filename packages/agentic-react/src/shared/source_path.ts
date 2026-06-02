@@ -142,6 +142,60 @@ const toViteFsUrl = (fileSystemPath: string): string =>
     ? `/@fs${fileSystemPath}`
     : `/@fs/${fileSystemPath}`;
 
+const joinNormalizedPath = (basePath: string, childPath: string): string =>
+  `${basePath.replace(/\/$/, '')}/${childPath.replace(/^\//, '')}`;
+
+export const toAbsoluteSourcePath = (
+  filePath: string,
+  sourceRoot?: string,
+): string | null => {
+  const normalizedSourceRoot = normalizeSourceRoot(sourceRoot);
+  const classifiedPath = classifySourcePath(filePath, normalizedSourceRoot);
+
+  if (!classifiedPath.isSourceFile || !classifiedPath.withinSourceRoot) {
+    return null;
+  }
+
+  if (classifiedPath.kind === 'vite-fs') {
+    return classifiedPath.normalizedPath.slice('/@fs'.length);
+  }
+
+  if (classifiedPath.kind === 'fs-absolute') {
+    return classifiedPath.normalizedPath;
+  }
+
+  if (!normalizedSourceRoot) {
+    return null;
+  }
+
+  if (classifiedPath.kind === 'vite-root-relative') {
+    return joinNormalizedPath(
+      normalizedSourceRoot,
+      classifiedPath.normalizedPath,
+    );
+  }
+
+  if (classifiedPath.kind === 'project-relative') {
+    const sanitizedPath = classifiedPath.normalizedPath
+      .replace(/^\.?\//, '')
+      .replace(/\/\.\//g, '/');
+    const sourceRootName = normalizedSourceRoot.split('/').filter(Boolean).pop();
+    if (
+      sourceRootName &&
+      sanitizedPath.startsWith(`${sourceRootName}/src/`)
+    ) {
+      return joinNormalizedPath(
+        normalizedSourceRoot,
+        sanitizedPath.slice(sourceRootName.length + 1),
+      );
+    }
+
+    return joinNormalizedPath(normalizedSourceRoot, sanitizedPath);
+  }
+
+  return null;
+};
+
 export const buildBrowserSourceCandidates = (
   filePath: string,
   sourceRoot?: string,

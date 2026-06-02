@@ -14,7 +14,7 @@ type AgenticReactTools = {
   getComponentTree: (options?: {
     allComponents?: boolean;
     debugMode?: boolean;
-  }) => unknown;
+  }) => Promise<unknown>;
   getComponentStates: (
     componentName: string,
     options?: { debugMode?: boolean },
@@ -25,7 +25,7 @@ type AgenticReactTools = {
       allComponents?: boolean;
       debugMode?: boolean;
     },
-  ) => WastedRenderFiberInfo[];
+  ) => Promise<WastedRenderFiberInfo[]>;
   registerCustomTool: (
     name: string,
     handler: (args: unknown) => ToolResultValue | Promise<ToolResultValue>,
@@ -51,7 +51,6 @@ type AgenticReactRuntime = {
 
 declare global {
   interface Window {
-    __REACT_COMPONENTS__: string[];
     __AGENTIC_REACT_CONFIG__?: AgenticReactConfig;
     __AGENTIC_REACT_BRIDGE_URL__?: string;
     __AGENTIC_REACT_TOOLS__: AgenticReactTools;

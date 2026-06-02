@@ -53,12 +53,6 @@ This repository publishes one npm package:
 pnpm install @jazelly/agentic-react -D
 ```
 
-You also need `@babel/preset-react` installed, as this plugin traverses AST to collect your React component names.
-
-```bash
-pnpm install @babel/preset-react -D
-```
-
 ### Vite
 
 ```ts
@@ -201,25 +195,24 @@ Vite Dev Server (Node.js)
 
 #### Step by step
 
-1. **Babel AST pass (build time)** — During Vite's `transform` hook, each `.js/.jsx/.ts/.tsx` file is parsed with `@babel/preset-react` to collect all user-defined React component names (function components, class components, `memo`/`forwardRef` wrappers, etc.). These names are stored and later injected into the page as `window.__REACT_COMPONENTS__`.
-
-2. **Browser-side injection (runtime)** — At dev startup, scripts are injected into the HTML `<head>`:
-   - The collected component names are set on `window.__REACT_COMPONENTS__`.
+1. **Browser-side injection (runtime)** — At dev startup, scripts are injected into the HTML `<head>`:
    - `overlay.js` is loaded as a module. It uses [bippy](https://github.com/nicholascostadev/bippy) to install a `__REACT_DEVTOOLS_GLOBAL_HOOK__` on `window`, giving direct access to the React fiber tree **without requiring the React DevTools browser extension**. It also hooks into React's commit lifecycle (`onCommitFiberRoot`) to continuously track fiber roots and detect unnecessary re-renders.
    - The overlay exposes all built-in tool functions (highlight, tree, states, re-renders) on `window.__AGENTIC_REACT_TOOLS__` and registers Vite HMR listeners (`import.meta.hot.on(...)`) for each tool.
 
-3. **MCP server (SSE transport)** — When the Vite dev server starts, the plugin attaches two HTTP endpoints:
+2. **MCP server (SSE transport)** — When the Vite dev server starts, the plugin attaches two HTTP endpoints:
    - `GET /sse` — Establishes a long-lived Server-Sent Events connection with the MCP client.
    - `POST /messages?sessionId=<id>` — Receives JSON-RPC tool-call requests from the MCP client.
 
    The MCP server advertises all built-in and custom tools (with JSON Schema descriptions derived from their Zod schemas) so any MCP-compatible client can discover and invoke them.
 
-4. **Tool call flow** — When an MCP client invokes a tool (e.g. `highlight-component`):
+3. **Tool call flow** — When an MCP client invokes a tool (e.g. `highlight-component`):
    1. The MCP server receives the JSON-RPC request via the `/messages` endpoint.
    2. It validates the arguments against the tool's Zod schema.
    3. It sends a custom event through Vite's HMR WebSocket to the browser (e.g. `highlight-component` with the serialized args).
    4. The browser-side HMR listener picks up the event, executes the tool function against the live React fiber tree, and sends the result back via another HMR event (e.g. `highlight-component-response`).
    5. The MCP server awaits this response, wraps it in a JSON-RPC result, and streams it back to the MCP client over SSE.
+
+4. **Project ownership** — Component tree filtering, wasted-render filtering, and selection source lookup resolve ownership from React fiber source metadata. If a component resolves to source inside the app rather than dependency/internal code, Agentic React treats it as project-owned.
 
 5. **Custom tools** — User-defined tools follow the same browser-runtime round trip, so browser-only handlers run in the page instead of the Node dev server. Their handler functions are registered in the browser at startup via dynamic `import()` or inline injection, and corresponding runtime listeners are created automatically.
 

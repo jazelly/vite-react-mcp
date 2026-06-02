@@ -4,19 +4,82 @@ import type {
   SelectionSourceSnippet,
   SelectionSourceTraceFrame,
 } from './types.js';
+import { toAbsoluteSourcePath } from './source_path.js';
 
-const formatDisplayFilePath = (filePath: string): string =>
-  filePath.startsWith('/src/') ? filePath.slice(1) : filePath;
+export const WEB_CONTEXT_TAG = 'web_context';
+export const WEB_CONTEXT_TYPE_REACT_COMPONENT_LOCATION =
+  'react_component_location';
 
-const formatSourceLocation = (source: SelectionResolvedSource): string => {
-  const filePath = formatDisplayFilePath(source.filePath);
+interface SelectionContextFormatOptions {
+  sourceRoot?: string;
+}
+
+const getPrimarySource = (
+  selectionContext: SelectionContext,
+): SelectionResolvedSource | SelectionSourceTraceFrame | null =>
+  selectionContext.resolvedSources[0] ??
+  selectionContext.externalComponent?.usedBy ??
+  selectionContext.sourceTrace.find((frame) => frame.kind === 'project') ??
+  null;
+
+export const buildWebContextText = (
+  selectionContext: SelectionContext,
+  options: SelectionContextFormatOptions = {},
+): string => {
+  const lines: string[] = [];
+  const componentName =
+    selectionContext.componentName ||
+    selectionContext.externalComponent?.componentName;
+  const primarySource = getPrimarySource(selectionContext);
+  const source = primarySource
+    ? formatSourceLocation(primarySource, options)
+    : null;
+  const details = buildSelectionContextSummary(selectionContext, options);
+
+  if (componentName) {
+    lines.push(`component: ${componentName}`);
+  }
+
+  if (selectionContext.selector) {
+    lines.push(`selector: ${selectionContext.selector}`);
+  }
+
+  if (source) {
+    lines.push(`source: ${source}`);
+  }
+
+  if (details) {
+    lines.push('', 'details:', details);
+  }
+
+  return `<${WEB_CONTEXT_TAG} type="${WEB_CONTEXT_TYPE_REACT_COMPONENT_LOCATION}">\n${lines.join('\n')}\n</${WEB_CONTEXT_TAG}>`;
+};
+
+const formatDisplayFilePath = (
+  filePath: string,
+  options: SelectionContextFormatOptions = {},
+): string =>
+  toAbsoluteSourcePath(filePath, options.sourceRoot) ??
+  (filePath.startsWith('/src/') ? filePath.slice(1) : filePath);
+
+const formatSourceLocation = (
+  source: Pick<
+    SelectionResolvedSource,
+    'filePath' | 'lineNumber' | 'columnNumber'
+  >,
+  options: SelectionContextFormatOptions = {},
+): string => {
+  const filePath = formatDisplayFilePath(source.filePath, options);
   const line = source.lineNumber != null ? `:${source.lineNumber}` : '';
   const column = source.columnNumber != null ? `:${source.columnNumber}` : '';
   return `${filePath}${line}${column}`;
 };
 
-const formatComponentSourceLine = (source: SelectionResolvedSource): string => {
-  const location = formatSourceLocation(source);
+const formatComponentSourceLine = (
+  source: SelectionResolvedSource,
+  options: SelectionContextFormatOptions = {},
+): string => {
+  const location = formatSourceLocation(source, options);
   return source.componentName
     ? `  in ${source.componentName} (at ${location})`
     : `  in ${location}`;
@@ -24,6 +87,7 @@ const formatComponentSourceLine = (source: SelectionResolvedSource): string => {
 
 const formatExternalComponentLine = (
   selectionContext: SelectionContext,
+  options: SelectionContextFormatOptions = {},
 ): string | null => {
   const externalComponent = selectionContext.externalComponent;
   if (!externalComponent) {
@@ -35,24 +99,28 @@ const formatExternalComponentLine = (
     : '';
   const usedBy = externalComponent.usedBy;
   const usedByText = usedBy
-    ? ` used by ${usedBy.componentName ?? 'local component'} at ${formatSourceLocation(usedBy)}`
+    ? ` used by ${usedBy.componentName ?? 'local component'} at ${formatSourceLocation(usedBy, options)}`
     : '';
 
   return `selected external component: <${externalComponent.componentName}>${packageName}${usedByText}`;
 };
 
-const formatSourceSnippet = (sourceSnippet: SelectionSourceSnippet): string =>
+const formatSourceSnippet = (
+  sourceSnippet: SelectionSourceSnippet,
+  options: SelectionContextFormatOptions = {},
+): string =>
   [
-    `Source (${formatDisplayFilePath(sourceSnippet.filePath)}:${sourceSnippet.startLine}-${sourceSnippet.endLine})`,
+    `Source (${formatDisplayFilePath(sourceSnippet.filePath, options)}:${sourceSnippet.startLine}-${sourceSnippet.endLine})`,
     sourceSnippet.snippet,
   ].join('\n');
 
 const formatTraceFrameLine = (
   traceFrame: SelectionSourceTraceFrame,
   index: number,
+  options: SelectionContextFormatOptions = {},
 ): string => {
   const arrow = index === 0 ? '  ' : '  -> ';
-  const location = formatSourceLocation(traceFrame);
+  const location = formatSourceLocation(traceFrame, options);
   const componentName = traceFrame.componentName
     ? `<${traceFrame.componentName}>`
     : '<unknown>';
@@ -72,19 +140,21 @@ const formatTraceFrameLine = (
 
 const buildSourceTracePreview = (
   sourceTrace: SelectionSourceTraceFrame[],
+  options: SelectionContextFormatOptions = {},
 ): string => {
   if (sourceTrace.length === 0) return '';
 
   return [
     'source trace:',
     ...sourceTrace.map((traceFrame, index) =>
-      formatTraceFrameLine(traceFrame, index),
+      formatTraceFrameLine(traceFrame, index, options),
     ),
   ].join('\n');
 };
 
 export const buildComponentSourceChain = (
   resolvedSources: SelectionResolvedSource[],
+  options: SelectionContextFormatOptions = {},
 ): string => {
   const lines: string[] = [];
   const seenSourceKeys = new Set<string>();
@@ -100,7 +170,7 @@ export const buildComponentSourceChain = (
     }
 
     seenSourceKeys.add(sourceKey);
-    lines.push(formatComponentSourceLine(source));
+    lines.push(formatComponentSourceLine(source, options));
   }
 
   return lines.join('\n');
@@ -108,17 +178,23 @@ export const buildComponentSourceChain = (
 
 export const buildSelectionSourcePreview = (
   selectionContext: SelectionContext,
+  options: SelectionContextFormatOptions = {},
 ): string | null => {
   const snippetText = selectionContext.sourceSnippets
-    .map(formatSourceSnippet)
+    .map((sourceSnippet) => formatSourceSnippet(sourceSnippet, options))
     .join('\n\n');
   const sourceChain = buildComponentSourceChain(
     selectionContext.resolvedSources,
+    options,
   );
   const sourceTrace = buildSourceTracePreview(
     selectionContext.sourceTrace ?? [],
+    options,
   );
-  const externalComponentLine = formatExternalComponentLine(selectionContext);
+  const externalComponentLine = formatExternalComponentLine(
+    selectionContext,
+    options,
+  );
   const shouldUseSourceTrace =
     Boolean(externalComponentLine) ||
     Boolean(
@@ -139,11 +215,13 @@ export const buildSelectionSourcePreview = (
 
 export const buildSelectionContextSummary = (
   selectionContext: SelectionContext,
+  options: SelectionContextFormatOptions = {},
 ): string => {
   const summaryLines: string[] = [];
   const sourcePreview =
-    selectionContext.sourcePreview ||
-    buildSelectionSourcePreview(selectionContext);
+    options.sourceRoot || !selectionContext.sourcePreview
+      ? buildSelectionSourcePreview(selectionContext, options)
+      : selectionContext.sourcePreview;
 
   if (sourcePreview) {
     summaryLines.push(sourcePreview);

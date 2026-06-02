@@ -544,7 +544,9 @@ const enrichSelectionContextSourceLocations = (
 
   return {
     ...nextSelectionContext,
-    sourcePreview: buildSelectionSourcePreview(nextSelectionContext),
+    sourcePreview: buildSelectionSourcePreview(nextSelectionContext, {
+      sourceRoot: rootDir,
+    }),
   };
 };
 
@@ -591,7 +593,7 @@ const enrichSelectionContextWithSnippets = (
 
     sourceSnippets.push({
       ...sourceSnippet,
-      filePath: sourceFilePath,
+      filePath: absoluteSourcePath,
     });
     seenFilePaths.add(sourceFilePath);
   }
@@ -602,6 +604,8 @@ const enrichSelectionContextWithSnippets = (
     sourcePreview: buildSelectionSourcePreview({
       ...enrichedSelectionContext,
       sourceSnippets,
+    }, {
+      sourceRoot: rootDir,
     }),
   };
 };
@@ -773,7 +777,9 @@ export function initMcpServer(
 
               return toTextResponse({
                 success: true,
-                summary: buildSelectionContextSummary(enrichedSelectionContext),
+                summary: buildSelectionContextSummary(enrichedSelectionContext, {
+                  sourceRoot: rootDir,
+                }),
                 context: enrichedSelectionContext,
               });
             }
@@ -838,7 +844,9 @@ export function initMcpServer(
               return toTextResponse({
                 success: true,
                 chosenMatch: response.chosenMatch,
-                summary: buildSelectionContextSummary(enrichedContext),
+                summary: buildSelectionContextSummary(enrichedContext, {
+                  sourceRoot: rootDir,
+                }),
                 context: enrichedContext,
               });
             }
