@@ -78,6 +78,18 @@ interface RgbaColor {
   a: number;
 }
 
+interface OverlayActionElements {
+  actionsElement: HTMLDivElement;
+  tuneButtonElement: HTMLButtonElement;
+  deleteButtonElement: HTMLButtonElement;
+}
+
+interface TuningSession {
+  element: Element;
+  selectionContext: SelectionContext;
+  setSelectionContext: (selectionContext: SelectionContext) => void;
+}
+
 const mergeToolkitConfig = (
   config: ToolkitConfig | undefined,
   nextConfig: Partial<ToolkitConfig> | undefined,
@@ -355,6 +367,58 @@ const formatComponentLocationLabel = (
     : componentLabel;
 };
 
+const buildTuningTargetLabel = (selectionContext: SelectionContext): string =>
+  formatComponentLocationLabel(
+    selectionContext.componentName ||
+      selectionContext.externalComponent?.componentName,
+    formatSourceLocationLabel(selectionContext),
+  ) ||
+  selectionContext.selector ||
+  'the selected element';
+
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value));
+
+const rgbStringToHex = (colorValue: string): string => {
+  const match = colorValue.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+  if (!match) return '#111827';
+
+  return `#${[match[1], match[2], match[3]]
+    .map((part) =>
+      clampNumber(Number(part), 0, 255).toString(16).padStart(2, '0'),
+    )
+    .join('')}`;
+};
+
+const hexToRgbString = (hexValue: string): string => {
+  const normalizedHex = hexValue.replace('#', '').trim();
+  if (!/^[0-9a-f]{6}$/i.test(normalizedHex)) return 'rgb(17, 24, 39)';
+
+  const red = Number.parseInt(normalizedHex.slice(0, 2), 16);
+  const green = Number.parseInt(normalizedHex.slice(2, 4), 16);
+  const blue = Number.parseInt(normalizedHex.slice(4, 6), 16);
+  return `rgb(${red}, ${green}, ${blue})`;
+};
+
+const hasTuneableText = (element: Element): boolean => {
+  const tagName = element.tagName.toLowerCase();
+  if (
+    /^(a|button|input|label|legend|option|p|span|strong|em|small|textarea|h[1-6])$/.test(
+      tagName,
+    )
+  ) {
+    return true;
+  }
+
+  if (getMeaningfulVisibleText(element)) {
+    return true;
+  }
+
+  return Array.from(element.children).some((childElement) =>
+    hasTuneableText(childElement),
+  );
+};
+
 const buildSelectedElementLabel = (
   element: Element,
   selectionContext?: SelectionContext | null,
@@ -437,6 +501,75 @@ const copyText = async (text: string): Promise<boolean> => {
   } catch (_error) {
     return false;
   }
+};
+
+const createOverlayIconButton = (
+  label: string,
+  iconPathMarkup: string,
+): HTMLButtonElement => {
+  const buttonElement = document.createElement('button');
+  const iconElement = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'svg',
+  );
+
+  buttonElement.setAttribute('type', 'button');
+  buttonElement.setAttribute('aria-label', label);
+  buttonElement.setAttribute('title', label);
+  buttonElement.style.width = '24px';
+  buttonElement.style.height = '24px';
+  buttonElement.style.border = '1px solid rgba(255, 255, 255, 0.86)';
+  buttonElement.style.borderRadius = '6px';
+  buttonElement.style.background = 'rgba(15, 23, 42, 0.96)';
+  buttonElement.style.color = '#ffffff';
+  buttonElement.style.display = 'inline-flex';
+  buttonElement.style.alignItems = 'center';
+  buttonElement.style.justifyContent = 'center';
+  buttonElement.style.padding = '0';
+  buttonElement.style.cursor = 'pointer';
+  buttonElement.style.pointerEvents = 'auto';
+
+  iconElement.setAttribute('viewBox', '0 0 24 24');
+  iconElement.setAttribute('width', '14');
+  iconElement.setAttribute('height', '14');
+  iconElement.setAttribute('fill', 'none');
+  iconElement.setAttribute('stroke', 'currentColor');
+  iconElement.setAttribute('stroke-width', '2');
+  iconElement.setAttribute('stroke-linecap', 'round');
+  iconElement.setAttribute('stroke-linejoin', 'round');
+  iconElement.setAttribute('aria-hidden', 'true');
+  iconElement.innerHTML = iconPathMarkup;
+  buttonElement.appendChild(iconElement);
+
+  return buttonElement;
+};
+
+const createOverlayActions = (): OverlayActionElements => {
+  const actionsElement = document.createElement('div');
+  const tuneButtonElement = createOverlayIconButton(
+    'Adjust selection',
+    '<path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>',
+  );
+  const deleteButtonElement = createOverlayIconButton(
+    'Delete selection',
+    '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
+  );
+
+  actionsElement.setAttribute('data-agentic-react-selected-actions', 'true');
+  actionsElement.style.position = 'absolute';
+  actionsElement.style.pointerEvents = 'auto';
+  actionsElement.style.display = 'inline-flex';
+  actionsElement.style.gap = '4px';
+  actionsElement.style.alignItems = 'center';
+
+  actionsElement.appendChild(tuneButtonElement);
+  actionsElement.appendChild(deleteButtonElement);
+
+  return {
+    actionsElement,
+    tuneButtonElement,
+    deleteButtonElement,
+  };
 };
 
 const getNormalizedSourceRoot = (): string =>
@@ -601,11 +734,18 @@ export const createSelectionToolkit = (
     'http://www.w3.org/2000/svg',
     'svg',
   );
+  const clearAllLabelElement = document.createElement('span');
   const statusElement = document.createElement('div');
   const hoverElement = document.createElement('div');
   const hoverLabelElement = document.createElement('div');
   const selectedElement = document.createElement('div');
   const selectedLabelElement = document.createElement('div');
+  const selectedActions = createOverlayActions();
+  const tuningModalElement = document.createElement('div');
+  const tuningPanelElement = document.createElement('div');
+  const tuningTitleElement = document.createElement('div');
+  const tuningBodyElement = document.createElement('div');
+  const tuningCloseButtonElement = document.createElement('button');
   const dimElements = Array.from({ length: 4 }, () =>
     document.createElement('div'),
   );
@@ -615,10 +755,12 @@ export const createSelectionToolkit = (
   let hoverLabelRequestId = 0;
   let dimHideTimeout: number | null = null;
   let selectedPulseTimeout: number | null = null;
+  let activeTuningSession: TuningSession | null = null;
   let multiSelectedOverlays: Array<{
     element: Element;
     overlayElement: HTMLDivElement;
     labelElement: HTMLDivElement;
+    actions: OverlayActionElements;
     selectionContext: SelectionContext;
     pulseTimeout: number | null;
   }> = [];
@@ -691,10 +833,7 @@ export const createSelectionToolkit = (
     clearAllButtonElement.setAttribute('type', 'button');
     clearAllButtonElement.setAttribute('aria-label', 'Clear all selections');
     clearAllButtonElement.setAttribute('title', 'Clear all selections');
-    clearAllButtonElement.setAttribute(
-      'data-agentic-react-clear-all',
-      'true',
-    );
+    clearAllButtonElement.setAttribute('data-agentic-react-clear-all', 'true');
     clearAllButtonElement.style.padding = '8px 12px';
     clearAllButtonElement.style.borderRadius = '8px';
     clearAllButtonElement.style.border = '1px solid rgba(255,255,255,0.2)';
@@ -702,11 +841,14 @@ export const createSelectionToolkit = (
     clearAllButtonElement.style.color = '#ffffff';
     clearAllButtonElement.style.cursor = 'pointer';
     clearAllButtonElement.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
-    clearAllButtonElement.style.minWidth = '42px';
+    clearAllButtonElement.style.minWidth = '96px';
     clearAllButtonElement.style.height = '34px';
     clearAllButtonElement.style.display = 'none';
     clearAllButtonElement.style.alignItems = 'center';
     clearAllButtonElement.style.justifyContent = 'center';
+    clearAllButtonElement.style.gap = '6px';
+    clearAllButtonElement.style.fontSize = '12px';
+    clearAllButtonElement.style.fontWeight = '600';
 
     clearAllIconElement.setAttribute('viewBox', '0 0 24 24');
     clearAllIconElement.setAttribute('width', '16');
@@ -719,7 +861,13 @@ export const createSelectionToolkit = (
     clearAllIconElement.setAttribute('aria-hidden', 'true');
     clearAllIconElement.innerHTML =
       '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>';
+
+    clearAllLabelElement.textContent = 'Clear all';
+    clearAllLabelElement.style.lineHeight = '1';
+    clearAllLabelElement.style.whiteSpace = 'nowrap';
+
     clearAllButtonElement.appendChild(clearAllIconElement);
+    clearAllButtonElement.appendChild(clearAllLabelElement);
   };
 
   createButton(selectButtonElement, 'Select');
@@ -775,6 +923,7 @@ export const createSelectionToolkit = (
   selectedElement.style.display = 'none';
   selectedElement.style.background = 'transparent';
   selectedElement.appendChild(selectedLabelElement);
+  selectedElement.appendChild(selectedActions.actionsElement);
 
   selectedLabelElement.setAttribute(
     'data-agentic-react-selected-label',
@@ -786,6 +935,49 @@ export const createSelectionToolkit = (
   selectedLabelElement.style.overflow = 'hidden';
   selectedLabelElement.style.textOverflow = 'ellipsis';
   selectedLabelElement.style.whiteSpace = 'nowrap';
+
+  tuningModalElement.setAttribute('data-agentic-react-tuning-modal', 'true');
+  tuningModalElement.style.position = 'fixed';
+  tuningModalElement.style.inset = '0';
+  tuningModalElement.style.display = 'none';
+  tuningModalElement.style.alignItems = 'center';
+  tuningModalElement.style.justifyContent = 'center';
+  tuningModalElement.style.background = 'rgba(15, 23, 42, 0.34)';
+  tuningModalElement.style.pointerEvents = 'auto';
+
+  tuningPanelElement.style.width = 'min(320px, calc(100vw - 32px))';
+  tuningPanelElement.style.background = '#ffffff';
+  tuningPanelElement.style.border = '1px solid rgba(15, 23, 42, 0.14)';
+  tuningPanelElement.style.borderRadius = '10px';
+  tuningPanelElement.style.boxShadow = '0 22px 60px rgba(15, 23, 42, 0.3)';
+  tuningPanelElement.style.padding = '12px';
+  tuningPanelElement.style.color = '#111827';
+  tuningPanelElement.style.fontFamily = 'ui-sans-serif, system-ui, sans-serif';
+
+  tuningTitleElement.style.fontSize = '13px';
+  tuningTitleElement.style.fontWeight = '700';
+  tuningTitleElement.style.marginBottom = '10px';
+
+  tuningBodyElement.style.display = 'flex';
+  tuningBodyElement.style.flexDirection = 'column';
+  tuningBodyElement.style.gap = '10px';
+
+  tuningCloseButtonElement.setAttribute('type', 'button');
+  tuningCloseButtonElement.setAttribute('aria-label', 'Close tuning options');
+  tuningCloseButtonElement.textContent = 'Close';
+  tuningCloseButtonElement.style.marginTop = '12px';
+  tuningCloseButtonElement.style.width = '100%';
+  tuningCloseButtonElement.style.padding = '8px 10px';
+  tuningCloseButtonElement.style.border = '1px solid rgba(15, 23, 42, 0.14)';
+  tuningCloseButtonElement.style.borderRadius = '8px';
+  tuningCloseButtonElement.style.background = '#f8fafc';
+  tuningCloseButtonElement.style.color = '#111827';
+  tuningCloseButtonElement.style.cursor = 'pointer';
+
+  tuningPanelElement.appendChild(tuningTitleElement);
+  tuningPanelElement.appendChild(tuningBodyElement);
+  tuningPanelElement.appendChild(tuningCloseButtonElement);
+  tuningModalElement.appendChild(tuningPanelElement);
 
   for (const dimElement of dimElements) {
     dimElement.setAttribute('data-agentic-react-dim', 'true');
@@ -813,14 +1005,15 @@ export const createSelectionToolkit = (
           0 0 0 9px var(--agentic-react-selection-accent, #111827),
           0 16px 38px rgba(15, 23, 42, 0.22);
         transform-origin: center;
-        animation: agentic-react-selected-idle-pulse 1500ms ease-in-out infinite;
+        animation: agentic-react-selected-idle-pulse 2200ms cubic-bezier(0.37, 0, 0.63, 1) infinite;
+        backface-visibility: hidden;
         will-change: transform, box-shadow;
       }
 
       [data-agentic-react-selected-label="true"],
       [data-agentic-react-hover-label="true"] {
         box-sizing: border-box;
-        right: 0;
+        left: 0;
         bottom: calc(100% + 6px);
         padding: 4px 6px;
         border: 1px solid rgba(255, 255, 255, 0.86);
@@ -846,8 +1039,12 @@ export const createSelectionToolkit = (
 
       [data-agentic-react-selected-label="true"][data-align="left"],
       [data-agentic-react-hover-label="true"][data-align="left"] {
-        right: auto;
         left: 0;
+      }
+
+      [data-agentic-react-selected-actions="true"] {
+        right: 0;
+        bottom: calc(100% + 6px);
       }
 
       [data-agentic-react-hover="true"] {
@@ -861,7 +1058,8 @@ export const createSelectionToolkit = (
           0 12px 30px rgba(15, 23, 42, 0.2);
         transform: translateZ(0);
         transform-origin: center;
-        animation: agentic-react-hover-pulse 1300ms ease-in-out infinite;
+        animation: agentic-react-hover-pulse 2000ms cubic-bezier(0.37, 0, 0.63, 1) infinite;
+        backface-visibility: hidden;
         will-change: transform, box-shadow;
       }
 
@@ -890,7 +1088,7 @@ export const createSelectionToolkit = (
       }
 
       [data-agentic-react-selected="true"].agentic-react-selection-pulse {
-        animation: agentic-react-selection-pulse ${SELECTION_CONFIRMATION_MS}ms cubic-bezier(0.2, 0.9, 0.2, 1);
+        animation: agentic-react-selection-pulse ${SELECTION_CONFIRMATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1);
       }
 
       @keyframes agentic-react-selected-idle-pulse {
@@ -903,21 +1101,21 @@ export const createSelectionToolkit = (
             0 0 0 9px var(--agentic-react-selection-accent, #111827),
             0 16px 38px rgba(15, 23, 42, 0.22);
         }
-        45% {
-          transform: scale(1.014);
+        42% {
+          transform: scale(1.009);
           box-shadow:
             0 0 0 3px rgba(15, 23, 42, 0.98),
-            0 0 0 7px rgba(255, 255, 255, 0.98),
-            0 0 0 12px var(--agentic-react-selection-accent, #111827),
-            0 18px 42px rgba(15, 23, 42, 0.26);
+            0 0 0 7px rgba(255, 255, 255, 0.97),
+            0 0 0 11px var(--agentic-react-selection-accent, #111827),
+            0 17px 40px rgba(15, 23, 42, 0.24);
         }
-        72% {
-          transform: scale(0.996);
+        70% {
+          transform: scale(0.999);
           box-shadow:
             0 0 0 2px rgba(15, 23, 42, 0.96),
-            0 0 0 5px rgba(255, 255, 255, 0.92),
+            0 0 0 6px rgba(255, 255, 255, 0.94),
             0 0 0 8px var(--agentic-react-selection-accent, #111827),
-            0 14px 34px rgba(15, 23, 42, 0.2);
+            0 15px 36px rgba(15, 23, 42, 0.21);
         }
       }
 
@@ -931,21 +1129,21 @@ export const createSelectionToolkit = (
             inset 0 0 0 1px rgba(255, 255, 255, 0.18),
             0 12px 30px rgba(15, 23, 42, 0.2);
         }
-        42% {
-          transform: translateZ(0) scale(1.018);
+        44% {
+          transform: translateZ(0) scale(1.01);
           box-shadow:
             0 0 0 3px var(--agentic-react-hover-outer, rgba(255, 255, 255, 0.98)),
-            0 0 0 8px var(--agentic-react-selection-accent, #111827),
+            0 0 0 7px var(--agentic-react-selection-accent, #111827),
             inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-            0 16px 36px rgba(15, 23, 42, 0.24);
+            0 14px 34px rgba(15, 23, 42, 0.22);
         }
-        68% {
-          transform: translateZ(0) scale(0.994);
+        72% {
+          transform: translateZ(0) scale(0.999);
           box-shadow:
             0 0 0 2px var(--agentic-react-hover-outer, rgba(255, 255, 255, 0.98)),
-            0 0 0 4px var(--agentic-react-selection-accent, #111827),
+            0 0 0 5px var(--agentic-react-selection-accent, #111827),
             inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-            0 10px 26px rgba(15, 23, 42, 0.18);
+            0 11px 28px rgba(15, 23, 42, 0.19);
         }
       }
 
@@ -958,21 +1156,21 @@ export const createSelectionToolkit = (
             0 0 0 9px var(--agentic-react-selection-accent, #111827),
             0 16px 38px rgba(15, 23, 42, 0.22);
         }
-        36% {
-          transform: scale(1.026);
+        38% {
+          transform: scale(1.018);
           box-shadow:
             0 0 0 3px rgba(15, 23, 42, 0.98),
             0 0 0 8px rgba(255, 255, 255, 0.98),
-            0 0 0 15px var(--agentic-react-selection-accent, #111827),
-            0 20px 46px rgba(15, 23, 42, 0.28);
+            0 0 0 13px var(--agentic-react-selection-accent, #111827),
+            0 19px 44px rgba(15, 23, 42, 0.26);
         }
-        68% {
-          transform: scale(0.992);
+        72% {
+          transform: scale(0.998);
           box-shadow:
             0 0 0 2px rgba(15, 23, 42, 0.96),
-            0 0 0 5px rgba(255, 255, 255, 0.92),
-            0 0 0 7px var(--agentic-react-selection-accent, #111827),
-            0 14px 34px rgba(15, 23, 42, 0.2);
+            0 0 0 6px rgba(255, 255, 255, 0.94),
+            0 0 0 8px var(--agentic-react-selection-accent, #111827),
+            0 15px 36px rgba(15, 23, 42, 0.21);
         }
         100% {
           transform: scale(1);
@@ -1102,15 +1300,138 @@ export const createSelectionToolkit = (
       selectionContext,
       componentNameOverride,
     );
-    labelElement.dataset.align = rect.right < 140 ? 'left' : 'right';
+    labelElement.dataset.align = 'left';
     labelElement.style.maxWidth = `${Math.max(
       80,
-      Math.min(
-        260,
-        window.innerWidth - 24,
-        rect.right < 140 ? window.innerWidth - rect.left - 12 : rect.right - 12,
-      ),
+      Math.min(260, window.innerWidth - 24, window.innerWidth - rect.left - 12),
     )}px`;
+  };
+
+  const closeTuningModal = () => {
+    activeTuningSession = null;
+    tuningModalElement.style.display = 'none';
+    tuningBodyElement.replaceChildren();
+  };
+
+  const addTuningPrompt = (prompt: string) => {
+    if (!activeTuningSession) return;
+
+    const nextTuningPrompts = [
+      ...(activeTuningSession.selectionContext.tuningPrompts || []),
+      prompt,
+    ];
+    const nextSelectionContext = {
+      ...activeTuningSession.selectionContext,
+      tuningPrompts: nextTuningPrompts,
+    };
+
+    activeTuningSession.selectionContext = nextSelectionContext;
+    activeTuningSession.setSelectionContext(nextSelectionContext);
+    updateStatus(`Added tuning prompt: ${prompt}`);
+  };
+
+  const createTuningRow = (
+    labelText: string,
+    inputElement: HTMLInputElement,
+  ) => {
+    const rowElement = document.createElement('label');
+    const labelElement = document.createElement('span');
+
+    rowElement.style.display = 'flex';
+    rowElement.style.alignItems = 'center';
+    rowElement.style.justifyContent = 'space-between';
+    rowElement.style.gap = '12px';
+    rowElement.style.fontSize = '12px';
+    rowElement.style.fontWeight = '600';
+
+    labelElement.textContent = labelText;
+    inputElement.setAttribute('aria-label', labelText);
+    inputElement.style.maxWidth = '136px';
+
+    rowElement.appendChild(labelElement);
+    rowElement.appendChild(inputElement);
+    return rowElement;
+  };
+
+  const openTuningModal = (session: TuningSession) => {
+    activeTuningSession = session;
+    tuningBodyElement.replaceChildren();
+
+    const computedStyle = window.getComputedStyle(session.element);
+    const targetLabel = buildTuningTargetLabel(session.selectionContext);
+    const supportsTextTuning = hasTuneableText(session.element);
+    const supportsBackgroundTuning = session.element instanceof HTMLElement;
+
+    tuningTitleElement.textContent = `Tune ${targetLabel}`;
+
+    if (supportsTextTuning) {
+      const textColorInputElement = document.createElement('input');
+      textColorInputElement.type = 'color';
+      textColorInputElement.name = 'text-color';
+      textColorInputElement.value = rgbStringToHex(computedStyle.color);
+      textColorInputElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} text color to ${hexToRgbString(
+            textColorInputElement.value,
+          )}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Text color', textColorInputElement),
+      );
+
+      const fontSizeInputElement = document.createElement('input');
+      fontSizeInputElement.type = 'number';
+      fontSizeInputElement.name = 'font-size';
+      fontSizeInputElement.min = '8';
+      fontSizeInputElement.max = '72';
+      fontSizeInputElement.step = '1';
+      fontSizeInputElement.value = String(
+        Math.round(Number.parseFloat(computedStyle.fontSize) || 16),
+      );
+      fontSizeInputElement.addEventListener('change', () => {
+        const fontSize = clampNumber(
+          Number(fontSizeInputElement.value) || 16,
+          8,
+          72,
+        );
+        fontSizeInputElement.value = String(fontSize);
+        addTuningPrompt(`Change ${targetLabel} font size to ${fontSize}px.`);
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Font size', fontSizeInputElement),
+      );
+    }
+
+    if (supportsBackgroundTuning) {
+      const backgroundColorInputElement = document.createElement('input');
+      backgroundColorInputElement.type = 'color';
+      backgroundColorInputElement.name = 'background-color';
+      backgroundColorInputElement.value = rgbStringToHex(
+        computedStyle.backgroundColor,
+      );
+      backgroundColorInputElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} background color to ${hexToRgbString(
+            backgroundColorInputElement.value,
+          )}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Background color', backgroundColorInputElement),
+      );
+    }
+
+    if (!supportsTextTuning && !supportsBackgroundTuning) {
+      const emptyElement = document.createElement('div');
+      emptyElement.textContent = 'No tuning options available.';
+      emptyElement.style.fontSize = '12px';
+      emptyElement.style.color = '#475569';
+      tuningBodyElement.appendChild(emptyElement);
+    }
+
+    tuningModalElement.style.zIndex = String(toolkitConfig.zIndex + 1);
+    tuningModalElement.style.display = 'flex';
   };
 
   const hideDimOverlay = () => {
@@ -1246,6 +1567,7 @@ export const createSelectionToolkit = (
   ) => {
     const overlayElement = document.createElement('div');
     const labelElement = document.createElement('div');
+    const actions = createOverlayActions();
 
     overlayElement.setAttribute('data-agentic-react-selected', 'true');
     overlayElement.setAttribute('data-agentic-react-multi-selected', 'true');
@@ -1268,15 +1590,45 @@ export const createSelectionToolkit = (
     labelElement.style.whiteSpace = 'nowrap';
 
     overlayElement.appendChild(labelElement);
+    overlayElement.appendChild(actions.actionsElement);
     document.body.appendChild(overlayElement);
 
-    return {
+    const overlay = {
       element,
       overlayElement,
       labelElement,
+      actions,
       selectionContext,
       pulseTimeout: null,
     };
+
+    actions.tuneButtonElement.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openTuningModal({
+        element,
+        selectionContext: overlay.selectionContext,
+        setSelectionContext: (nextSelectionContext) => {
+          multiSelectionContexts = multiSelectionContexts.map((context) =>
+            context === overlay.selectionContext
+              ? nextSelectionContext
+              : context,
+          );
+          overlay.selectionContext = nextSelectionContext;
+        },
+      });
+    });
+
+    actions.deleteButtonElement.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      removeMultiSelectedOverlay(overlay);
+      updateStatus(
+        `${multiSelectionContexts.length} selected. Continue selecting or click Done.`,
+      );
+    });
+
+    return overlay;
   };
 
   const updateMultiSelectedOverlay = (
@@ -1348,9 +1700,28 @@ export const createSelectionToolkit = (
     multiSelectedOverlays = [];
   };
 
+  const removeMultiSelectedOverlay = (
+    overlay: (typeof multiSelectedOverlays)[number],
+  ) => {
+    if (overlay.pulseTimeout !== null) {
+      window.clearTimeout(overlay.pulseTimeout);
+    }
+    overlay.overlayElement.remove();
+    multiSelectedOverlays = multiSelectedOverlays.filter(
+      (candidateOverlay) => candidateOverlay !== overlay,
+    );
+    multiSelectionContexts = multiSelectionContexts.filter(
+      (selectionContext) =>
+        selectionContext !== overlay.selectionContext &&
+        selectionContext.selector !== overlay.selectionContext.selector,
+    );
+    renderMultiSelectionControls();
+  };
+
   const clearMultiSelections = () => {
     multiSelectionContexts = [];
     clearMultiSelectedOverlays();
+    closeTuningModal();
     renderMultiSelectionControls();
   };
 
@@ -1423,12 +1794,23 @@ export const createSelectionToolkit = (
 
   const isToolkitElement = (element: Element) =>
     toolkitRootElement.contains(element) ||
+    tuningModalElement.contains(element) ||
     hoverElement.contains(element) ||
     selectedElement.contains(element) ||
     multiSelectedOverlays.some(({ overlayElement }) =>
       overlayElement.contains(element),
     ) ||
     dimElements.some((dimElement) => dimElement.contains(element));
+
+  const isToolkitNode = (node: Node) =>
+    toolkitRootElement.contains(node) ||
+    tuningModalElement.contains(node) ||
+    hoverElement.contains(node) ||
+    selectedElement.contains(node) ||
+    multiSelectedOverlays.some(({ overlayElement }) =>
+      overlayElement.contains(node),
+    ) ||
+    dimElements.some((dimElement) => dimElement.contains(node));
 
   const getSelectableElement = (clientX: number, clientY: number) =>
     getSelectableElementAtPosition(clientX, clientY, isToolkitElement);
@@ -1455,10 +1837,7 @@ export const createSelectionToolkit = (
       return;
     }
 
-    if (
-      clickTarget instanceof Node &&
-      toolkitRootElement.contains(clickTarget)
-    ) {
+    if (clickTarget instanceof Node && isToolkitNode(clickTarget)) {
       return;
     }
 
@@ -1497,7 +1876,14 @@ export const createSelectionToolkit = (
         selectionContext.selector ? ` (${selectionContext.selector})` : ''
       }`;
       if (isMultiSelectionMode) {
-        multiSelectionContexts.push(selectionContext);
+        const existingSelectionIndex = multiSelectionContexts.findIndex(
+          (context) => context.selector === selectionContext.selector,
+        );
+        if (existingSelectionIndex >= 0) {
+          multiSelectionContexts[existingSelectionIndex] = selectionContext;
+        } else {
+          multiSelectionContexts.push(selectionContext);
+        }
         renderMultiSelectionControls();
         updateStatus(
           `Added ${capturedSelectionLabel}. ${multiSelectionContexts.length} selected. Click Done to copy all.`,
@@ -1591,6 +1977,7 @@ export const createSelectionToolkit = (
       'aria-label',
       'Open Agentic React toolkit',
     );
+    closeTuningModal();
     hideHoverOverlay();
     hideDimOverlay();
     clearSelectableElementCache();
@@ -1614,6 +2001,7 @@ export const createSelectionToolkit = (
     toolkitRootElement.style.display = 'none';
     exitSelectionMode();
     hideSelectedOverlay();
+    closeTuningModal();
   };
 
   const setToolkitConfig = (config: Partial<ToolkitConfig>) => {
@@ -1802,6 +2190,43 @@ export const createSelectionToolkit = (
     };
   };
 
+  selectedActions.tuneButtonElement.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!selectedTargetElement || !lastSelectionContext) {
+      updateStatus('No selection to adjust.');
+      return;
+    }
+
+    openTuningModal({
+      element: selectedTargetElement,
+      selectionContext: lastSelectionContext,
+      setSelectionContext: (nextSelectionContext) => {
+        lastSelectionContext = nextSelectionContext;
+      },
+    });
+  });
+
+  selectedActions.deleteButtonElement.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    lastSelectionContext = null;
+    hideSelectedOverlay();
+    hideDimOverlay();
+    closeTuningModal();
+    updateStatus('Cleared selected context.');
+  });
+
+  tuningCloseButtonElement.addEventListener('click', () => {
+    closeTuningModal();
+  });
+
+  tuningModalElement.addEventListener('click', (event) => {
+    if (event.target === tuningModalElement) {
+      closeTuningModal();
+    }
+  });
+
   launcherButtonElement.addEventListener('click', () => {
     togglePanel();
   });
@@ -1882,6 +2307,9 @@ export const createSelectionToolkit = (
     }
     if (!selectedElement.isConnected) {
       document.body.appendChild(selectedElement);
+    }
+    if (!tuningModalElement.isConnected) {
+      document.body.appendChild(tuningModalElement);
     }
     return true;
   };

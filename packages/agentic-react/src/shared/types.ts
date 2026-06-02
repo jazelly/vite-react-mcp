@@ -84,6 +84,7 @@ export interface SelectionContext {
   resolvedSources: SelectionResolvedSource[];
   sourceTrace: SelectionSourceTraceFrame[];
   sourceSnippets: SelectionSourceSnippet[];
+  tuningPrompts?: string[];
   capturedAt: number;
 }
 
