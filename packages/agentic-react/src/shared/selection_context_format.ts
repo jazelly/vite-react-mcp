@@ -155,6 +155,15 @@ export const buildSelectionContextSummary = (
     summaryLines.push(`component: ${selectionContext.componentName}`);
   }
 
+  if (selectionContext.tuningPrompts?.length) {
+    summaryLines.push(
+      [
+        'tuning prompts:',
+        ...selectionContext.tuningPrompts.map((prompt) => `- ${prompt}`),
+      ].join('\n'),
+    );
+  }
+
   if (selectionContext.selector) {
     summaryLines.push(`selector: ${selectionContext.selector}`);
   }

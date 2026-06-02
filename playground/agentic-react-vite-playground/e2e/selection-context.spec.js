@@ -176,6 +176,7 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   });
   await expect(doneButton).toBeVisible();
   await expect(clearAllButton).toBeVisible();
+  await expect(clearAllButton).toContainText('Clear all');
   await expect(clearAllButton).toBeDisabled();
 
   const doneStyles = await doneButton.evaluate((element) => {
@@ -231,6 +232,29 @@ test('toolkit multiselect appends selections and copies all on done', async ({
     page.locator('[data-agentic-react-multi-selected="true"]'),
   ).toHaveCount(2);
 
+  const multiSelectedOverlays = page.locator(
+    '[data-agentic-react-multi-selected="true"]',
+  );
+  await multiSelectedOverlays
+    .first()
+    .getByRole('button', { name: 'Adjust selection', exact: true })
+    .click({ force: true });
+  const tuningModal = page.locator('[data-agentic-react-tuning-modal="true"]');
+  await expect(tuningModal.getByLabel('Text color')).toBeVisible();
+  const textColorInput = tuningModal.locator('input[name="text-color"]');
+  await textColorInput.fill('#336699');
+  await textColorInput.dispatchEvent('change');
+  await expect(toolkitRoot).toContainText('rgb(51, 102, 153)');
+  await tuningModal
+    .getByRole('button', { name: 'Close tuning options', exact: true })
+    .click();
+
+  await multiSelectedOverlays
+    .nth(1)
+    .getByRole('button', { name: 'Delete selection', exact: true })
+    .click({ force: true });
+  await expect(multiSelectedOverlays).toHaveCount(1);
+
   await doneButton.click();
   await expect(
     page.locator('[data-agentic-react-multi-selected="true"]'),
@@ -241,8 +265,12 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   );
   expect(clipboardText).toContain('Selection 1');
   expect(clipboardText).toContain('selector: #profile-display-email-value');
-  expect(clipboardText).toContain('Selection 2');
-  expect(clipboardText).toContain('selector: #profile-header-occupation-value');
+  expect(clipboardText).toContain('tuning prompts:');
+  expect(clipboardText).toContain('text color to rgb(51, 102, 153).');
+  expect(clipboardText).not.toContain('Selection 2');
+  expect(clipboardText).not.toContain(
+    'selector: #profile-header-occupation-value',
+  );
 });
 
 test('copying the selected context includes a playground source snippet', async ({
