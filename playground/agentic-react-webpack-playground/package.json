@@ -13,7 +13,7 @@
     "@tabler/icons-react": "^3.43.0",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "@jazelly/agentic-react": "workspace:*"
+    "@agentic-react/webpack": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "7.27.4",

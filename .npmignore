@@ -1,5 +1,5 @@
-# Workspace-only files. The publishable package lives under
-# packages/agentic-react and uses its own package.json "files" allowlist.
+# Workspace-only files. Publishable packages live under packages/* and use
+# their own package.json "files" allowlists.
 playground/
 packages/
 scripts/

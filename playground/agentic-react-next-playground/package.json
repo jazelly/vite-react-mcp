@@ -13,7 +13,7 @@
     "next": "15.5.18",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "@jazelly/agentic-react": "workspace:*"
+    "@agentic-react/next": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1"

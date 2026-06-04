@@ -14,7 +14,7 @@ module.exports = composePlugins(
     const federatedModules = await withModuleFederation(
       moduleFederationConfig,
     );
-    const { default: withAgenticReactWebpack } = await import('@jazelly/agentic-react/webpack');
+    const { default: withAgenticReactWebpack } = await import('@agentic-react/webpack');
     const mergedConfig = replaceDefinePlugin(
       merge(federatedModules(config, nxContext), {
         devServer: {

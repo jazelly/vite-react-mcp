@@ -1,4 +1,4 @@
-import type { ToolResultValue } from '@jazelly/agentic-react';
+import type { ToolResultValue } from '@agentic-react/vite';
 
 export default function myCustomTool(args: {
   message: string;

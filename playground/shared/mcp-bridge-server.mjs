@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { URLSearchParams } from 'node:url';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { RuntimeBridgeServer, initMcpServer } from 'react-mcp';
+import { RuntimeBridgeServer, initMcpServer } from '@agentic-react/core';
 
 const port = Number(
   process.env.AGENTIC_REACT_SERVER_PORT || 51426,

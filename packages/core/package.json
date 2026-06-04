@@ -1,0 +1,84 @@
+{
+  "name": "@agentic-react/core",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Bundler-agnostic Agentic React runtime selection and MCP primitives",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "shx rm -rf dist && tsc && shx cp -r src/assets dist/assets && shx cp ../../CHANGELOG dist/CHANGELOG",
+    "build:src": "shx rm -rf dist && tsc --project tsconfig.json --outDir dist --rootDir src && shx cp -r src/assets dist/assets && shx cp ../../CHANGELOG dist/CHANGELOG"
+  },
+  "keywords": [
+    "agentic-react",
+    "react",
+    "mcp",
+    "visual-edit",
+    "agents",
+    "devtools",
+    "llm",
+    "runtime",
+    "selection"
+  ],
+  "author": {
+    "name": "jazelly",
+    "email": "xzha4350@gmail.com"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react-reconciler": "0.26.7"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "bippy": "^0.5.39",
+    "zod": "^3.22.4",
+    "zod-to-json-schema": "^3.23.5",
+    "ws": "^8.21.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge/server.d.ts",
+      "default": "./dist/bridge/server.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "default": "./dist/mcp/index.js"
+    },
+    "./overlay": {
+      "types": "./dist/overlay.d.ts",
+      "default": "./dist/overlay.js"
+    },
+    "./select": {
+      "types": "./dist/select.d.ts",
+      "default": "./dist/select.js"
+    },
+    "./shared/const": {
+      "types": "./dist/shared/const.d.ts",
+      "default": "./dist/shared/const.js"
+    },
+    "./shared/custom-tools-script": {
+      "types": "./dist/shared/custom_tools_script.d.ts",
+      "default": "./dist/shared/custom_tools_script.js"
+    },
+    "./shared/protocol": {
+      "types": "./dist/shared/protocol.d.ts",
+      "default": "./dist/shared/protocol.js"
+    },
+    "./shared/types": {
+      "types": "./dist/shared/types.d.ts",
+      "default": "./dist/shared/types.js"
+    }
+  }
+}
