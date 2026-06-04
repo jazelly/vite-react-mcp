@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import AgenticReact from '@jazelly/agentic-react';
+import AgenticReact from '@agentic-react/vite';
 import { z } from 'zod';
 import log1 from './tools/log1.js';
 

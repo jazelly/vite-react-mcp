@@ -29,7 +29,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.4.2",
-    "@jazelly/agentic-react": "workspace:*"
+    "@agentic-react/vite": "workspace:*"
   },
   "browserslist": {
     "production": [

@@ -251,18 +251,20 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   const tuningPanel = page.locator('[data-agentic-react-tuning-panel="true"]');
   await expect(tuningModal.getByLabel('Text color')).toBeVisible();
   await expect(tuningModal.getByLabel('Background')).toBeVisible();
-  await expect(tuningModal.getByLabel('Opacity')).toBeVisible();
-  await expect(tuningModal.getByLabel('Font', { exact: true })).toBeVisible();
+  await expect(tuningModal.getByLabel('Opacity', { exact: true })).toBeVisible();
+  await expect(
+    tuningModal.getByLabel('Font', { exact: true }),
+  ).toHaveCount(1);
   await expect(
     tuningModal.getByLabel('Font size', { exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(1);
   await expect(
     tuningModal.getByLabel('Font weight', { exact: true }),
-  ).toBeVisible();
-  await expect(tuningModal.getByLabel('Width')).toBeVisible();
-  await expect(tuningModal.getByLabel('Height')).toBeVisible();
-  await expect(tuningModal.getByLabel('Padding')).toBeVisible();
-  await expect(tuningModal.getByLabel('Margin')).toBeVisible();
+  ).toHaveCount(1);
+  await expect(tuningModal.getByLabel('Width', { exact: true })).toHaveCount(1);
+  await expect(tuningModal.getByLabel('Height', { exact: true })).toHaveCount(1);
+  await expect(tuningModal.getByLabel('Padding', { exact: true })).toHaveCount(1);
+  await expect(tuningModal.getByLabel('Margin', { exact: true })).toHaveCount(1);
   await expect(
     tuningModal.getByLabel('Describe custom tuning changes'),
   ).toBeVisible();
@@ -282,6 +284,8 @@ test('toolkit multiselect appends selections and copies all on done', async ({
     return {
       borderRadius: styles.borderRadius,
       borderTopColor: styles.borderTopColor,
+      maxHeight: styles.maxHeight,
+      overflowY: styles.overflowY,
       targetTagBackground: targetTagStyles?.backgroundColor || '',
       targetTagColor: targetTagStyles?.color || '',
     };
@@ -290,8 +294,16 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   expect(tuningStyleOverrides.borderTopColor).toBe(
     'rgba(15, 118, 110, 0.22)',
   );
+  expect(tuningStyleOverrides.maxHeight).toBe('360px');
+  expect(tuningStyleOverrides.overflowY).toBe('auto');
   expect(tuningStyleOverrides.targetTagBackground).toBe('rgb(236, 254, 255)');
   expect(tuningStyleOverrides.targetTagColor).toBe('rgb(15, 118, 110)');
+  await expect(
+    tuningModal
+      .locator('[data-agentic-react-color-value="true"]')
+      .filter({ hasText: 'rgba(' })
+      .first(),
+  ).toBeVisible();
   const tuningPanelPlacement = await tuningPanel.evaluate((element) => {
     const panelRect = element.getBoundingClientRect();
     const anchorRect = document
@@ -354,10 +366,20 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   await textColorInput.fill('#336699');
   await textColorInput.dispatchEvent('change');
   await expect(toolkitRoot).toContainText('rgb(51, 102, 153)');
+  await expect(
+    tuningModal.locator('[data-agentic-react-color-value="true"]').first(),
+  ).toContainText('rgba(51, 102, 153, 1)');
   const opacityInput = tuningModal.locator('input[name="opacity"]');
   await opacityInput.fill('0.8');
   await opacityInput.dispatchEvent('change');
   await expect(toolkitRoot).toContainText('opacity to 0.8');
+  await tuningModal
+    .getByRole('button', { name: 'Increment Font size', exact: true })
+    .click();
+  await expect(toolkitRoot).toContainText('font size to 17px');
+  await tuningPanel.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
   await tuningModal.locator('select[name="font-weight"]').selectOption('700');
   await expect(toolkitRoot).toContainText('font weight to 700');
   const paddingInput = tuningModal.locator('input[name="padding"]');
@@ -391,6 +413,7 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   expect(clipboardText).toContain('tuning prompts:');
   expect(clipboardText).toContain('text color to rgb(51, 102, 153).');
   expect(clipboardText).toContain('opacity to 0.8.');
+  expect(clipboardText).toContain('font size to 17px.');
   expect(clipboardText).toContain('font weight to 700.');
   expect(clipboardText).toContain('padding to 12px.');
   expect(clipboardText).not.toContain('Selection 2');

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
-import withAgenticReactWebpack from '@jazelly/agentic-react/webpack';
+import withAgenticReactWebpack from '@agentic-react/webpack';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

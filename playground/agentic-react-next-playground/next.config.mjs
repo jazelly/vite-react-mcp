@@ -1,4 +1,4 @@
-import withAgenticReactNext from '@jazelly/agentic-react/next';
+import withAgenticReactNext from '@agentic-react/next';
 
 const nextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
