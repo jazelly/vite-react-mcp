@@ -480,9 +480,15 @@ a {
 .table-head,
 .issue-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 82px 54px 58px 52px;
+  grid-template-columns:
+    minmax(0, 1.7fr)
+    minmax(0, 0.7fr)
+    minmax(0, 0.5fr)
+    minmax(0, 0.52fr)
+    minmax(0, 0.5fr);
   align-items: center;
   column-gap: 10px;
+  min-width: 0;
 }
 
 .table-head {
@@ -504,6 +510,14 @@ a {
   font-size: 12px;
   text-align: left;
   cursor: pointer;
+}
+
+.table-head > span,
+.issue-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .issue-row:hover,
@@ -920,22 +934,98 @@ a {
 
   .workspace-shell {
     margin-top: 44px;
-    overflow-x: auto;
+    overflow: hidden;
   }
 
   .workspace-topbar,
   .workspace-grid {
-    min-width: 860px;
+    min-width: 0;
+  }
+
+  .workspace-topbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+    height: auto;
+    padding: 10px;
+  }
+
+  .command-bar {
+    width: auto;
+    min-width: 0;
   }
 
   .workspace-grid {
-    grid-template-columns: 190px 420px 250px;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .workspace-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .sidebar-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sidebar-item,
+  .project-item {
+    min-width: 0;
+  }
+
+  .project-item span,
+  .sidebar-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .list-toolbar {
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .toolbar-actions {
+    flex: 0 0 auto;
+  }
+
+  .table-head {
+    display: none;
+  }
+
+  .issue-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px 10px;
+    min-width: 0;
+    min-height: 0;
+    padding: 14px 18px;
+  }
+
+  .issue-title-cell {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .issue-row > span:not(.issue-title-cell) {
+    min-width: 0;
+    padding: 3px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #8d8d8d;
+    font-size: 11px;
   }
 
   .inspector {
     grid-column: auto;
     border-top: 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    border-left: 0;
   }
 
   .analytics-band {

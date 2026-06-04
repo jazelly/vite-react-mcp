@@ -161,7 +161,7 @@ test('toolkit select copies the selected context automatically', async ({
 
 test('toolkit multiselect appends selections and copies all on done', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto('/profile/1');
   await page.waitForFunction(() => window.__AGENTIC_REACT__);
 
@@ -243,16 +243,127 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   const multiSelectedOverlays = page.locator(
     '[data-agentic-react-multi-selected="true"]',
   );
-  await multiSelectedOverlays
+  const firstTuneButton = multiSelectedOverlays
     .first()
-    .getByRole('button', { name: 'Adjust selection', exact: true })
-    .click({ force: true });
+    .getByRole('button', { name: 'Adjust selection', exact: true });
+  await firstTuneButton.click({ force: true });
   const tuningModal = page.locator('[data-agentic-react-tuning-modal="true"]');
+  const tuningPanel = page.locator('[data-agentic-react-tuning-panel="true"]');
   await expect(tuningModal.getByLabel('Text color')).toBeVisible();
+  await expect(tuningModal.getByLabel('Background')).toBeVisible();
+  await expect(tuningModal.getByLabel('Opacity')).toBeVisible();
+  await expect(tuningModal.getByLabel('Font', { exact: true })).toBeVisible();
+  await expect(
+    tuningModal.getByLabel('Font size', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    tuningModal.getByLabel('Font weight', { exact: true }),
+  ).toBeVisible();
+  await expect(tuningModal.getByLabel('Width')).toBeVisible();
+  await expect(tuningModal.getByLabel('Height')).toBeVisible();
+  await expect(tuningModal.getByLabel('Padding')).toBeVisible();
+  await expect(tuningModal.getByLabel('Margin')).toBeVisible();
+  await expect(
+    tuningModal.getByLabel('Describe custom tuning changes'),
+  ).toBeVisible();
+  await expect(tuningPanel).toBeVisible();
+  await expect(tuningPanel).toHaveClass(/vite-playground-tuning-panel/);
+  await expect(tuningModal.getByLabel('Text color')).toHaveClass(
+    /vite-playground-tuning-control/,
+  );
+  const tuningStyleOverrides = await tuningPanel.evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    const targetTagElement = element.querySelector(
+      '[data-agentic-react-tuning-target-tag="true"]',
+    );
+    const targetTagStyles = targetTagElement
+      ? window.getComputedStyle(targetTagElement)
+      : null;
+    return {
+      borderRadius: styles.borderRadius,
+      borderTopColor: styles.borderTopColor,
+      targetTagBackground: targetTagStyles?.backgroundColor || '',
+      targetTagColor: targetTagStyles?.color || '',
+    };
+  });
+  expect(tuningStyleOverrides.borderRadius).toBe('14px');
+  expect(tuningStyleOverrides.borderTopColor).toBe(
+    'rgba(15, 118, 110, 0.22)',
+  );
+  expect(tuningStyleOverrides.targetTagBackground).toBe('rgb(236, 254, 255)');
+  expect(tuningStyleOverrides.targetTagColor).toBe('rgb(15, 118, 110)');
+  const tuningPanelPlacement = await tuningPanel.evaluate((element) => {
+    const panelRect = element.getBoundingClientRect();
+    const anchorRect = document
+      .querySelector(
+        '[data-agentic-react-multi-selected="true"] [aria-label="Adjust selection"]',
+      )
+      ?.getBoundingClientRect();
+
+    return {
+      panel: {
+        left: panelRect.left,
+        top: panelRect.top,
+        right: panelRect.right,
+        bottom: panelRect.bottom,
+      },
+      anchor: anchorRect
+        ? {
+            left: anchorRect.left,
+            right: anchorRect.right,
+          }
+        : null,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+    };
+  });
+  expect(tuningPanelPlacement.panel.left).toBeGreaterThanOrEqual(-0.5);
+  expect(tuningPanelPlacement.panel.top).toBeGreaterThanOrEqual(-0.5);
+  expect(tuningPanelPlacement.panel.right).toBeLessThanOrEqual(
+    tuningPanelPlacement.viewport.width + 0.5,
+  );
+  expect(tuningPanelPlacement.panel.bottom).toBeLessThanOrEqual(
+    tuningPanelPlacement.viewport.height + 0.5,
+  );
+  if (!tuningPanelPlacement.anchor) {
+    throw new Error('Expected tuning panel to be anchored to the tune button');
+  }
+  expect(
+    Math.min(
+      Math.abs(
+        tuningPanelPlacement.panel.left - tuningPanelPlacement.anchor.right,
+      ),
+      Math.abs(
+        tuningPanelPlacement.anchor.left - tuningPanelPlacement.panel.right,
+      ),
+    ),
+  ).toBeLessThanOrEqual(16);
+  const tuningScreenshotPath =
+    process.env.AGENTIC_REACT_TUNING_SCREENSHOT_PATH;
+  const tuningScreenshot = await page.screenshot({
+    ...(tuningScreenshotPath ? { path: tuningScreenshotPath } : {}),
+    fullPage: false,
+  });
+  await testInfo.attach('tuning-modal-positioning', {
+    body: tuningScreenshot,
+    contentType: 'image/png',
+  });
   const textColorInput = tuningModal.locator('input[name="text-color"]');
   await textColorInput.fill('#336699');
   await textColorInput.dispatchEvent('change');
   await expect(toolkitRoot).toContainText('rgb(51, 102, 153)');
+  const opacityInput = tuningModal.locator('input[name="opacity"]');
+  await opacityInput.fill('0.8');
+  await opacityInput.dispatchEvent('change');
+  await expect(toolkitRoot).toContainText('opacity to 0.8');
+  await tuningModal.locator('select[name="font-weight"]').selectOption('700');
+  await expect(toolkitRoot).toContainText('font weight to 700');
+  const paddingInput = tuningModal.locator('input[name="padding"]');
+  await paddingInput.fill('12');
+  await paddingInput.dispatchEvent('change');
+  await expect(toolkitRoot).toContainText('padding to 12px');
   await tuningModal
     .getByRole('button', { name: 'Close tuning options', exact: true })
     .click();
@@ -279,6 +390,9 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   expect(clipboardText).toContain('selector: #profile-display-email-value');
   expect(clipboardText).toContain('tuning prompts:');
   expect(clipboardText).toContain('text color to rgb(51, 102, 153).');
+  expect(clipboardText).toContain('opacity to 0.8.');
+  expect(clipboardText).toContain('font weight to 700.');
+  expect(clipboardText).toContain('padding to 12px.');
   expect(clipboardText).not.toContain('Selection 2');
   expect(clipboardText).not.toContain(
     'selector: #profile-header-occupation-value',
@@ -317,6 +431,56 @@ test('copying the selected context includes a playground source snippet', async 
   expect(
     copyResult.context.sourceSnippets.map(({ filePath }) => filePath).join('\n'),
   ).not.toContain('node_modules');
+});
+
+test('toolkit tuning exposes layout controls for container elements', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__AGENTIC_REACT__);
+  await page.evaluate(() => {
+    const fixtureElement = document.createElement('div');
+    fixtureElement.id = 'layout-tuning-fixture';
+    fixtureElement.style.display = 'flex';
+    fixtureElement.style.alignItems = 'center';
+    fixtureElement.style.justifyContent = 'space-between';
+    fixtureElement.style.gap = '10px';
+    fixtureElement.style.margin = '12px';
+    fixtureElement.style.padding = '12px';
+    fixtureElement.innerHTML =
+      '<span>Layout fixture</span><button type="button">Action</button>';
+    document.body.prepend(fixtureElement);
+  });
+
+  const toolkitRoot = getToolkitRoot(page);
+  await openToolkitPanel(page);
+  await toolkitRoot.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.locator('#layout-tuning-fixture').click();
+  await page.waitForFunction(() =>
+    window.__AGENTIC_REACT__?.getLastSelectionContext(),
+  );
+
+  await page
+    .locator('[data-agentic-react-selected="true"]')
+    .getByRole('button', { name: 'Adjust selection', exact: true })
+    .click({ force: true });
+
+  const tuningModal = page.locator('[data-agentic-react-tuning-modal="true"]');
+  await expect(
+    tuningModal.getByLabel('Layout direction', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    tuningModal.getByLabel('Distribution', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    tuningModal.getByLabel('Alignment', { exact: true }),
+  ).toBeVisible();
+  await expect(tuningModal.getByLabel('Spacing', { exact: true })).toBeVisible();
+
+  await tuningModal
+    .locator('select[name="layout-direction"]')
+    .selectOption('column');
+  await expect(toolkitRoot).toContainText('layout direction to column');
 });
 
 test('selecting an element without an id still returns a usable fallback selector', async ({

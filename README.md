@@ -5,6 +5,10 @@
 
 A single dev-only React plugin that creates an MCP server to help LLMs understand your React app context across Vite, Webpack, and Next.js.
 
+## Demo
+
+<video src="./playground/demo/demo1-single-select.mp4" controls muted></video>
+
 ## Package
 
 This repository publishes one npm package:

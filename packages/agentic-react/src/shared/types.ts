@@ -21,6 +21,43 @@ export type ToolkitPosition =
   | 'bottom-left'
   | 'bottom-right';
 
+export type ToolkitTuningModalStyleSlot =
+  | 'root'
+  | 'panel'
+  | 'arrow'
+  | 'title'
+  | 'body'
+  | 'targetTag'
+  | 'customPromptForm'
+  | 'customPromptInput'
+  | 'customPromptButton'
+  | 'sectionTitle'
+  | 'row'
+  | 'label'
+  | 'controlWrap'
+  | 'control'
+  | 'colorInput'
+  | 'numberInput'
+  | 'select'
+  | 'textarea'
+  | 'suffix'
+  | 'closeButton';
+
+export type ToolkitTuningModalStyleValue = string | number;
+
+export type ToolkitTuningModalStyle = Record<
+  string,
+  ToolkitTuningModalStyleValue
+>;
+
+export interface ToolkitTuningModalConfig {
+  classNames?: Partial<Record<ToolkitTuningModalStyleSlot, string>>;
+  styles?: Partial<
+    Record<ToolkitTuningModalStyleSlot, ToolkitTuningModalStyle>
+  >;
+  tokens?: Record<string, ToolkitTuningModalStyleValue>;
+}
+
 export interface ToolkitConfig {
   enabled?: boolean;
   defaultVisible?: boolean;
@@ -30,6 +67,7 @@ export interface ToolkitConfig {
   accentColor?: string;
   zIndex?: number;
   iconUrl?: string;
+  tuningModal?: ToolkitTuningModalConfig;
 }
 
 export interface AgenticReactConfig {
