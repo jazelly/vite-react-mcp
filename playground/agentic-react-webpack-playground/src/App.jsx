@@ -487,7 +487,7 @@ function AppContent() {
             slowing down the team.
           </p>
           <a className="primary-cta" href="#workspace">
-            Open workspace
+            Start
             <IconArrowRight size={16} />
           </a>
         </div>

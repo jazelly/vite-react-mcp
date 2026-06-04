@@ -16,6 +16,8 @@ import type {
   SelectionResolvedSource,
   ToolkitConfig,
   ToolkitPosition,
+  ToolkitTuningModalStyle,
+  ToolkitTuningModalStyleSlot,
 } from '../../shared/types.js';
 import {
   buildSelectionContextForElement,
@@ -61,6 +63,7 @@ const DEFAULT_TOOLKIT_CONFIG: Required<Omit<ToolkitConfig, 'iconUrl'>> & {
   accentColor: '#111827',
   zIndex: 2147483000,
   iconUrl: DEFAULT_TOOLKIT_ICON_DATA_URL,
+  tuningModal: {},
 };
 
 const DEFAULT_SNIPPET_CONTEXT_LINES = 8;
@@ -71,6 +74,57 @@ const SELECTION_STYLE_ID = 'agentic-react-selection-styles';
 const CONTRAST_LIGHT = 'rgba(255, 255, 255, 0.98)';
 const CONTRAST_DARK = 'rgba(15, 23, 42, 0.98)';
 const SELECTED_LABEL_MAX_LENGTH = 96;
+const TUNING_PANEL_MARGIN = 12;
+const TUNING_PANEL_GAP = 8;
+const TUNING_FONT_WEIGHT_OPTIONS = [
+  '100',
+  '200',
+  '300',
+  '400',
+  '500',
+  '600',
+  '700',
+  '800',
+  '900',
+];
+const TUNING_FONT_FAMILY_OPTIONS = [
+  'inherit',
+  'system-ui',
+  'Inter',
+  'Arial',
+  'Georgia',
+  'Times New Roman',
+  'monospace',
+];
+const TUNING_DISPLAY_OPTIONS = [
+  'block',
+  'inline-block',
+  'flex',
+  'inline-flex',
+  'grid',
+  'inline-grid',
+];
+const TUNING_FLEX_DIRECTION_OPTIONS = [
+  'row',
+  'row-reverse',
+  'column',
+  'column-reverse',
+];
+const TUNING_JUSTIFY_OPTIONS = [
+  'flex-start',
+  'center',
+  'flex-end',
+  'space-between',
+  'space-around',
+  'space-evenly',
+];
+const TUNING_ALIGN_OPTIONS = [
+  'stretch',
+  'flex-start',
+  'center',
+  'flex-end',
+  'baseline',
+];
 
 interface RgbaColor {
   r: number;
@@ -86,6 +140,7 @@ interface OverlayActionElements {
 }
 
 interface TuningSession {
+  anchorElement: HTMLElement;
   element: Element;
   selectionContext: SelectionContext;
   setSelectionContext: (selectionContext: SelectionContext) => void;
@@ -111,6 +166,19 @@ const mergeToolkitConfig = (
         ...DEFAULT_TOOLKIT_CONFIG.offset,
         ...(baseConfig.offset || {}),
       },
+      tuningModal: {
+        ...DEFAULT_TOOLKIT_CONFIG.tuningModal,
+        ...(baseConfig.tuningModal || {}),
+        classNames: {
+          ...(baseConfig.tuningModal?.classNames || {}),
+        },
+        styles: {
+          ...(baseConfig.tuningModal?.styles || {}),
+        },
+        tokens: {
+          ...(baseConfig.tuningModal?.tokens || {}),
+        },
+      },
     };
   }
 
@@ -125,6 +193,23 @@ const mergeToolkitConfig = (
       ...DEFAULT_TOOLKIT_CONFIG.offset,
       ...(baseConfig.offset || {}),
       ...(nextConfig.offset || {}),
+    },
+    tuningModal: {
+      ...DEFAULT_TOOLKIT_CONFIG.tuningModal,
+      ...(baseConfig.tuningModal || {}),
+      ...(nextConfig.tuningModal || {}),
+      classNames: {
+        ...(baseConfig.tuningModal?.classNames || {}),
+        ...(nextConfig.tuningModal?.classNames || {}),
+      },
+      styles: {
+        ...(baseConfig.tuningModal?.styles || {}),
+        ...(nextConfig.tuningModal?.styles || {}),
+      },
+      tokens: {
+        ...(baseConfig.tuningModal?.tokens || {}),
+        ...(nextConfig.tuningModal?.tokens || {}),
+      },
     },
   };
 };
@@ -160,6 +245,31 @@ const setPosition = (
 
   element.style.bottom = `${yOffset}px`;
   element.style.right = `${xOffset}px`;
+};
+
+const toKebabCase = (value: string): string =>
+  value.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+
+const getTuningTokenName = (tokenName: string): string =>
+  `--agentic-react-tuning-${toKebabCase(tokenName)}`;
+
+const applyStyleDeclaration = (
+  element: HTMLElement,
+  styleDeclaration: ToolkitTuningModalStyle | undefined,
+) => {
+  if (!styleDeclaration) return;
+
+  for (const [propertyName, propertyValue] of Object.entries(
+    styleDeclaration,
+  )) {
+    if (propertyName.startsWith('--') || propertyName.includes('-')) {
+      element.style.setProperty(propertyName, String(propertyValue));
+    } else {
+      (element.style as CSSStyleDeclaration & Record<string, string>)[
+        propertyName
+      ] = String(propertyValue);
+    }
+  }
 };
 
 const parseCssColor = (color: string): RgbaColor | null => {
@@ -418,6 +528,31 @@ const hasTuneableText = (element: Element): boolean => {
   return Array.from(element.children).some((childElement) =>
     hasTuneableText(childElement),
   );
+};
+
+const hasTuneableLayout = (
+  element: Element,
+  computedStyle: CSSStyleDeclaration,
+) => {
+  const tagName = element.tagName.toLowerCase();
+  if (/^(flex|inline-flex|grid|inline-grid)$/.test(computedStyle.display)) {
+    return true;
+  }
+
+  if (
+    /^(article|aside|body|div|fieldset|footer|form|header|label|li|main|nav|ol|section|table|tbody|td|tfoot|th|thead|tr|ul)$/.test(
+      tagName,
+    )
+  ) {
+    return true;
+  }
+
+  return element.children.length > 0;
+};
+
+const normalizeCssNumber = (value: string, fallbackValue: number): number => {
+  const parsedValue = Number.parseFloat(value);
+  return Number.isFinite(parsedValue) ? parsedValue : fallbackValue;
 };
 
 const buildSelectedElementLabel = (
@@ -749,6 +884,7 @@ export const createSelectionToolkit = (
   const selectedActions = createOverlayActions();
   const tuningModalElement = document.createElement('div');
   const tuningPanelElement = document.createElement('div');
+  const tuningArrowElement = document.createElement('div');
   const tuningTitleElement = document.createElement('div');
   const tuningBodyElement = document.createElement('div');
   const tuningCloseButtonElement = document.createElement('button');
@@ -946,27 +1082,44 @@ export const createSelectionToolkit = (
   tuningModalElement.style.position = 'fixed';
   tuningModalElement.style.inset = '0';
   tuningModalElement.style.display = 'none';
-  tuningModalElement.style.alignItems = 'center';
-  tuningModalElement.style.justifyContent = 'center';
-  tuningModalElement.style.background = 'rgba(15, 23, 42, 0.34)';
+  tuningModalElement.style.background = 'transparent';
   tuningModalElement.style.pointerEvents = 'auto';
 
-  tuningPanelElement.style.width = 'min(320px, calc(100vw - 32px))';
-  tuningPanelElement.style.background = '#ffffff';
-  tuningPanelElement.style.border = '1px solid rgba(15, 23, 42, 0.14)';
-  tuningPanelElement.style.borderRadius = '10px';
-  tuningPanelElement.style.boxShadow = '0 22px 60px rgba(15, 23, 42, 0.3)';
+  tuningPanelElement.setAttribute('data-agentic-react-tuning-panel', 'true');
+  tuningPanelElement.style.position = 'fixed';
+  tuningPanelElement.style.width = 'min(420px, calc(100vw - 32px))';
+  tuningPanelElement.style.maxHeight = 'calc(100vh - 24px)';
+  tuningPanelElement.style.overflowY = 'auto';
+  tuningPanelElement.style.background =
+    'var(--agentic-react-tuning-panel-background, #ffffff)';
+  tuningPanelElement.style.border =
+    'var(--agentic-react-tuning-panel-border, 1px solid rgba(15, 23, 42, 0.14))';
+  tuningPanelElement.style.borderRadius =
+    'var(--agentic-react-tuning-panel-radius, 10px)';
+  tuningPanelElement.style.boxShadow =
+    'var(--agentic-react-tuning-panel-shadow, 0 22px 60px rgba(15, 23, 42, 0.3))';
   tuningPanelElement.style.padding = '12px';
-  tuningPanelElement.style.color = '#111827';
+  tuningPanelElement.style.color =
+    'var(--agentic-react-tuning-panel-color, #111827)';
   tuningPanelElement.style.fontFamily = 'ui-sans-serif, system-ui, sans-serif';
+  tuningPanelElement.style.pointerEvents = 'auto';
+
+  tuningArrowElement.setAttribute('aria-hidden', 'true');
+  tuningArrowElement.style.position = 'fixed';
+  tuningArrowElement.style.width = '10px';
+  tuningArrowElement.style.height = '10px';
+  tuningArrowElement.style.background =
+    'var(--agentic-react-tuning-panel-background, #ffffff)';
+  tuningArrowElement.style.transform = 'rotate(45deg)';
+  tuningArrowElement.style.pointerEvents = 'none';
 
   tuningTitleElement.style.fontSize = '13px';
   tuningTitleElement.style.fontWeight = '700';
-  tuningTitleElement.style.marginBottom = '10px';
+  tuningTitleElement.style.marginBottom = '8px';
 
   tuningBodyElement.style.display = 'flex';
   tuningBodyElement.style.flexDirection = 'column';
-  tuningBodyElement.style.gap = '10px';
+  tuningBodyElement.style.gap = '8px';
 
   tuningCloseButtonElement.setAttribute('type', 'button');
   tuningCloseButtonElement.setAttribute('aria-label', 'Close tuning options');
@@ -974,16 +1127,61 @@ export const createSelectionToolkit = (
   tuningCloseButtonElement.style.marginTop = '12px';
   tuningCloseButtonElement.style.width = '100%';
   tuningCloseButtonElement.style.padding = '8px 10px';
-  tuningCloseButtonElement.style.border = '1px solid rgba(15, 23, 42, 0.14)';
-  tuningCloseButtonElement.style.borderRadius = '8px';
-  tuningCloseButtonElement.style.background = '#f8fafc';
-  tuningCloseButtonElement.style.color = '#111827';
+  tuningCloseButtonElement.style.border =
+    'var(--agentic-react-tuning-control-border, 1px solid rgba(15, 23, 42, 0.14))';
+  tuningCloseButtonElement.style.borderRadius =
+    'var(--agentic-react-tuning-control-radius, 8px)';
+  tuningCloseButtonElement.style.background =
+    'var(--agentic-react-tuning-secondary-button-background, #f8fafc)';
+  tuningCloseButtonElement.style.color =
+    'var(--agentic-react-tuning-secondary-button-color, #111827)';
   tuningCloseButtonElement.style.cursor = 'pointer';
 
   tuningPanelElement.appendChild(tuningTitleElement);
   tuningPanelElement.appendChild(tuningBodyElement);
   tuningPanelElement.appendChild(tuningCloseButtonElement);
+  tuningModalElement.appendChild(tuningArrowElement);
   tuningModalElement.appendChild(tuningPanelElement);
+
+  const getTuningModalConfig = () => toolkitConfig.tuningModal || {};
+
+  const applyTuningTokens = (element: HTMLElement) => {
+    const tokens = getTuningModalConfig().tokens || {};
+    for (const [tokenName, tokenValue] of Object.entries(tokens)) {
+      element.style.setProperty(
+        getTuningTokenName(tokenName),
+        String(tokenValue),
+      );
+    }
+  };
+
+  const applyTuningSlotStyles = (
+    element: HTMLElement,
+    ...slots: ToolkitTuningModalStyleSlot[]
+  ) => {
+    const tuningModalConfig = getTuningModalConfig();
+    for (const slot of slots) {
+      const className = tuningModalConfig.classNames?.[slot];
+      if (className) {
+        element.classList.add(
+          ...className.split(/\s+/).filter((name) => name.length > 0),
+        );
+      }
+      applyStyleDeclaration(element, tuningModalConfig.styles?.[slot]);
+    }
+  };
+
+  const applyTuningModalStaticStyles = () => {
+    applyTuningTokens(tuningModalElement);
+    applyTuningSlotStyles(tuningModalElement, 'root');
+    applyTuningSlotStyles(tuningPanelElement, 'panel');
+    applyTuningSlotStyles(tuningArrowElement, 'arrow');
+    applyTuningSlotStyles(tuningTitleElement, 'title');
+    applyTuningSlotStyles(tuningBodyElement, 'body');
+    applyTuningSlotStyles(tuningCloseButtonElement, 'closeButton');
+  };
+
+  applyTuningModalStaticStyles();
 
   for (const dimElement of dimElements) {
     dimElement.setAttribute('data-agentic-react-dim', 'true');
@@ -1281,6 +1479,7 @@ export const createSelectionToolkit = (
     for (const dimElement of dimElements) {
       dimElement.style.zIndex = String(Math.max(0, toolkitConfig.zIndex - 3));
     }
+    applyTuningModalStaticStyles();
     renderLauncherLogo();
     renderPanelVisibility();
   };
@@ -1309,14 +1508,79 @@ export const createSelectionToolkit = (
     labelElement.dataset.align = 'left';
     labelElement.style.maxWidth = `${Math.max(
       80,
-        Math.min(420, window.innerWidth - 24, window.innerWidth - rect.left - 12),
-      )}px`;
+      Math.min(420, window.innerWidth - 24, window.innerWidth - rect.left - 12),
+    )}px`;
   };
 
   const closeTuningModal = () => {
     activeTuningSession = null;
     tuningModalElement.style.display = 'none';
     tuningBodyElement.replaceChildren();
+  };
+
+  const positionTuningPanel = () => {
+    if (!activeTuningSession?.anchorElement.isConnected) {
+      closeTuningModal();
+      return;
+    }
+
+    const anchorRect =
+      activeTuningSession.anchorElement.getBoundingClientRect();
+    const panelRect = tuningPanelElement.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const maxLeft = Math.max(
+      TUNING_PANEL_MARGIN,
+      viewportWidth - TUNING_PANEL_MARGIN - panelRect.width,
+    );
+    const maxTop = Math.max(
+      TUNING_PANEL_MARGIN,
+      viewportHeight - TUNING_PANEL_MARGIN - panelRect.height,
+    );
+    const rightLeft = anchorRect.right + TUNING_PANEL_GAP;
+    const leftLeft = anchorRect.left - TUNING_PANEL_GAP - panelRect.width;
+    const canFitRight =
+      rightLeft + panelRect.width <= viewportWidth - TUNING_PANEL_MARGIN;
+    const canFitLeft = leftLeft >= TUNING_PANEL_MARGIN;
+    const placeOnRight =
+      canFitRight ||
+      (!canFitLeft && viewportWidth - anchorRect.right >= anchorRect.left);
+    const unclampedLeft = placeOnRight ? rightLeft : leftLeft;
+    const left = clampNumber(unclampedLeft, TUNING_PANEL_MARGIN, maxLeft);
+    const anchorCenterY = anchorRect.top + anchorRect.height / 2;
+    const top = clampNumber(
+      anchorCenterY - panelRect.height / 2,
+      TUNING_PANEL_MARGIN,
+      maxTop,
+    );
+    const arrowTop = clampNumber(
+      anchorCenterY - top - 5,
+      14,
+      Math.max(14, panelRect.height - 18),
+    );
+
+    tuningPanelElement.dataset.placement = placeOnRight ? 'right' : 'left';
+    tuningPanelElement.style.left = `${Math.round(left)}px`;
+    tuningPanelElement.style.top = `${Math.round(top)}px`;
+    tuningPanelElement.style.right = '';
+    tuningPanelElement.style.bottom = '';
+    tuningArrowElement.style.top = `${Math.round(top + arrowTop)}px`;
+    tuningArrowElement.style.left = placeOnRight
+      ? `${Math.round(left - 6)}px`
+      : `${Math.round(left + panelRect.width - 4)}px`;
+    tuningArrowElement.style.right = '';
+    tuningArrowElement.style.borderLeft = placeOnRight
+      ? '1px solid rgba(15, 23, 42, 0.14)'
+      : 'none';
+    tuningArrowElement.style.borderBottom = placeOnRight
+      ? '1px solid rgba(15, 23, 42, 0.14)'
+      : 'none';
+    tuningArrowElement.style.borderRight = placeOnRight
+      ? 'none'
+      : '1px solid rgba(15, 23, 42, 0.14)';
+    tuningArrowElement.style.borderTop = placeOnRight
+      ? 'none'
+      : '1px solid rgba(15, 23, 42, 0.14)';
   };
 
   const addTuningPrompt = (prompt: string) => {
@@ -1336,27 +1600,153 @@ export const createSelectionToolkit = (
     updateStatus(`Added tuning prompt: ${prompt}`);
   };
 
+  const createTuningSectionTitle = (titleText: string) => {
+    const sectionTitleElement = document.createElement('div');
+    sectionTitleElement.textContent = titleText;
+    sectionTitleElement.style.marginTop = '4px';
+    sectionTitleElement.style.paddingTop = '8px';
+    sectionTitleElement.style.borderTop = '1px solid rgba(15, 23, 42, 0.08)';
+    sectionTitleElement.style.fontSize = '11px';
+    sectionTitleElement.style.fontWeight = '800';
+    sectionTitleElement.style.letterSpacing = '0';
+    sectionTitleElement.style.color =
+      'var(--agentic-react-tuning-section-color, #334155)';
+    applyTuningSlotStyles(sectionTitleElement, 'sectionTitle');
+    return sectionTitleElement;
+  };
+
+  const styleTuningControl = (
+    controlElement: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  ) => {
+    controlElement.style.width = '100%';
+    controlElement.style.minWidth = '0';
+    controlElement.style.boxSizing = 'border-box';
+    controlElement.style.border =
+      'var(--agentic-react-tuning-control-border, 1px solid rgba(15, 23, 42, 0.14))';
+    controlElement.style.borderRadius =
+      'var(--agentic-react-tuning-control-radius, 8px)';
+    controlElement.style.background =
+      'var(--agentic-react-tuning-control-background, #ffffff)';
+    controlElement.style.color =
+      'var(--agentic-react-tuning-control-color, #111827)';
+    controlElement.style.fontSize = '12px';
+    controlElement.style.fontFamily = 'ui-sans-serif, system-ui, sans-serif';
+    applyTuningSlotStyles(controlElement, 'control');
+  };
+
   const createTuningRow = (
     labelText: string,
-    inputElement: HTMLInputElement,
+    controlElement: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+    suffixText = '',
   ) => {
     const rowElement = document.createElement('label');
     const labelElement = document.createElement('span');
+    const controlWrapElement = document.createElement('span');
+    const suffixElement = document.createElement('span');
 
-    rowElement.style.display = 'flex';
+    rowElement.style.display = 'grid';
+    rowElement.style.gridTemplateColumns = '128px minmax(0, 1fr)';
     rowElement.style.alignItems = 'center';
-    rowElement.style.justifyContent = 'space-between';
     rowElement.style.gap = '12px';
     rowElement.style.fontSize = '12px';
     rowElement.style.fontWeight = '600';
 
     labelElement.textContent = labelText;
-    inputElement.setAttribute('aria-label', labelText);
-    inputElement.style.maxWidth = '136px';
+    labelElement.style.color =
+      'var(--agentic-react-tuning-label-color, #111827)';
+    labelElement.style.lineHeight = '1.2';
+    controlElement.setAttribute('aria-label', labelText);
+    styleTuningControl(controlElement);
+
+    if (controlElement instanceof HTMLInputElement) {
+      controlElement.style.height =
+        controlElement.type === 'color' ? '30px' : '32px';
+      controlElement.style.padding =
+        controlElement.type === 'color' ? '3px 4px' : '6px 8px';
+      applyTuningSlotStyles(
+        controlElement,
+        controlElement.type === 'color' ? 'colorInput' : 'numberInput',
+      );
+    } else if (controlElement instanceof HTMLSelectElement) {
+      controlElement.style.height = '32px';
+      controlElement.style.padding = '6px 8px';
+      applyTuningSlotStyles(controlElement, 'select');
+    } else {
+      controlElement.style.minHeight = '54px';
+      controlElement.style.padding = '8px';
+      controlElement.style.resize = 'vertical';
+      applyTuningSlotStyles(controlElement, 'textarea');
+    }
+
+    controlWrapElement.style.display = 'grid';
+    controlWrapElement.style.gridTemplateColumns = suffixText
+      ? 'minmax(0, 1fr) auto'
+      : '1fr';
+    controlWrapElement.style.alignItems = 'center';
+    controlWrapElement.style.gap = '6px';
+    controlWrapElement.appendChild(controlElement);
+
+    if (suffixText) {
+      suffixElement.textContent = suffixText;
+      suffixElement.style.fontSize = '12px';
+      suffixElement.style.color = '#475569';
+      applyTuningSlotStyles(suffixElement, 'suffix');
+      controlWrapElement.appendChild(suffixElement);
+    }
 
     rowElement.appendChild(labelElement);
-    rowElement.appendChild(inputElement);
+    rowElement.appendChild(controlWrapElement);
+    applyTuningSlotStyles(rowElement, 'row');
+    applyTuningSlotStyles(labelElement, 'label');
+    applyTuningSlotStyles(controlWrapElement, 'controlWrap');
     return rowElement;
+  };
+
+  const createTuningInput = (
+    name: string,
+    value: string,
+    inputType = 'text',
+  ) => {
+    const inputElement = document.createElement('input');
+    inputElement.type = inputType;
+    inputElement.name = name;
+    inputElement.value = value;
+    return inputElement;
+  };
+
+  const createTuningNumberInput = (
+    name: string,
+    value: number,
+    min: number,
+    max: number,
+    step: number,
+  ) => {
+    const inputElement = createTuningInput(name, String(value), 'number');
+    inputElement.min = String(min);
+    inputElement.max = String(max);
+    inputElement.step = String(step);
+    return inputElement;
+  };
+
+  const createTuningSelect = (
+    name: string,
+    values: string[],
+    selectedValue: string,
+  ) => {
+    const selectElement = document.createElement('select');
+    selectElement.name = name;
+
+    for (const value of values) {
+      const optionElement = document.createElement('option');
+      optionElement.value = value;
+      optionElement.textContent = value;
+      selectElement.appendChild(optionElement);
+    }
+
+    selectElement.value = values.includes(selectedValue)
+      ? selectedValue
+      : values[0] || '';
+    return selectElement;
   };
 
   const openTuningModal = (session: TuningSession) => {
@@ -1365,16 +1755,97 @@ export const createSelectionToolkit = (
 
     const computedStyle = window.getComputedStyle(session.element);
     const targetLabel = buildTuningTargetLabel(session.selectionContext);
+    const targetTagName = session.element.tagName.toLowerCase();
     const supportsTextTuning = hasTuneableText(session.element);
-    const supportsBackgroundTuning = session.element instanceof HTMLElement;
+    const supportsElementTuning = session.element instanceof HTMLElement;
+    const supportsLayoutTuning =
+      supportsElementTuning &&
+      hasTuneableLayout(session.element, computedStyle);
+    const targetRect = session.element.getBoundingClientRect();
 
     tuningTitleElement.textContent = `Tune ${targetLabel}`;
 
+    const targetTagElement = document.createElement('div');
+    targetTagElement.setAttribute(
+      'data-agentic-react-tuning-target-tag',
+      'true',
+    );
+    targetTagElement.textContent = targetTagName;
+    targetTagElement.style.display = 'inline-flex';
+    targetTagElement.style.alignItems = 'center';
+    targetTagElement.style.width = 'fit-content';
+    targetTagElement.style.maxWidth = '100%';
+    targetTagElement.style.marginBottom = '2px';
+    targetTagElement.style.padding = '4px 8px';
+    targetTagElement.style.border = '1px solid rgba(15, 23, 42, 0.1)';
+    targetTagElement.style.borderRadius = '999px';
+    targetTagElement.style.background = '#f8fafc';
+    targetTagElement.style.color = '#0f172a';
+    targetTagElement.style.fontFamily =
+      'ui-monospace, SFMono-Regular, monospace';
+    targetTagElement.style.fontSize = '12px';
+    targetTagElement.style.fontWeight = '700';
+    applyTuningSlotStyles(targetTagElement, 'targetTag');
+    tuningBodyElement.appendChild(targetTagElement);
+
+    const customPromptFormElement = document.createElement('form');
+    const customPromptInputElement = document.createElement('textarea');
+    const customPromptButtonElement = document.createElement('button');
+    customPromptFormElement.style.display = 'grid';
+    customPromptFormElement.style.gridTemplateColumns = 'minmax(0, 1fr) auto';
+    customPromptFormElement.style.gap = '8px';
+    customPromptFormElement.style.alignItems = 'end';
+    customPromptInputElement.name = 'custom-tuning-prompt';
+    customPromptInputElement.placeholder = 'Describe these changes...';
+    customPromptInputElement.setAttribute(
+      'aria-label',
+      'Describe custom tuning changes',
+    );
+    styleTuningControl(customPromptInputElement);
+    customPromptInputElement.style.minHeight = '42px';
+    customPromptInputElement.style.padding = '8px';
+    customPromptInputElement.style.resize = 'vertical';
+    applyTuningSlotStyles(
+      customPromptInputElement,
+      'textarea',
+      'customPromptInput',
+    );
+    customPromptButtonElement.type = 'submit';
+    customPromptButtonElement.textContent = 'Add';
+    customPromptButtonElement.style.height = '32px';
+    customPromptButtonElement.style.padding = '0 12px';
+    customPromptButtonElement.style.border =
+      'var(--agentic-react-tuning-primary-button-border, 1px solid rgba(15, 23, 42, 0.14))';
+    customPromptButtonElement.style.borderRadius =
+      'var(--agentic-react-tuning-control-radius, 8px)';
+    customPromptButtonElement.style.background =
+      'var(--agentic-react-tuning-primary-button-background, #111827)';
+    customPromptButtonElement.style.color =
+      'var(--agentic-react-tuning-primary-button-color, #ffffff)';
+    customPromptButtonElement.style.cursor = 'pointer';
+    customPromptButtonElement.style.fontSize = '12px';
+    customPromptButtonElement.style.fontWeight = '700';
+    applyTuningSlotStyles(customPromptButtonElement, 'customPromptButton');
+    applyTuningSlotStyles(customPromptFormElement, 'customPromptForm');
+    customPromptFormElement.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const customPrompt = customPromptInputElement.value.trim();
+      if (!customPrompt) return;
+      addTuningPrompt(customPrompt);
+      customPromptInputElement.value = '';
+    });
+    customPromptFormElement.appendChild(customPromptInputElement);
+    customPromptFormElement.appendChild(customPromptButtonElement);
+    tuningBodyElement.appendChild(customPromptFormElement);
+
+    tuningBodyElement.appendChild(createTuningSectionTitle('Visual'));
+
     if (supportsTextTuning) {
-      const textColorInputElement = document.createElement('input');
-      textColorInputElement.type = 'color';
-      textColorInputElement.name = 'text-color';
-      textColorInputElement.value = rgbStringToHex(computedStyle.color);
+      const textColorInputElement = createTuningInput(
+        'text-color',
+        rgbStringToHex(computedStyle.color),
+        'color',
+      );
       textColorInputElement.addEventListener('change', () => {
         addTuningPrompt(
           `Change ${targetLabel} text color to ${hexToRgbString(
@@ -1384,6 +1855,64 @@ export const createSelectionToolkit = (
       });
       tuningBodyElement.appendChild(
         createTuningRow('Text color', textColorInputElement),
+      );
+    }
+
+    if (supportsElementTuning) {
+      const backgroundColorInputElement = createTuningInput(
+        'background-color',
+        rgbStringToHex(computedStyle.backgroundColor),
+        'color',
+      );
+      backgroundColorInputElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} background color to ${hexToRgbString(
+            backgroundColorInputElement.value,
+          )}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Background', backgroundColorInputElement),
+      );
+
+      const opacityInputElement = createTuningNumberInput(
+        'opacity',
+        Number(normalizeCssNumber(computedStyle.opacity, 1).toFixed(2)),
+        0,
+        1,
+        0.05,
+      );
+      opacityInputElement.addEventListener('change', () => {
+        const opacity = Number(
+          clampNumber(Number(opacityInputElement.value) || 1, 0, 1).toFixed(2),
+        );
+        opacityInputElement.value = String(opacity);
+        addTuningPrompt(`Change ${targetLabel} opacity to ${opacity}.`);
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Opacity', opacityInputElement),
+      );
+    }
+
+    if (supportsTextTuning) {
+      tuningBodyElement.appendChild(createTuningSectionTitle('Typography'));
+      const currentFontFamily =
+        computedStyle.fontFamily.split(',')[0]?.replace(/["']/g, '').trim() ||
+        'inherit';
+      const fontFamilySelectElement = createTuningSelect(
+        'font-family',
+        Array.from(
+          new Set([currentFontFamily, ...TUNING_FONT_FAMILY_OPTIONS]),
+        ).filter(Boolean),
+        currentFontFamily,
+      );
+      fontFamilySelectElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} font family to ${fontFamilySelectElement.value}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Font', fontFamilySelectElement),
       );
 
       const fontSizeInputElement = document.createElement('input');
@@ -1405,30 +1934,196 @@ export const createSelectionToolkit = (
         addTuningPrompt(`Change ${targetLabel} font size to ${fontSize}px.`);
       });
       tuningBodyElement.appendChild(
-        createTuningRow('Font size', fontSizeInputElement),
+        createTuningRow('Font size', fontSizeInputElement, 'px'),
       );
-    }
 
-    if (supportsBackgroundTuning) {
-      const backgroundColorInputElement = document.createElement('input');
-      backgroundColorInputElement.type = 'color';
-      backgroundColorInputElement.name = 'background-color';
-      backgroundColorInputElement.value = rgbStringToHex(
-        computedStyle.backgroundColor,
+      const fontWeight = computedStyle.fontWeight || '400';
+      const fontWeightSelectElement = createTuningSelect(
+        'font-weight',
+        Array.from(new Set([fontWeight, ...TUNING_FONT_WEIGHT_OPTIONS])),
+        fontWeight,
       );
-      backgroundColorInputElement.addEventListener('change', () => {
+      fontWeightSelectElement.addEventListener('change', () => {
         addTuningPrompt(
-          `Change ${targetLabel} background color to ${hexToRgbString(
-            backgroundColorInputElement.value,
-          )}.`,
+          `Change ${targetLabel} font weight to ${fontWeightSelectElement.value}.`,
         );
       });
       tuningBodyElement.appendChild(
-        createTuningRow('Background color', backgroundColorInputElement),
+        createTuningRow('Font weight', fontWeightSelectElement),
       );
     }
 
-    if (!supportsTextTuning && !supportsBackgroundTuning) {
+    if (supportsElementTuning) {
+      tuningBodyElement.appendChild(createTuningSectionTitle('Box'));
+      const widthInputElement = createTuningNumberInput(
+        'width',
+        Math.round(
+          targetRect.width || normalizeCssNumber(computedStyle.width, 0),
+        ),
+        0,
+        2000,
+        1,
+      );
+      widthInputElement.addEventListener('change', () => {
+        const width = clampNumber(
+          Number(widthInputElement.value) || 0,
+          0,
+          2000,
+        );
+        widthInputElement.value = String(width);
+        addTuningPrompt(`Change ${targetLabel} width to ${width}px.`);
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Width', widthInputElement, 'px'),
+      );
+
+      const heightInputElement = createTuningNumberInput(
+        'height',
+        Math.round(
+          targetRect.height || normalizeCssNumber(computedStyle.height, 0),
+        ),
+        0,
+        2000,
+        1,
+      );
+      heightInputElement.addEventListener('change', () => {
+        const height = clampNumber(
+          Number(heightInputElement.value) || 0,
+          0,
+          2000,
+        );
+        heightInputElement.value = String(height);
+        addTuningPrompt(`Change ${targetLabel} height to ${height}px.`);
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Height', heightInputElement, 'px'),
+      );
+
+      const paddingInputElement = createTuningNumberInput(
+        'padding',
+        Math.round(normalizeCssNumber(computedStyle.paddingTop, 0)),
+        0,
+        240,
+        1,
+      );
+      paddingInputElement.addEventListener('change', () => {
+        const padding = clampNumber(
+          Number(paddingInputElement.value) || 0,
+          0,
+          240,
+        );
+        paddingInputElement.value = String(padding);
+        addTuningPrompt(`Change ${targetLabel} padding to ${padding}px.`);
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Padding', paddingInputElement, 'px'),
+      );
+
+      const marginInputElement = createTuningNumberInput(
+        'margin',
+        Math.round(normalizeCssNumber(computedStyle.marginTop, 0)),
+        -240,
+        240,
+        1,
+      );
+      marginInputElement.addEventListener('change', () => {
+        const margin = clampNumber(
+          Number(marginInputElement.value) || 0,
+          -240,
+          240,
+        );
+        marginInputElement.value = String(margin);
+        addTuningPrompt(`Change ${targetLabel} margin to ${margin}px.`);
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Margin', marginInputElement, 'px'),
+      );
+    }
+
+    if (supportsLayoutTuning) {
+      tuningBodyElement.appendChild(createTuningSectionTitle('Layout'));
+      const displaySelectElement = createTuningSelect(
+        'display',
+        Array.from(new Set([computedStyle.display, ...TUNING_DISPLAY_OPTIONS])),
+        computedStyle.display,
+      );
+      displaySelectElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} display layout to ${displaySelectElement.value}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Display', displaySelectElement),
+      );
+
+      const directionSelectElement = createTuningSelect(
+        'layout-direction',
+        TUNING_FLEX_DIRECTION_OPTIONS,
+        computedStyle.flexDirection,
+      );
+      directionSelectElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} layout direction to ${directionSelectElement.value}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Layout direction', directionSelectElement),
+      );
+
+      const distributionSelectElement = createTuningSelect(
+        'distribution',
+        Array.from(
+          new Set([computedStyle.justifyContent, ...TUNING_JUSTIFY_OPTIONS]),
+        ),
+        computedStyle.justifyContent,
+      );
+      distributionSelectElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} distribution to ${distributionSelectElement.value}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Distribution', distributionSelectElement),
+      );
+
+      const alignmentSelectElement = createTuningSelect(
+        'alignment',
+        Array.from(
+          new Set([computedStyle.alignItems, ...TUNING_ALIGN_OPTIONS]),
+        ),
+        computedStyle.alignItems,
+      );
+      alignmentSelectElement.addEventListener('change', () => {
+        addTuningPrompt(
+          `Change ${targetLabel} alignment to ${alignmentSelectElement.value}.`,
+        );
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Alignment', alignmentSelectElement),
+      );
+
+      const spacingInputElement = createTuningNumberInput(
+        'spacing',
+        Math.round(normalizeCssNumber(computedStyle.gap, 0)),
+        0,
+        240,
+        1,
+      );
+      spacingInputElement.addEventListener('change', () => {
+        const spacing = clampNumber(
+          Number(spacingInputElement.value) || 0,
+          0,
+          240,
+        );
+        spacingInputElement.value = String(spacing);
+        addTuningPrompt(`Change ${targetLabel} spacing to ${spacing}px.`);
+      });
+      tuningBodyElement.appendChild(
+        createTuningRow('Spacing', spacingInputElement, 'px'),
+      );
+    }
+
+    if (!supportsTextTuning && !supportsElementTuning) {
       const emptyElement = document.createElement('div');
       emptyElement.textContent = 'No tuning options available.';
       emptyElement.style.fontSize = '12px';
@@ -1437,7 +2132,8 @@ export const createSelectionToolkit = (
     }
 
     tuningModalElement.style.zIndex = String(toolkitConfig.zIndex + 1);
-    tuningModalElement.style.display = 'flex';
+    tuningModalElement.style.display = 'block';
+    positionTuningPanel();
   };
 
   const hideDimOverlay = () => {
@@ -1633,6 +2329,7 @@ export const createSelectionToolkit = (
       event.preventDefault();
       event.stopPropagation();
       openTuningModal({
+        anchorElement: actions.tuneButtonElement,
         element,
         selectionContext: overlay.selectionContext,
         setSelectionContext: (nextSelectionContext) => {
@@ -1816,6 +2513,10 @@ export const createSelectionToolkit = (
       showDimForElement(dimTargetElement);
     } else if (dimTargetElement) {
       hideDimOverlay();
+    }
+
+    if (activeTuningSession) {
+      positionTuningPanel();
     }
   };
 
@@ -2230,6 +2931,7 @@ export const createSelectionToolkit = (
     }
 
     openTuningModal({
+      anchorElement: selectedActions.tuneButtonElement,
       element: selectedTargetElement,
       selectionContext: lastSelectionContext,
       setSelectionContext: (nextSelectionContext) => {
