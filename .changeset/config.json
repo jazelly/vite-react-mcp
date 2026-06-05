@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "agentic-react-vite-playground",
+    "agentic-react-webpack-playground",
+    "agentic-react-next-playground",
+    "agentic-react-nx-module-federation-playground"
+  ]
+}
