@@ -23,6 +23,7 @@ export default defineConfig({
         iconUrl: '/agentic-react-logo.png',
         tuningModal: {
           classNames: {
+            surface: 'vite-playground-tuning-surface',
             panel: 'vite-playground-tuning-panel',
             control: 'vite-playground-tuning-control',
           },
@@ -34,6 +35,9 @@ export default defineConfig({
             panelShadow: '0 24px 72px rgba(15, 118, 110, 0.22)',
           },
           styles: {
+            surface: {
+              filter: 'drop-shadow(0 18px 40px rgba(15, 118, 110, 0.16))',
+            },
             panel: {
               border: '1px solid rgba(15, 118, 110, 0.22)',
             },

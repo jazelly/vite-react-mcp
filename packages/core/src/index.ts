@@ -1,5 +1,5 @@
 export { RuntimeBridgeServer } from './bridge/server.js';
-export { initMcpServer } from './mcp/index.js';
+export { createStreamableHttpMcpHandler, initMcpServer } from './mcp/index.js';
 export {
   buildSelectionContextForElement,
   buildSelectionContextSummary,
@@ -22,5 +22,15 @@ export type {
   ToolkitConfig,
   ToolkitOffset,
   ToolkitPosition,
+  ToolkitTuningModalConfig,
+  ToolkitTuningModalStyle,
+  ToolkitTuningModalStyleSlot,
+  ToolkitTuningModalStyleValue,
   ToolResultValue,
+  TuningModalActions,
+  TuningModalContext,
+  TuningModalExtension,
+  TuningModalExtensionCleanup,
+  TuningModalSlotRenderArgs,
+  TuningModalWrapArgs,
 } from './shared/types.js';

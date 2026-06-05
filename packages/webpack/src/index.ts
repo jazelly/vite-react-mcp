@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { RuntimeBridgeServer } from '@agentic-react/core/bridge';
-import { initMcpServer } from '@agentic-react/core/mcp';
+import {
+  createStreamableHttpMcpHandler,
+  initMcpServer,
+} from '@agentic-react/core/mcp';
 import {
   __AGENTIC_REACT_BRIDGE_URL__,
   __AGENTIC_REACT_CONFIG__,
@@ -16,9 +19,9 @@ import { SOURCE_LOOKUP_PATH } from '@agentic-react/core/shared/protocol';
 import type {
   CustomTool,
   SelectionResolvedSource,
+  ToolkitConfig,
 } from '@agentic-react/core/shared/types';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 
 interface WebpackEnv {
   mode?: string;
@@ -27,6 +30,7 @@ interface WebpackEnv {
 export interface AgenticReactWebpackOptions {
   customTools?: CustomTool[];
   rootDir?: string;
+  toolkit?: ToolkitConfig;
 }
 
 type WebpackDevServer = {
@@ -41,6 +45,7 @@ const getCoreDistPath = () =>
 const writeWebpackClientEntry = (
   rootDir: string,
   customTools: CustomTool[],
+  toolkitConfig: ToolkitConfig,
 ): string => {
   const coreDistPath = getCoreDistPath();
   const generatedDirectory = path.join(rootDir, '.agentic-react-webpack');
@@ -71,11 +76,15 @@ import {
 import { BRIDGE_WS_PATH } from ${JSON.stringify(protocolSpecifier)};
 
 if (typeof window !== 'undefined') {
-  if (!window[${__AGENTIC_REACT_CONFIG__}]) {
-    window[${__AGENTIC_REACT_CONFIG__}] = {
-      sourceRoot: ${JSON.stringify(rootDir)},
-    };
-  }
+  const existingAgenticReactConfig = window[${__AGENTIC_REACT_CONFIG__}] || {};
+  window[${__AGENTIC_REACT_CONFIG__}] = {
+    ...existingAgenticReactConfig,
+    sourceRoot: existingAgenticReactConfig.sourceRoot || ${JSON.stringify(rootDir)},
+    toolkit: {
+      ...(existingAgenticReactConfig.toolkit || {}),
+      ...${JSON.stringify(toolkitConfig)},
+    },
+  };
 
   if (!window[${__AGENTIC_REACT_BRIDGE_URL__}]) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -288,50 +297,12 @@ const createSourceLookupMiddleware = (rootDir: string) => ({
   },
 });
 
-const createMcpMiddlewares = (mcpServer: Server) => {
-  const transports = new Map<string, SSEServerTransport>();
-
+const createMcpMiddlewares = (createMcpServer: () => Server) => {
   return [
     {
-      name: 'agentic-react-sse',
-      path: '/sse',
-      middleware: async (_req: any, res: any) => {
-        const transport = new SSEServerTransport('/messages', res);
-        transports.set(transport.sessionId, transport);
-        res.on('close', () => {
-          transports.delete(transport.sessionId);
-        });
-        await mcpServer.connect(transport);
-      },
-    },
-    {
-      name: 'agentic-react-messages',
-      path: '/messages',
-      middleware: async (req: any, res: any) => {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.end('Method Not Allowed');
-          return;
-        }
-
-        const query = new URLSearchParams(req.url?.split('?').pop() || '');
-        const clientId = query.get('sessionId');
-
-        if (!clientId || typeof clientId !== 'string') {
-          res.statusCode = 400;
-          res.end('Bad Request');
-          return;
-        }
-
-        const transport = transports.get(clientId);
-        if (!transport) {
-          res.statusCode = 404;
-          res.end('Not Found');
-          return;
-        }
-
-        await transport.handlePostMessage(req, res);
-      },
+      name: 'agentic-react-mcp',
+      path: '/mcp',
+      middleware: createStreamableHttpMcpHandler(createMcpServer),
     },
   ];
 };
@@ -352,16 +323,17 @@ export const withAgenticReactWebpack = (
     (typeof nextConfig.context === 'string'
       ? nextConfig.context
       : process.cwd());
-  const entryPath = writeWebpackClientEntry(rootDir, options.customTools || []);
-  const runtimeBridge = new RuntimeBridgeServer();
-  const mcpServer = initMcpServer(
-    runtimeBridge,
+  const entryPath = writeWebpackClientEntry(
     rootDir,
     options.customTools || [],
+    options.toolkit || {},
   );
+  const runtimeBridge = new RuntimeBridgeServer();
+  const createMcpServer = () =>
+    initMcpServer(runtimeBridge, rootDir, options.customTools || []);
   const mcpMiddlewares = [
     createSourceLookupMiddleware(rootDir),
-    ...createMcpMiddlewares(mcpServer),
+    ...createMcpMiddlewares(createMcpServer),
   ];
 
   nextConfig.entry = prependWebpackEntry(nextConfig.entry, entryPath);
@@ -402,3 +374,27 @@ export const withAgenticReactWebpack = (
 };
 
 export default withAgenticReactWebpack;
+export type {
+  AgenticReactConfig,
+  CustomClientFunction,
+  CustomTool,
+  JsonValue,
+  SelectionContext,
+  SelectionResolvedSource,
+  SelectionSourceSnippet,
+  SelectionStackFrame,
+  ToolkitConfig,
+  ToolkitOffset,
+  ToolkitPosition,
+  ToolkitTuningModalConfig,
+  ToolkitTuningModalStyle,
+  ToolkitTuningModalStyleSlot,
+  ToolkitTuningModalStyleValue,
+  ToolResultValue,
+  TuningModalActions,
+  TuningModalContext,
+  TuningModalExtension,
+  TuningModalExtensionCleanup,
+  TuningModalSlotRenderArgs,
+  TuningModalWrapArgs,
+} from '@agentic-react/core/shared/types';

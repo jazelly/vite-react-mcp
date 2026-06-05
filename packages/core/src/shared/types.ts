@@ -23,6 +23,7 @@ export type ToolkitPosition =
 
 export type ToolkitTuningModalStyleSlot =
   | 'root'
+  | 'surface'
   | 'panel'
   | 'arrow'
   | 'title'
@@ -125,6 +126,47 @@ export interface SelectionContext {
   sourceSnippets: SelectionSourceSnippet[];
   tuningPrompts?: string[];
   capturedAt: number;
+}
+
+export interface TuningModalContext {
+  element: Element;
+  tagName: string;
+  targetLabel: string;
+  computedStyle: CSSStyleDeclaration;
+  selectionContext: SelectionContext;
+}
+
+export interface TuningModalActions {
+  addPrompt: (prompt: string) => void;
+  close: () => void;
+  requestReposition: () => void;
+}
+
+export interface TuningModalSlotRenderArgs {
+  container: HTMLElement;
+  context: TuningModalContext;
+  actions: TuningModalActions;
+}
+
+export interface TuningModalWrapArgs {
+  surfaceElement: HTMLElement;
+  panelElement: HTMLElement;
+  context: TuningModalContext;
+  actions: TuningModalActions;
+}
+
+export type TuningModalExtensionCleanup = undefined | (() => void);
+
+export interface TuningModalExtension {
+  id: string;
+  beforeFields?: (
+    args: TuningModalSlotRenderArgs,
+  ) => TuningModalExtensionCleanup;
+  afterFields?: (
+    args: TuningModalSlotRenderArgs,
+  ) => TuningModalExtensionCleanup;
+  footer?: (args: TuningModalSlotRenderArgs) => TuningModalExtensionCleanup;
+  wrapModal?: (args: TuningModalWrapArgs) => TuningModalExtensionCleanup;
 }
 
 export type CustomClientFunction =

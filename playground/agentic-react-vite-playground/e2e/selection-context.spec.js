@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const MCP_SERVER_URL = 'http://127.0.0.1:51423/sse';
+const MCP_SERVER_URL = 'http://127.0.0.1:51423/mcp';
 
 const createMcpClient = async () => {
   const client = new Client({
     name: 'agentic-react-e2e',
     version: '0.0.0',
   });
-  const transport = new SSEClientTransport(new URL(MCP_SERVER_URL));
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_SERVER_URL));
   await client.connect(transport);
   return { client, transport };
 };
@@ -248,6 +248,9 @@ test('toolkit multiselect appends selections and copies all on done', async ({
     .getByRole('button', { name: 'Adjust selection', exact: true });
   await firstTuneButton.click({ force: true });
   const tuningModal = page.locator('[data-agentic-react-tuning-modal="true"]');
+  const tuningSurface = page.locator(
+    '[data-agentic-react-tuning-surface="true"]',
+  );
   const tuningPanel = page.locator('[data-agentic-react-tuning-panel="true"]');
   await expect(tuningModal.getByLabel('Text color')).toBeVisible();
   await expect(tuningModal.getByLabel('Background')).toBeVisible();
@@ -268,6 +271,7 @@ test('toolkit multiselect appends selections and copies all on done', async ({
   await expect(
     tuningModal.getByLabel('Describe custom tuning changes'),
   ).toBeVisible();
+  await expect(tuningSurface).toHaveClass(/vite-playground-tuning-surface/);
   await expect(tuningPanel).toBeVisible();
   await expect(tuningPanel).toHaveClass(/vite-playground-tuning-panel/);
   await expect(tuningModal.getByLabel('Text color')).toHaveClass(
@@ -504,6 +508,110 @@ test('toolkit tuning exposes layout controls for container elements', async ({
     .locator('select[name="layout-direction"]')
     .selectOption('column');
   await expect(toolkitRoot).toContainText('layout direction to column');
+});
+
+test('toolkit tuning modal extensions can wrap and add modal content', async ({
+  page,
+}) => {
+  await page.goto('/profile/1');
+  await page.waitForFunction(() => window.__AGENTIC_REACT__);
+  await page.evaluate(() => {
+    window.__AGENTIC_REACT__.registerTuningModalExtension({
+      id: 'e2e-custom-tuning-modal',
+      beforeFields({ container, context }) {
+        const element = document.createElement('div');
+        element.setAttribute('data-e2e-tuning-before', 'true');
+        element.textContent = `Custom before ${context.tagName}`;
+        container.appendChild(element);
+      },
+      afterFields({ container, actions }) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.setAttribute('data-e2e-tuning-prompt', 'true');
+        button.textContent = 'Add glow prompt';
+        button.addEventListener('click', () => {
+          actions.addPrompt('Make the selected element glow.');
+        });
+        container.appendChild(button);
+      },
+      footer({ container }) {
+        const element = document.createElement('div');
+        element.setAttribute('data-e2e-tuning-footer', 'true');
+        element.textContent = 'Custom footer';
+        container.appendChild(element);
+      },
+      wrapModal({ surfaceElement, panelElement }) {
+        const shell = document.createElement('div');
+        shell.setAttribute('data-e2e-tuning-wrapper', 'true');
+        shell.style.border = '2px solid rgb(14, 165, 233)';
+        shell.style.padding = '4px';
+        shell.style.background = 'rgb(240, 249, 255)';
+        surfaceElement.replaceChildren(shell);
+        shell.appendChild(panelElement);
+
+        return () => {
+          surfaceElement.replaceChildren(panelElement);
+        };
+      },
+    });
+  });
+
+  const toolkitRoot = getToolkitRoot(page);
+  await openToolkitPanel(page);
+  await toolkitRoot.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.locator('#profile-display-email-value').click();
+  await page.waitForFunction(() =>
+    window.__AGENTIC_REACT__?.getLastSelectionContext(),
+  );
+
+  await page
+    .locator('[data-agentic-react-selected="true"]')
+    .getByRole('button', { name: 'Adjust selection', exact: true })
+    .click({ force: true });
+
+  const tuningModal = page.locator('[data-agentic-react-tuning-modal="true"]');
+  const tuningSurface = page.locator(
+    '[data-agentic-react-tuning-surface="true"]',
+  );
+  const tuningPanel = page.locator('[data-agentic-react-tuning-panel="true"]');
+  await expect(
+    tuningSurface.locator('[data-e2e-tuning-wrapper="true"]'),
+  ).toBeVisible();
+  await expect(
+    tuningModal.locator('[data-e2e-tuning-before="true"]'),
+  ).toContainText('Custom before');
+  await expect(
+    tuningModal.locator('[data-e2e-tuning-footer="true"]'),
+  ).toContainText('Custom footer');
+  await expect(tuningModal.getByLabel('Text color')).toBeVisible();
+  await expect(tuningModal.getByLabel('Opacity', { exact: true })).toBeVisible();
+  await expect(tuningModal.getByLabel('Width', { exact: true })).toBeVisible();
+
+  const surfacePlacement = await tuningSurface.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(surfacePlacement.left).toBeGreaterThanOrEqual(-0.5);
+  expect(surfacePlacement.top).toBeGreaterThanOrEqual(-0.5);
+  expect(surfacePlacement.right).toBeLessThanOrEqual(
+    surfacePlacement.viewportWidth + 0.5,
+  );
+  expect(surfacePlacement.bottom).toBeLessThanOrEqual(
+    surfacePlacement.viewportHeight + 0.5,
+  );
+
+  await tuningModal
+    .locator('[data-e2e-tuning-prompt="true"]')
+    .click({ force: true });
+  await expect(toolkitRoot).toContainText('Make the selected element glow.');
+  await expect(tuningPanel).toBeVisible();
 });
 
 test('selecting an element without an id still returns a usable fallback selector', async ({

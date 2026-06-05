@@ -18,6 +18,10 @@ import type {
   ToolkitPosition,
   ToolkitTuningModalStyle,
   ToolkitTuningModalStyleSlot,
+  TuningModalActions,
+  TuningModalContext,
+  TuningModalExtension,
+  TuningModalExtensionCleanup,
 } from '../../shared/types.js';
 import {
   buildSelectionContextForElement,
@@ -47,6 +51,7 @@ interface ToolkitRuntimeResult {
     context?: SelectionContext;
     error?: string;
   }>;
+  registerTuningModalExtension: (extension: TuningModalExtension) => () => void;
 }
 
 const DEFAULT_TOOLKIT_CONFIG: Required<Omit<ToolkitConfig, 'iconUrl'>> & {
@@ -899,6 +904,7 @@ export const createSelectionToolkit = (
   const selectedLabelElement = document.createElement('div');
   const selectedActions = createOverlayActions();
   const tuningModalElement = document.createElement('div');
+  const tuningSurfaceElement = document.createElement('div');
   const tuningPanelElement = document.createElement('div');
   const tuningArrowElement = document.createElement('div');
   const tuningTitleElement = document.createElement('div');
@@ -914,6 +920,8 @@ export const createSelectionToolkit = (
   let dimHideTimeout: number | null = null;
   let selectedPulseTimeout: number | null = null;
   let activeTuningSession: TuningSession | null = null;
+  let tuningModalExtensions: TuningModalExtension[] = [];
+  const tuningExtensionCleanups: Array<() => void> = [];
   let multiSelectedOverlays: Array<{
     element: Element;
     overlayElement: HTMLDivElement;
@@ -1101,8 +1109,17 @@ export const createSelectionToolkit = (
   tuningModalElement.style.background = 'transparent';
   tuningModalElement.style.pointerEvents = 'auto';
 
+  tuningSurfaceElement.setAttribute(
+    'data-agentic-react-tuning-surface',
+    'true',
+  );
+  tuningSurfaceElement.style.position = 'fixed';
+  tuningSurfaceElement.style.pointerEvents = 'auto';
+  tuningSurfaceElement.style.width = 'fit-content';
+  tuningSurfaceElement.style.maxWidth = 'calc(100vw - 32px)';
+
   tuningPanelElement.setAttribute('data-agentic-react-tuning-panel', 'true');
-  tuningPanelElement.style.position = 'fixed';
+  tuningPanelElement.style.position = 'relative';
   tuningPanelElement.style.width = 'min(420px, calc(100vw - 32px))';
   tuningPanelElement.style.maxHeight = 'min(50vh, calc(100vh - 24px))';
   tuningPanelElement.style.overflowY = 'auto';
@@ -1158,7 +1175,8 @@ export const createSelectionToolkit = (
   tuningPanelElement.appendChild(tuningBodyElement);
   tuningPanelElement.appendChild(tuningCloseButtonElement);
   tuningModalElement.appendChild(tuningArrowElement);
-  tuningModalElement.appendChild(tuningPanelElement);
+  tuningSurfaceElement.appendChild(tuningPanelElement);
+  tuningModalElement.appendChild(tuningSurfaceElement);
 
   const getTuningModalConfig = () => toolkitConfig.tuningModal || {};
 
@@ -1191,6 +1209,7 @@ export const createSelectionToolkit = (
   const applyTuningModalStaticStyles = () => {
     applyTuningTokens(tuningModalElement);
     applyTuningSlotStyles(tuningModalElement, 'root');
+    applyTuningSlotStyles(tuningSurfaceElement, 'surface');
     applyTuningSlotStyles(tuningPanelElement, 'panel');
     applyTuningSlotStyles(tuningArrowElement, 'arrow');
     applyTuningSlotStyles(tuningTitleElement, 'title');
@@ -1530,9 +1549,17 @@ export const createSelectionToolkit = (
   };
 
   const closeTuningModal = () => {
+    for (const cleanup of tuningExtensionCleanups.splice(0)) {
+      try {
+        cleanup();
+      } catch (_error) {
+        // Extension cleanup should not prevent the built-in modal from closing.
+      }
+    }
     activeTuningSession = null;
     tuningModalElement.style.display = 'none';
     tuningBodyElement.replaceChildren();
+    tuningSurfaceElement.replaceChildren(tuningPanelElement);
   };
 
   const positionTuningPanel = () => {
@@ -1543,21 +1570,24 @@ export const createSelectionToolkit = (
 
     const anchorRect =
       activeTuningSession.anchorElement.getBoundingClientRect();
+    const surfaceRect = tuningSurfaceElement.getBoundingClientRect();
     const panelRect = tuningPanelElement.getBoundingClientRect();
+    const surfaceWidth = surfaceRect.width || panelRect.width;
+    const surfaceHeight = surfaceRect.height || panelRect.height;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const maxLeft = Math.max(
       TUNING_PANEL_MARGIN,
-      viewportWidth - TUNING_PANEL_MARGIN - panelRect.width,
+      viewportWidth - TUNING_PANEL_MARGIN - surfaceWidth,
     );
     const maxTop = Math.max(
       TUNING_PANEL_MARGIN,
-      viewportHeight - TUNING_PANEL_MARGIN - panelRect.height,
+      viewportHeight - TUNING_PANEL_MARGIN - surfaceHeight,
     );
     const rightLeft = anchorRect.right + TUNING_PANEL_GAP;
-    const leftLeft = anchorRect.left - TUNING_PANEL_GAP - panelRect.width;
+    const leftLeft = anchorRect.left - TUNING_PANEL_GAP - surfaceWidth;
     const canFitRight =
-      rightLeft + panelRect.width <= viewportWidth - TUNING_PANEL_MARGIN;
+      rightLeft + surfaceWidth <= viewportWidth - TUNING_PANEL_MARGIN;
     const canFitLeft = leftLeft >= TUNING_PANEL_MARGIN;
     const placeOnRight =
       canFitRight ||
@@ -1566,25 +1596,25 @@ export const createSelectionToolkit = (
     const left = clampNumber(unclampedLeft, TUNING_PANEL_MARGIN, maxLeft);
     const anchorCenterY = anchorRect.top + anchorRect.height / 2;
     const top = clampNumber(
-      anchorCenterY - panelRect.height / 2,
+      anchorCenterY - surfaceHeight / 2,
       TUNING_PANEL_MARGIN,
       maxTop,
     );
     const arrowTop = clampNumber(
       anchorCenterY - top - 5,
       14,
-      Math.max(14, panelRect.height - 18),
+      Math.max(14, surfaceHeight - 18),
     );
 
-    tuningPanelElement.dataset.placement = placeOnRight ? 'right' : 'left';
-    tuningPanelElement.style.left = `${Math.round(left)}px`;
-    tuningPanelElement.style.top = `${Math.round(top)}px`;
-    tuningPanelElement.style.right = '';
-    tuningPanelElement.style.bottom = '';
+    tuningSurfaceElement.dataset.placement = placeOnRight ? 'right' : 'left';
+    tuningSurfaceElement.style.left = `${Math.round(left)}px`;
+    tuningSurfaceElement.style.top = `${Math.round(top)}px`;
+    tuningSurfaceElement.style.right = '';
+    tuningSurfaceElement.style.bottom = '';
     tuningArrowElement.style.top = `${Math.round(top + arrowTop)}px`;
     tuningArrowElement.style.left = placeOnRight
       ? `${Math.round(left - 6)}px`
-      : `${Math.round(left + panelRect.width - 4)}px`;
+      : `${Math.round(left + surfaceWidth - 4)}px`;
     tuningArrowElement.style.right = '';
     tuningArrowElement.style.borderLeft = placeOnRight
       ? '1px solid rgba(15, 23, 42, 0.14)'
@@ -1615,6 +1645,82 @@ export const createSelectionToolkit = (
     activeTuningSession.selectionContext = nextSelectionContext;
     activeTuningSession.setSelectionContext(nextSelectionContext);
     updateStatus(`Added tuning prompt: ${prompt}`);
+  };
+
+  const buildTuningModalContext = (
+    session: TuningSession,
+    computedStyle: CSSStyleDeclaration,
+    targetLabel: string,
+    targetTagName: string,
+  ): TuningModalContext => ({
+    element: session.element,
+    tagName: targetTagName,
+    targetLabel,
+    computedStyle,
+    selectionContext: session.selectionContext,
+  });
+
+  const buildTuningModalActions = (): TuningModalActions => ({
+    addPrompt: addTuningPrompt,
+    close: closeTuningModal,
+    requestReposition: positionTuningPanel,
+  });
+
+  const pushTuningExtensionCleanup = (cleanup: TuningModalExtensionCleanup) => {
+    if (typeof cleanup === 'function') {
+      tuningExtensionCleanups.push(cleanup);
+    }
+  };
+
+  const renderTuningExtensionSlot = (
+    slot: 'beforeFields' | 'afterFields' | 'footer',
+    container: HTMLElement,
+    context: TuningModalContext,
+    actions: TuningModalActions,
+  ) => {
+    for (const extension of tuningModalExtensions) {
+      const renderSlot = extension[slot];
+      if (!renderSlot) continue;
+
+      pushTuningExtensionCleanup(
+        renderSlot({
+          container,
+          context,
+          actions,
+        }),
+      );
+    }
+  };
+
+  const renderTuningExtensionWrappers = (
+    context: TuningModalContext,
+    actions: TuningModalActions,
+  ) => {
+    for (const extension of tuningModalExtensions) {
+      pushTuningExtensionCleanup(
+        extension.wrapModal?.({
+          surfaceElement: tuningSurfaceElement,
+          panelElement: tuningPanelElement,
+          context,
+          actions,
+        }),
+      );
+    }
+  };
+
+  const registerTuningModalExtension = (extension: TuningModalExtension) => {
+    tuningModalExtensions = [
+      ...tuningModalExtensions.filter(
+        (registeredExtension) => registeredExtension.id !== extension.id,
+      ),
+      extension,
+    ];
+
+    return () => {
+      tuningModalExtensions = tuningModalExtensions.filter(
+        (registeredExtension) => registeredExtension.id !== extension.id,
+      );
+    };
   };
 
   const createTuningSectionTitle = (titleText: string) => {
@@ -1846,6 +1952,7 @@ export const createSelectionToolkit = (
   };
 
   const openTuningModal = (session: TuningSession) => {
+    closeTuningModal();
     activeTuningSession = session;
     tuningBodyElement.replaceChildren();
 
@@ -1858,6 +1965,13 @@ export const createSelectionToolkit = (
       supportsElementTuning &&
       hasTuneableLayout(session.element, computedStyle);
     const targetRect = session.element.getBoundingClientRect();
+    const tuningContext = buildTuningModalContext(
+      session,
+      computedStyle,
+      targetLabel,
+      targetTagName,
+    );
+    const tuningActions = buildTuningModalActions();
 
     tuningTitleElement.textContent = `Tune ${targetLabel}`;
 
@@ -1933,6 +2047,21 @@ export const createSelectionToolkit = (
     customPromptFormElement.appendChild(customPromptInputElement);
     customPromptFormElement.appendChild(customPromptButtonElement);
     tuningBodyElement.appendChild(customPromptFormElement);
+
+    const beforeFieldsElement = document.createElement('div');
+    beforeFieldsElement.setAttribute(
+      'data-agentic-react-tuning-slot',
+      'before-fields',
+    );
+    renderTuningExtensionSlot(
+      'beforeFields',
+      beforeFieldsElement,
+      tuningContext,
+      tuningActions,
+    );
+    if (beforeFieldsElement.hasChildNodes()) {
+      tuningBodyElement.appendChild(beforeFieldsElement);
+    }
 
     tuningBodyElement.appendChild(createTuningSectionTitle('Visual'));
 
@@ -2232,6 +2361,33 @@ export const createSelectionToolkit = (
       );
     }
 
+    const afterFieldsElement = document.createElement('div');
+    afterFieldsElement.setAttribute(
+      'data-agentic-react-tuning-slot',
+      'after-fields',
+    );
+    renderTuningExtensionSlot(
+      'afterFields',
+      afterFieldsElement,
+      tuningContext,
+      tuningActions,
+    );
+    if (afterFieldsElement.hasChildNodes()) {
+      tuningBodyElement.appendChild(afterFieldsElement);
+    }
+
+    const footerElement = document.createElement('div');
+    footerElement.setAttribute('data-agentic-react-tuning-slot', 'footer');
+    renderTuningExtensionSlot(
+      'footer',
+      footerElement,
+      tuningContext,
+      tuningActions,
+    );
+    if (footerElement.hasChildNodes()) {
+      tuningBodyElement.appendChild(footerElement);
+    }
+
     if (!supportsTextTuning && !supportsElementTuning) {
       const emptyElement = document.createElement('div');
       emptyElement.textContent = 'No tuning options available.';
@@ -2240,6 +2396,7 @@ export const createSelectionToolkit = (
       tuningBodyElement.appendChild(emptyElement);
     }
 
+    renderTuningExtensionWrappers(tuningContext, tuningActions);
     tuningModalElement.style.zIndex = String(toolkitConfig.zIndex + 1);
     tuningModalElement.style.display = 'block';
     positionTuningPanel();
@@ -3186,5 +3343,6 @@ export const createSelectionToolkit = (
     },
     getLastSelectionContext,
     copyLastSelectionContext,
+    registerTuningModalExtension,
   };
 };

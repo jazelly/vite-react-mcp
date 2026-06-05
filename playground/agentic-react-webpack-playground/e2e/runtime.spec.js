@@ -1,17 +1,17 @@
 import { expect, test } from '@playwright/test';
 
-const MCP_SERVER_URL = `http://127.0.0.1:${process.env.AGENTIC_REACT_WEBPACK_PLAYGROUND_PORT || '51425'}/sse`;
+const MCP_SERVER_URL = `http://127.0.0.1:${process.env.AGENTIC_REACT_WEBPACK_PLAYGROUND_PORT || '51425'}/mcp`;
 
 const createMcpClient = async () => {
-  const [{ Client }, { SSEClientTransport }] = await Promise.all([
+  const [{ Client }, { StreamableHTTPClientTransport }] = await Promise.all([
     import('@modelcontextprotocol/sdk/client/index.js'),
-    import('@modelcontextprotocol/sdk/client/sse.js'),
+    import('@modelcontextprotocol/sdk/client/streamableHttp.js'),
   ]);
   const client = new Client({
     name: 'webpack-playground-mcp-e2e',
     version: '0.0.0',
   });
-  const transport = new SSEClientTransport(new URL(MCP_SERVER_URL));
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_SERVER_URL));
   await client.connect(transport);
   return { client, transport };
 };
@@ -34,6 +34,21 @@ test('webpack playground injects runtime globals', async ({ page }) => {
     hasSelectionMode: typeof window.__AGENTIC_REACT__?.setSelectionMode,
     hasGetContext: typeof window.__AGENTIC_REACT__?.getLastSelectionContext,
     hasCopyContext: typeof window.__AGENTIC_REACT__?.copyLastSelectionContext,
+    hasRegisterTuningModalExtension:
+      typeof window.__AGENTIC_REACT__?.registerTuningModalExtension,
+    tuningSurfaceClassName:
+      window.__AGENTIC_REACT_CONFIG__?.toolkit?.tuningModal?.classNames
+        ?.surface,
+    tuningPanelClassName:
+      window.__AGENTIC_REACT_CONFIG__?.toolkit?.tuningModal?.classNames?.panel,
+    unregisterType: (() => {
+      const unregister =
+        window.__AGENTIC_REACT__?.registerTuningModalExtension({
+          id: 'webpack-runtime-smoke',
+        });
+      unregister?.();
+      return typeof unregister;
+    })(),
   }));
 
   expect(runtimeShape.hasRuntime).toBe(true);
@@ -41,6 +56,14 @@ test('webpack playground injects runtime globals', async ({ page }) => {
   expect(runtimeShape.hasSelectionMode).toBe('function');
   expect(runtimeShape.hasGetContext).toBe('function');
   expect(runtimeShape.hasCopyContext).toBe('function');
+  expect(runtimeShape.hasRegisterTuningModalExtension).toBe('function');
+  expect(runtimeShape.tuningSurfaceClassName).toBe(
+    'webpack-playground-tuning-surface',
+  );
+  expect(runtimeShape.tuningPanelClassName).toBe(
+    'webpack-playground-tuning-panel',
+  );
+  expect(runtimeShape.unregisterType).toBe('function');
 });
 
 test('webpack playground MCP tools return expected outcomes', async ({

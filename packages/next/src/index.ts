@@ -2,9 +2,11 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { URLSearchParams } from 'node:url';
 import { RuntimeBridgeServer } from '@agentic-react/core/bridge';
-import { initMcpServer } from '@agentic-react/core/mcp';
+import {
+  createStreamableHttpMcpHandler,
+  initMcpServer,
+} from '@agentic-react/core/mcp';
 import {
   __AGENTIC_REACT_BRIDGE_URL__,
   __AGENTIC_REACT_CONFIG__,
@@ -15,8 +17,10 @@ import {
   toRelativeImportSpecifier,
 } from '@agentic-react/core/shared/custom-tools-script';
 import { BRIDGE_WS_PATH } from '@agentic-react/core/shared/protocol';
-import type { CustomTool } from '@agentic-react/core/shared/types';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import type {
+  CustomTool,
+  ToolkitConfig,
+} from '@agentic-react/core/shared/types';
 
 interface NextWebpackContext {
   dev: boolean;
@@ -34,6 +38,7 @@ interface NextConfig {
 export interface AgenticReactNextOptions {
   customTools?: CustomTool[];
   rootDir?: string;
+  toolkit?: ToolkitConfig;
   bridgeUrl?: string;
   server?: {
     enabled?: boolean;
@@ -60,6 +65,7 @@ const writeNextClientEntry = (
   rootDir: string,
   bridgeUrl: string | null,
   customTools: CustomTool[],
+  toolkitConfig: ToolkitConfig,
 ): string => {
   const coreDistPath = getCoreDistPath();
   const generatedDirectory = path.join(rootDir, '.next/agentic-react');
@@ -90,11 +96,15 @@ import {
 import { BRIDGE_WS_PATH } from ${JSON.stringify(protocolSpecifier)};
 
 if (typeof window !== 'undefined') {
-  if (!window[${__AGENTIC_REACT_CONFIG__}]) {
-    window[${__AGENTIC_REACT_CONFIG__}] = {
-      sourceRoot: ${JSON.stringify(rootDir)},
-    };
-  }
+  const existingAgenticReactConfig = window[${__AGENTIC_REACT_CONFIG__}] || {};
+  window[${__AGENTIC_REACT_CONFIG__}] = {
+    ...existingAgenticReactConfig,
+    sourceRoot: existingAgenticReactConfig.sourceRoot || ${JSON.stringify(rootDir)},
+    toolkit: {
+      ...(existingAgenticReactConfig.toolkit || {}),
+      ...${JSON.stringify(toolkitConfig)},
+    },
+  };
 
   if (!window[${__AGENTIC_REACT_BRIDGE_URL__}]) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -161,8 +171,9 @@ const getBridgeServerRegistry = (): Map<string, BridgeServerState> => {
 
 const createBridgeHttpServer = (rootDir: string, customTools: CustomTool[]) => {
   const runtimeBridge = new RuntimeBridgeServer();
-  const mcpServer = initMcpServer(runtimeBridge, rootDir, customTools);
-  const transports = new Map<string, SSEServerTransport>();
+  const handleMcpRequest = createStreamableHttpMcpHandler(() =>
+    initMcpServer(runtimeBridge, rootDir, customTools),
+  );
 
   const httpServer = http.createServer(async (req, res) => {
     const requestUrl = req.url || '/';
@@ -175,39 +186,8 @@ const createBridgeHttpServer = (rootDir: string, customTools: CustomTool[]) => {
       return;
     }
 
-    if (requestPath === '/sse') {
-      const transport = new SSEServerTransport('/messages', res);
-      transports.set(transport.sessionId, transport);
-      res.on('close', () => {
-        transports.delete(transport.sessionId);
-      });
-      await mcpServer.connect(transport);
-      return;
-    }
-
-    if (requestPath === '/messages') {
-      if (req.method !== 'POST') {
-        res.statusCode = 405;
-        res.end('Method Not Allowed');
-        return;
-      }
-
-      const query = new URLSearchParams(requestUrl.split('?')[1] || '');
-      const sessionId = query.get('sessionId');
-      if (!sessionId) {
-        res.statusCode = 400;
-        res.end('Bad Request');
-        return;
-      }
-
-      const transport = transports.get(sessionId);
-      if (!transport) {
-        res.statusCode = 404;
-        res.end('Not Found');
-        return;
-      }
-
-      await transport.handlePostMessage(req, res);
+    if (requestPath === '/mcp') {
+      await handleMcpRequest(req, res);
       return;
     }
 
@@ -287,6 +267,7 @@ export const withAgenticReactNext = (
         rootDir,
         bridgeUrl,
         options.customTools || [],
+        options.toolkit || {},
       );
       const originalEntry = transformedConfig.entry;
 
@@ -305,3 +286,27 @@ export const withAgenticReactNext = (
 };
 
 export default withAgenticReactNext;
+export type {
+  AgenticReactConfig,
+  CustomClientFunction,
+  CustomTool,
+  JsonValue,
+  SelectionContext,
+  SelectionResolvedSource,
+  SelectionSourceSnippet,
+  SelectionStackFrame,
+  ToolkitConfig,
+  ToolkitOffset,
+  ToolkitPosition,
+  ToolkitTuningModalConfig,
+  ToolkitTuningModalStyle,
+  ToolkitTuningModalStyleSlot,
+  ToolkitTuningModalStyleValue,
+  ToolResultValue,
+  TuningModalActions,
+  TuningModalContext,
+  TuningModalExtension,
+  TuningModalExtensionCleanup,
+  TuningModalSlotRenderArgs,
+  TuningModalWrapArgs,
+} from '@agentic-react/core/shared/types';

@@ -32,7 +32,7 @@ export default defineConfig({
 The Vite adapter injects the core browser runtime, attaches the runtime bridge to the dev server, and exposes MCP over:
 
 ```text
-http://localhost:<vite-port>/sse
+http://localhost:<vite-port>/mcp
 ```
 
 ### Webpack
@@ -52,7 +52,7 @@ export default (env, argv) =>
 The Webpack adapter prepends a generated runtime entry, attaches the runtime bridge to webpack-dev-server, and exposes MCP at:
 
 ```text
-http://localhost:<webpack-dev-server-port>/sse
+http://localhost:<webpack-dev-server-port>/mcp
 ```
 
 ### Next.js
@@ -71,7 +71,7 @@ export default withAgenticReactNext(nextConfig);
 The Next adapter injects the browser runtime through Next's Webpack config and starts a local bridge server. By default MCP is available at:
 
 ```text
-http://127.0.0.1:51426/sse
+http://127.0.0.1:51426/mcp
 ```
 
 ## Runtime-Only Usage
@@ -98,7 +98,7 @@ Runtime-only mode can inspect the live browser tree, but it cannot read or edit 
 Bundler adapters add local-dev capabilities that the runtime cannot know on its own:
 
 - inject the core runtime automatically
-- attach local MCP `/sse` and `/messages` endpoints
+- attach a local MCP Streamable HTTP `/mcp` endpoint
 - bridge MCP calls from Node to the browser runtime
 - provide local source-root context for source lookup
 - keep dev-only tooling out of production bundles

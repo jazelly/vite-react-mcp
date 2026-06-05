@@ -10,6 +10,37 @@ const devServerPort = Number(
     process.env.PORT ||
     51425,
 );
+const toolkit = {
+  tuningModal: {
+    classNames: {
+      surface: 'webpack-playground-tuning-surface',
+      panel: 'webpack-playground-tuning-panel',
+      control: 'webpack-playground-tuning-control',
+    },
+    tokens: {
+      panelRadius: '12px',
+      controlRadius: '9px',
+      primaryButtonBackground: '#1d4ed8',
+      primaryButtonColor: '#ffffff',
+      panelShadow: '0 24px 72px rgba(29, 78, 216, 0.22)',
+    },
+    styles: {
+      surface: {
+        filter: 'drop-shadow(0 18px 40px rgba(29, 78, 216, 0.16))',
+      },
+      panel: {
+        border: '1px solid rgba(29, 78, 216, 0.24)',
+      },
+      targetTag: {
+        background: '#eff6ff',
+        color: '#1d4ed8',
+      },
+      sectionTitle: {
+        color: '#1d4ed8',
+      },
+    },
+  },
+};
 
 const baseConfig = {
   mode: 'development',
@@ -59,6 +90,12 @@ const baseConfig = {
 };
 
 export default (env = {}, argv = {}) =>
-  withAgenticReactWebpack(baseConfig, {
-    mode: argv.mode || env.mode || 'development',
-  });
+  withAgenticReactWebpack(
+    baseConfig,
+    {
+      mode: argv.mode || env.mode || 'development',
+    },
+    {
+      toolkit,
+    },
+  );
