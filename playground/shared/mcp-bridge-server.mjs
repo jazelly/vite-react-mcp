@@ -1,7 +1,9 @@
 import http from 'node:http';
-import { URLSearchParams } from 'node:url';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { RuntimeBridgeServer, initMcpServer } from '@agentic-react/core';
+import {
+  RuntimeBridgeServer,
+  createStreamableHttpMcpHandler,
+  initMcpServer,
+} from '@agentic-react/core';
 
 const port = Number(
   process.env.AGENTIC_REACT_SERVER_PORT || 51426,
@@ -10,8 +12,9 @@ const host = process.env.AGENTIC_REACT_SERVER_HOST || '127.0.0.1';
 const rootDir = process.env.AGENTIC_REACT_ROOT_DIR || process.cwd();
 
 const runtimeBridge = new RuntimeBridgeServer();
-const mcpServer = initMcpServer(runtimeBridge, rootDir, []);
-const transports = new Map();
+const handleMcpRequest = createStreamableHttpMcpHandler(() =>
+  initMcpServer(runtimeBridge, rootDir, []),
+);
 
 const httpServer = http.createServer(async (req, res) => {
   const requestUrl = req.url || '/';
@@ -24,39 +27,8 @@ const httpServer = http.createServer(async (req, res) => {
     return;
   }
 
-  if (requestPath === '/sse') {
-    const transport = new SSEServerTransport('/messages', res);
-    transports.set(transport.sessionId, transport);
-    res.on('close', () => {
-      transports.delete(transport.sessionId);
-    });
-    await mcpServer.connect(transport);
-    return;
-  }
-
-  if (requestPath === '/messages') {
-    if (req.method !== 'POST') {
-      res.statusCode = 405;
-      res.end('Method Not Allowed');
-      return;
-    }
-
-    const query = new URLSearchParams(requestUrl.split('?')[1] || '');
-    const sessionId = query.get('sessionId');
-    if (!sessionId) {
-      res.statusCode = 400;
-      res.end('Bad Request');
-      return;
-    }
-
-    const transport = transports.get(sessionId);
-    if (!transport) {
-      res.statusCode = 404;
-      res.end('Not Found');
-      return;
-    }
-
-    await transport.handlePostMessage(req, res);
+  if (requestPath === '/mcp') {
+    await handleMcpRequest(req, res);
     return;
   }
 

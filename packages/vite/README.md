@@ -15,4 +15,4 @@ export default defineConfig({
 });
 ```
 
-This adapter injects `@agentic-react/core` into the browser runtime, attaches the local runtime bridge to the Vite dev server, and exposes MCP endpoints at `/sse` and `/messages`.
+This adapter injects `@agentic-react/core` into the browser runtime, attaches the local runtime bridge to the Vite dev server, and exposes MCP over Streamable HTTP at `/mcp`.

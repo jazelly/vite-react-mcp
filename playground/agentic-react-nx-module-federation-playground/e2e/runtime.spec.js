@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const shellPort = process.env.NX_MF_SHELL_PORT || '4200';
 const catalogPort = process.env.NX_MF_CATALOG_PORT || '4201';
 const profilePort = process.env.NX_MF_PROFILE_PORT || '4202';
-const MCP_SERVER_URL = `http://127.0.0.1:${shellPort}/sse`;
+const MCP_SERVER_URL = `http://127.0.0.1:${shellPort}/mcp`;
 const REMOTE_ENTRY_URLS = [
   [`http://127.0.0.1:${catalogPort}/remoteEntry.js`, 'var catalog'],
   [`http://127.0.0.1:${profilePort}/remoteEntry.js`, 'var profile'],
@@ -27,15 +27,15 @@ const waitForRemoteEntries = async (request) => {
 };
 
 const createMcpClient = async () => {
-  const [{ Client }, { SSEClientTransport }] = await Promise.all([
+  const [{ Client }, { StreamableHTTPClientTransport }] = await Promise.all([
     import('@modelcontextprotocol/sdk/client/index.js'),
-    import('@modelcontextprotocol/sdk/client/sse.js'),
+    import('@modelcontextprotocol/sdk/client/streamableHttp.js'),
   ]);
   const client = new Client({
     name: 'nx-module-federation-playground-mcp-e2e',
     version: '0.0.0',
   });
-  const transport = new SSEClientTransport(new URL(MCP_SERVER_URL));
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_SERVER_URL));
   await client.connect(transport);
   return { client, transport };
 };
@@ -111,6 +111,21 @@ test('nx module federation playground injects runtime globals', async ({
     hasSelectionMode: typeof window.__AGENTIC_REACT__?.setSelectionMode,
     hasGetContext: typeof window.__AGENTIC_REACT__?.getLastSelectionContext,
     hasCopyContext: typeof window.__AGENTIC_REACT__?.copyLastSelectionContext,
+    hasRegisterTuningModalExtension:
+      typeof window.__AGENTIC_REACT__?.registerTuningModalExtension,
+    tuningSurfaceClassName:
+      window.__AGENTIC_REACT_CONFIG__?.toolkit?.tuningModal?.classNames
+        ?.surface,
+    tuningPanelClassName:
+      window.__AGENTIC_REACT_CONFIG__?.toolkit?.tuningModal?.classNames?.panel,
+    unregisterType: (() => {
+      const unregister =
+        window.__AGENTIC_REACT__?.registerTuningModalExtension({
+          id: 'nx-runtime-smoke',
+        });
+      unregister?.();
+      return typeof unregister;
+    })(),
   }));
 
   expect(runtimeShape.hasRuntime).toBe(true);
@@ -118,6 +133,10 @@ test('nx module federation playground injects runtime globals', async ({
   expect(runtimeShape.hasSelectionMode).toBe('function');
   expect(runtimeShape.hasGetContext).toBe('function');
   expect(runtimeShape.hasCopyContext).toBe('function');
+  expect(runtimeShape.hasRegisterTuningModalExtension).toBe('function');
+  expect(runtimeShape.tuningSurfaceClassName).toBe('nx-shell-tuning-surface');
+  expect(runtimeShape.tuningPanelClassName).toBe('nx-shell-tuning-panel');
+  expect(runtimeShape.unregisterType).toBe('function');
 });
 
 test('nx module federation host exposes remote React context to MCP', async ({

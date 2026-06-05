@@ -40,6 +40,8 @@ const runtimeApi = {
   getLastSelectionContext: () => selectionToolkit.getLastSelectionContext(),
   copyLastSelectionContext: (format = 'text') =>
     selectionToolkit.copyLastSelectionContext(format),
+  registerTuningModalExtension: (extension) =>
+    selectionToolkit.registerTuningModalExtension(extension),
 };
 
 const builtInTools = {

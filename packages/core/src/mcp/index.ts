@@ -1,9 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   type CallToolResult,
+  isInitializeRequest,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -120,6 +124,135 @@ const toTextResponse = (data: unknown): CallToolResult => {
     content: [{ type: 'text', text: JSON.stringify(data) }],
   };
 };
+
+type NodeMcpRequest = IncomingMessage & { body?: unknown };
+
+type CreateMcpServer = () => Server;
+
+type StreamableHttpMcpHandler = (
+  req: NodeMcpRequest,
+  res: ServerResponse,
+) => Promise<void>;
+
+const getMcpSessionId = (req: IncomingMessage): string | null => {
+  const header = req.headers['mcp-session-id'];
+  if (Array.isArray(header)) {
+    return header[0] || null;
+  }
+  return header || null;
+};
+
+const readJsonRequestBody = async (
+  req: NodeMcpRequest,
+): Promise<unknown> => {
+  if (req.body !== undefined) {
+    return req.body;
+  }
+
+  let rawBody = '';
+  for await (const chunk of req) {
+    rawBody += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+  }
+
+  if (!rawBody.trim()) {
+    return undefined;
+  }
+
+  return JSON.parse(rawBody);
+};
+
+const writeJsonRpcError = (
+  res: ServerResponse,
+  statusCode: number,
+  code: number,
+  message: string,
+) => {
+  if (res.headersSent || res.writableEnded) {
+    return;
+  }
+  res.statusCode = statusCode;
+  res.setHeader('content-type', 'application/json');
+  res.end(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code, message },
+      id: null,
+    }),
+  );
+};
+
+export function createStreamableHttpMcpHandler(
+  createMcpServer: CreateMcpServer,
+): StreamableHttpMcpHandler {
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+
+  return async (req, res) => {
+    const method = req.method || 'GET';
+    if (method !== 'GET' && method !== 'POST' && method !== 'DELETE') {
+      writeJsonRpcError(res, 405, -32000, 'Method not allowed.');
+      return;
+    }
+
+    let parsedBody: unknown;
+    if (method === 'POST') {
+      try {
+        parsedBody = await readJsonRequestBody(req);
+      } catch (_error) {
+        writeJsonRpcError(res, 400, -32700, 'Parse error.');
+        return;
+      }
+    }
+
+    const sessionId = getMcpSessionId(req);
+    let transport =
+      sessionId === null ? undefined : transports.get(sessionId);
+
+    try {
+      if (!transport && sessionId) {
+        writeJsonRpcError(
+          res,
+          404,
+          -32000,
+          'Session not found for MCP Streamable HTTP transport.',
+        );
+        return;
+      }
+
+      if (!transport) {
+        if (method !== 'POST' || !isInitializeRequest(parsedBody)) {
+          writeJsonRpcError(
+            res,
+            400,
+            -32000,
+            'Bad Request: No valid MCP session ID provided.',
+          );
+          return;
+        }
+
+        const server = createMcpServer();
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (initializedSessionId) => {
+            transports.set(initializedSessionId, transport);
+          },
+        });
+
+        transport.onclose = () => {
+          const initializedSessionId = transport?.sessionId;
+          if (initializedSessionId) {
+            transports.delete(initializedSessionId);
+          }
+        };
+
+        await server.connect(transport);
+      }
+
+      await transport.handleRequest(req, res, parsedBody);
+    } catch (_error) {
+      writeJsonRpcError(res, 500, -32603, 'Internal server error.');
+    }
+  };
+}
 
 const resolveAbsoluteSourcePath = (
   rootDir: string,

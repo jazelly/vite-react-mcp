@@ -3,6 +3,7 @@ import type {
   SelectionContext,
   ToolResultValue,
   ToolkitConfig,
+  TuningModalExtension,
 } from './shared/types.js';
 import type { WastedRenderFiberInfo } from './types/internal.js';
 
@@ -47,6 +48,7 @@ type AgenticReactRuntime = {
     context?: SelectionContext;
     error?: string;
   }>;
+  registerTuningModalExtension: (extension: TuningModalExtension) => () => void;
 };
 
 declare global {

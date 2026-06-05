@@ -1,7 +1,10 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { RuntimeBridgeServer } from '@agentic-react/core/bridge';
-import { initMcpServer } from '@agentic-react/core/mcp';
+import {
+  createStreamableHttpMcpHandler,
+  initMcpServer,
+} from '@agentic-react/core/mcp';
 import {
   __AGENTIC_REACT_BRIDGE_URL__,
   __AGENTIC_REACT_CONFIG__,
@@ -13,7 +16,6 @@ import type {
   ToolkitConfig,
 } from '@agentic-react/core/shared/types';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { type ViteDevServer, normalizePath } from 'vite';
 import type { Plugin, ResolvedConfig } from 'vite';
 
@@ -32,44 +34,12 @@ const resolvedAgenticReact = `\0${agenticReactImportee}`;
 
 function instrumentViteDevServer(
   viteDevServer: ViteDevServer,
-  mcpServer: Server,
+  createMcpServer: () => Server,
 ) {
-  const transports = new Map<string, SSEServerTransport>();
-
-  viteDevServer.middlewares.use('/sse', async (_req, res) => {
-    const transport = new SSEServerTransport('/messages', res);
-    transports.set(transport.sessionId, transport);
-    res.on('close', () => {
-      transports.delete(transport.sessionId);
-    });
-    await mcpServer.connect(transport);
-  });
-
-  viteDevServer.middlewares.use('/messages', async (req, res) => {
-    if (req.method !== 'POST') {
-      res.statusCode = 405;
-      res.end('Method Not Allowed');
-      return;
-    }
-
-    const query = new URLSearchParams(req.url?.split('?').pop() || '');
-    const clientId = query.get('sessionId');
-
-    if (!clientId || typeof clientId !== 'string') {
-      res.statusCode = 400;
-      res.end('Bad Request');
-      return;
-    }
-
-    const transport = transports.get(clientId);
-    if (!transport) {
-      res.statusCode = 404;
-      res.end('Not Found');
-      return;
-    }
-
-    await transport.handlePostMessage(req, res);
-  });
+  viteDevServer.middlewares.use(
+    '/mcp',
+    createStreamableHttpMcpHandler(createMcpServer),
+  );
 }
 
 export interface AgenticReactOptions {
@@ -93,12 +63,9 @@ function AgenticReact(options: AgenticReactOptions = {}): Plugin {
         runtimeBridge.attach(viteDevServer.httpServer);
       }
 
-      const mcpServer = initMcpServer(
-        runtimeBridge,
-        viteDevServer.config.root,
-        customTools,
-      );
-      instrumentViteDevServer(viteDevServer, mcpServer);
+      const createMcpServer = () =>
+        initMcpServer(runtimeBridge, viteDevServer.config.root, customTools);
+      instrumentViteDevServer(viteDevServer, createMcpServer);
 
       setTimeout(() => {
         console.info(
@@ -222,5 +189,15 @@ export type {
   ToolkitConfig,
   ToolkitOffset,
   ToolkitPosition,
+  ToolkitTuningModalConfig,
+  ToolkitTuningModalStyle,
+  ToolkitTuningModalStyleSlot,
+  ToolkitTuningModalStyleValue,
   ToolResultValue,
+  TuningModalActions,
+  TuningModalContext,
+  TuningModalExtension,
+  TuningModalExtensionCleanup,
+  TuningModalSlotRenderArgs,
+  TuningModalWrapArgs,
 } from '@agentic-react/core/shared/types';

@@ -13,4 +13,4 @@ export default (env, argv) =>
   withAgenticReactWebpack(config, { mode: argv.mode });
 ```
 
-This adapter injects `@agentic-react/core` through a generated browser entry, attaches the local runtime bridge to webpack-dev-server, and exposes MCP endpoints at `/sse` and `/messages`.
+This adapter injects `@agentic-react/core` through a generated browser entry, attaches the local runtime bridge to webpack-dev-server, and exposes MCP over Streamable HTTP at `/mcp`.
