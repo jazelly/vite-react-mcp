@@ -7,8 +7,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import {
   CallToolRequestSchema,
   type CallToolResult,
-  isInitializeRequest,
   ListToolsRequestSchema,
+  isInitializeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
@@ -142,9 +142,7 @@ const getMcpSessionId = (req: IncomingMessage): string | null => {
   return header || null;
 };
 
-const readJsonRequestBody = async (
-  req: NodeMcpRequest,
-): Promise<unknown> => {
+const readJsonRequestBody = async (req: NodeMcpRequest): Promise<unknown> => {
   if (req.body !== undefined) {
     return req.body;
   }
@@ -204,8 +202,7 @@ export function createStreamableHttpMcpHandler(
     }
 
     const sessionId = getMcpSessionId(req);
-    let transport =
-      sessionId === null ? undefined : transports.get(sessionId);
+    let transport = sessionId === null ? undefined : transports.get(sessionId);
 
     try {
       if (!transport && sessionId) {
@@ -724,7 +721,7 @@ const enrichSelectionContextWithSnippets = (
 
     sourceSnippets.push({
       ...sourceSnippet,
-      filePath: absoluteSourcePath,
+      filePath: sourceFilePath,
     });
     seenFilePaths.add(sourceFilePath);
   }
@@ -762,15 +759,28 @@ const parseSelectionContextResponse = (response: {
 };
 
 export interface McpRuntimeBridge {
-  request: (event: BridgeRequestEvent, payload: unknown) => Promise<unknown>;
+  request: (
+    event: BridgeRequestEvent,
+    payload: unknown,
+    options?: {
+      acceptResponse?: (value: unknown) => boolean;
+      broadcast?: boolean;
+      timeoutMs?: number;
+    },
+  ) => Promise<unknown>;
 }
 
 const requestRuntime = async <T>(
   bridge: McpRuntimeBridge,
   event: BridgeRequestEvent,
   args: unknown,
+  options?: {
+    acceptResponse?: (value: unknown) => boolean;
+    broadcast?: boolean;
+    timeoutMs?: number;
+  },
 ): Promise<T> => {
-  const response = await bridge.request(event, args);
+  const response = await bridge.request(event, args, options);
   return response as T;
 };
 
@@ -885,7 +895,15 @@ export function initMcpServer(
 
               const browserResponse = await requestRuntime<{
                 context: SelectionContext | null;
-              }>(bridge, 'get-last-selection-context', args);
+              }>(bridge, 'get-last-selection-context', args, {
+                acceptResponse: (response) =>
+                  Boolean(
+                    response &&
+                      typeof response === 'object' &&
+                      'context' in response &&
+                      response.context,
+                  ),
+              });
 
               const selectionContext =
                 parseSelectionContextResponse(browserResponse);
@@ -932,7 +950,15 @@ export function initMcpServer(
                 format: 'text' | 'json';
                 context?: SelectionContext;
                 error?: string;
-              }>(bridge, 'copy-last-selection-context', args);
+              }>(bridge, 'copy-last-selection-context', args, {
+                acceptResponse: (response) =>
+                  Boolean(
+                    response &&
+                      typeof response === 'object' &&
+                      'context' in response &&
+                      response.context,
+                  ),
+              });
 
               return toTextResponse(response);
             }
@@ -1008,6 +1034,7 @@ export function initMcpServer(
               args: parsedArgs,
               name: customTool.name,
             },
+            { broadcast: true },
           );
           return {
             content: [{ type: 'text', text: formatToolResult(result) }],

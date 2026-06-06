@@ -350,12 +350,31 @@ const getBridgeUrl = () => {
 
 const connectBridge = () => {
   let socket;
+  let shouldReconnect = true;
+
+  const closeBridgeForUnload = () => {
+    shouldReconnect = false;
+    try {
+      socket?.close();
+    } catch (_error) {
+      // noop
+    }
+  };
+
+  window.addEventListener('pagehide', closeBridgeForUnload);
+  window.addEventListener('beforeunload', closeBridgeForUnload);
 
   const establishConnection = () => {
+    if (!shouldReconnect) {
+      return;
+    }
+
     try {
       socket = new WebSocket(getBridgeUrl());
     } catch (_error) {
-      setTimeout(establishConnection, 1000);
+      if (shouldReconnect) {
+        setTimeout(establishConnection, 1000);
+      }
       return;
     }
 
@@ -397,7 +416,9 @@ const connectBridge = () => {
     });
 
     socket.addEventListener('close', () => {
-      setTimeout(establishConnection, 1000);
+      if (shouldReconnect) {
+        setTimeout(establishConnection, 1000);
+      }
     });
 
     socket.addEventListener('error', () => {

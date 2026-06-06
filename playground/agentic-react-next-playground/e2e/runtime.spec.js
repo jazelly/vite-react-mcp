@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const MCP_SERVER_URL = 'http://127.0.0.1:51426/mcp';
+const bridgePort = process.env.AGENTIC_REACT_NEXT_BRIDGE_PORT || '51426';
+const MCP_SERVER_URL = `http://127.0.0.1:${bridgePort}/mcp`;
 
 const createMcpClient = async () => {
   const [{ Client }, { StreamableHTTPClientTransport }] = await Promise.all([

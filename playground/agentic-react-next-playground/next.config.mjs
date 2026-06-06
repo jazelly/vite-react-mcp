@@ -1,11 +1,16 @@
 import withAgenticReactNext from '@agentic-react/next';
 
+const bridgePort = Number(process.env.AGENTIC_REACT_NEXT_BRIDGE_PORT || 51426);
+
 const nextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   reactStrictMode: true,
 };
 
 export default withAgenticReactNext(nextConfig, {
+  server: {
+    port: bridgePort,
+  },
   toolkit: {
     tuningModal: {
       classNames: {
