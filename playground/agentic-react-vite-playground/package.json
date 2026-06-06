@@ -1,5 +1,6 @@
 {
   "name": "agentic-react-vite-playground",
+  "private": true,
   "type": "module",
   "scripts": {
     "start": "vite",
