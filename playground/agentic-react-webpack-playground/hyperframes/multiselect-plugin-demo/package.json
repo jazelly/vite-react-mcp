@@ -1,0 +1,11 @@
+{
+  "name": "multiselect-plugin-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.6.73 preview",
+    "check": "npx --yes hyperframes@0.6.73 lint && npx --yes hyperframes@0.6.73 validate && npx --yes hyperframes@0.6.73 inspect",
+    "render": "npx --yes hyperframes@0.6.73 render",
+    "publish": "npx --yes hyperframes@0.6.73 publish"
+  }
+}
