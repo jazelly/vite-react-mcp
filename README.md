@@ -2,6 +2,16 @@
 
 Agentic React is a monorepo for React runtime inspection and local-dev MCP integrations. The packages are published under the `@agentic-react` namespace.
 
+## Demos
+
+### Single Select
+
+<video src="./playground/demo/demo1-single-select.mp4" controls></video>
+
+### Multiselect
+
+<video src="./playground/demo/demo2-multiselect.mp4" controls></video>
+
 ## Packages
 
 - `@agentic-react/core`: bundler-agnostic browser runtime, React selection toolkit, and MCP primitives.
