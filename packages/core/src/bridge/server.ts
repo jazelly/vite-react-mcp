@@ -9,11 +9,18 @@ import {
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
+  socket: WebSocket;
   timeoutId: NodeJS.Timeout;
 }
 
 const DEFAULT_TIMEOUT_MS = 10000;
 const BRIDGE_CONNECT_POLL_MS = 50;
+
+interface RuntimeBridgeRequestOptions {
+  acceptResponse?: (value: unknown) => boolean;
+  broadcast?: boolean;
+  timeoutMs?: number;
+}
 
 const isBridgeMessage = (value: unknown): value is BridgeMessage => {
   if (!value || typeof value !== 'object') {
@@ -30,6 +37,7 @@ export class RuntimeBridgeServer {
   private wsServer: WebSocketServer | null = null;
   private activeSocket: WebSocket | null = null;
   private readonly pendingRequests = new Map<string, PendingRequest>();
+  private readonly sockets = new Set<WebSocket>();
 
   attach(httpServer: any) {
     this.wsServer = new WebSocketServer({ noServer: true });
@@ -48,13 +56,7 @@ export class RuntimeBridgeServer {
     });
 
     this.wsServer.on('connection', (websocket) => {
-      if (
-        this.activeSocket &&
-        this.activeSocket.readyState === this.activeSocket.OPEN
-      ) {
-        this.activeSocket.close();
-      }
-
+      this.sockets.add(websocket);
       this.activeSocket = websocket;
 
       websocket.on('message', (messageBuffer) => {
@@ -91,11 +93,15 @@ export class RuntimeBridgeServer {
       });
 
       websocket.on('close', () => {
+        this.sockets.delete(websocket);
         if (this.activeSocket === websocket) {
           this.activeSocket = null;
         }
 
         for (const [requestId, pendingRequest] of this.pendingRequests) {
+          if (pendingRequest.socket !== websocket) {
+            continue;
+          }
           clearTimeout(pendingRequest.timeoutId);
           pendingRequest.reject(
             new Error('Bridge connection closed before receiving response'),
@@ -109,10 +115,89 @@ export class RuntimeBridgeServer {
   async request(
     event: BridgeRequestEvent,
     payload: unknown,
-    timeoutMs: number = DEFAULT_TIMEOUT_MS,
+    optionsOrTimeoutMs:
+      | RuntimeBridgeRequestOptions
+      | number = DEFAULT_TIMEOUT_MS,
   ): Promise<unknown> {
-    const socket = await this.waitForActiveSocket(timeoutMs);
+    const options =
+      typeof optionsOrTimeoutMs === 'number'
+        ? { timeoutMs: optionsOrTimeoutMs }
+        : optionsOrTimeoutMs;
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const sockets = await this.waitForOpenSockets(timeoutMs);
+    const orderedSockets = this.orderSocketsByActivity(sockets);
 
+    if (options.broadcast) {
+      const responses = await Promise.allSettled(
+        orderedSockets.map((socket) =>
+          this.requestFromSocket(socket, event, payload, timeoutMs),
+        ),
+      );
+      const fulfilledResponses = responses
+        .filter(
+          (response): response is PromiseFulfilledResult<unknown> =>
+            response.status === 'fulfilled',
+        )
+        .map((response) => response.value);
+      const acceptedResponse = fulfilledResponses.find(
+        (response) =>
+          !options.acceptResponse || options.acceptResponse(response),
+      );
+      if (acceptedResponse !== undefined) {
+        return acceptedResponse;
+      }
+      if (fulfilledResponses.length > 0) {
+        return fulfilledResponses[0];
+      }
+      const rejectedResponse = responses.find(
+        (response): response is PromiseRejectedResult =>
+          response.status === 'rejected',
+      );
+      throw rejectedResponse?.reason instanceof Error
+        ? rejectedResponse.reason
+        : new Error(`Bridge request failed for ${event}`);
+    }
+
+    let firstResponse: unknown;
+    let hasFirstResponse = false;
+    let lastError: Error | null = null;
+
+    for (const socket of orderedSockets) {
+      try {
+        const response = await this.requestFromSocket(
+          socket,
+          event,
+          payload,
+          timeoutMs,
+        );
+        if (!hasFirstResponse) {
+          firstResponse = response;
+          hasFirstResponse = true;
+        }
+        if (!options.acceptResponse || options.acceptResponse(response)) {
+          return response;
+        }
+      } catch (error) {
+        lastError =
+          error instanceof Error ? error : new Error('Bridge request failed');
+      }
+    }
+
+    if (hasFirstResponse) {
+      return firstResponse;
+    }
+    if (lastError) {
+      throw lastError;
+    }
+    throw new Error(`Bridge request failed for ${event}`);
+  }
+
+  private async requestFromSocket(
+    socket: WebSocket,
+    event: BridgeRequestEvent,
+    payload: unknown,
+    timeoutMs: number,
+  ): Promise<unknown> {
     const requestId = randomUUID();
 
     return new Promise((resolve, reject) => {
@@ -124,6 +209,7 @@ export class RuntimeBridgeServer {
       this.pendingRequests.set(requestId, {
         resolve,
         reject,
+        socket,
         timeoutId,
       });
 
@@ -146,23 +232,50 @@ export class RuntimeBridgeServer {
     });
   }
 
-  private async waitForActiveSocket(timeoutMs: number): Promise<WebSocket> {
+  private getOpenSockets(): WebSocket[] {
+    const sockets = Array.from(this.sockets).filter(
+      (socket) => socket.readyState === socket.OPEN,
+    );
     if (
       this.activeSocket &&
-      this.activeSocket.readyState === this.activeSocket.OPEN
+      this.activeSocket.readyState !== this.activeSocket.OPEN
     ) {
-      return this.activeSocket;
+      this.activeSocket = null;
+    }
+    return sockets;
+  }
+
+  private orderSocketsByActivity(sockets: WebSocket[]): WebSocket[] {
+    const activeSocket =
+      this.activeSocket &&
+      this.activeSocket.readyState === this.activeSocket.OPEN
+        ? this.activeSocket
+        : null;
+    const newestFirst = [...sockets].reverse();
+
+    if (!activeSocket) {
+      return newestFirst;
+    }
+
+    return [
+      activeSocket,
+      ...newestFirst.filter((socket) => socket !== activeSocket),
+    ];
+  }
+
+  private async waitForOpenSockets(timeoutMs: number): Promise<WebSocket[]> {
+    const openSockets = this.getOpenSockets();
+    if (openSockets.length > 0) {
+      return openSockets;
     }
 
     return new Promise((resolve, reject) => {
       const startedAt = Date.now();
       const intervalId = setInterval(() => {
-        if (
-          this.activeSocket &&
-          this.activeSocket.readyState === this.activeSocket.OPEN
-        ) {
+        const nextOpenSockets = this.getOpenSockets();
+        if (nextOpenSockets.length > 0) {
           clearInterval(intervalId);
-          resolve(this.activeSocket);
+          resolve(nextOpenSockets);
           return;
         }
 
