@@ -68,7 +68,7 @@ const writeNextClientEntry = (
   toolkitConfig: ToolkitConfig,
 ): string => {
   const coreDistPath = getCoreDistPath();
-  const generatedDirectory = path.join(rootDir, '.next/agentic-react');
+  const generatedDirectory = path.join(rootDir, '.agentic-react-next');
   const generatedEntryPath = path.join(generatedDirectory, 'client-entry.mjs');
   const constSpecifier = toRelativeImportSpecifier(
     generatedDirectory,
@@ -263,15 +263,15 @@ export const withAgenticReactNext = (
 
       const rootDir = options.rootDir || process.cwd();
       const bridgeUrl = startNextBridgeServer(options);
-      const entryPath = writeNextClientEntry(
-        rootDir,
-        bridgeUrl,
-        options.customTools || [],
-        options.toolkit || {},
-      );
       const originalEntry = transformedConfig.entry;
 
       transformedConfig.entry = async () => {
+        const entryPath = writeNextClientEntry(
+          rootDir,
+          bridgeUrl,
+          options.customTools || [],
+          options.toolkit || {},
+        );
         const resolvedEntry =
           typeof originalEntry === 'function'
             ? await originalEntry()

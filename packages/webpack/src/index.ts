@@ -42,13 +42,31 @@ const require = createRequire(import.meta.url);
 const getCoreDistPath = () =>
   path.dirname(require.resolve('@agentic-react/core/overlay'));
 
+const sanitizeGeneratedEntryName = (value: string): string =>
+  value.trim().replace(/[^A-Za-z0-9._-]+/g, '-');
+
+const getGeneratedEntryName = (config: Record<string, unknown>): string => {
+  const output = config.output;
+  if (output && typeof output === 'object' && !Array.isArray(output)) {
+    const uniqueName = (output as Record<string, unknown>).uniqueName;
+    if (typeof uniqueName === 'string') {
+      return sanitizeGeneratedEntryName(uniqueName);
+    }
+  }
+
+  return '';
+};
+
 const writeWebpackClientEntry = (
   rootDir: string,
+  generatedEntryName: string,
   customTools: CustomTool[],
   toolkitConfig: ToolkitConfig,
 ): string => {
   const coreDistPath = getCoreDistPath();
-  const generatedDirectory = path.join(rootDir, '.agentic-react-webpack');
+  const generatedDirectory = generatedEntryName
+    ? path.join(rootDir, '.agentic-react-webpack', generatedEntryName)
+    : path.join(rootDir, '.agentic-react-webpack');
   const generatedEntryPath = path.join(generatedDirectory, 'client-entry.mjs');
   const constSpecifier = toRelativeImportSpecifier(
     generatedDirectory,
@@ -325,6 +343,7 @@ export const withAgenticReactWebpack = (
       : process.cwd());
   const entryPath = writeWebpackClientEntry(
     rootDir,
+    getGeneratedEntryName(nextConfig),
     options.customTools || [],
     options.toolkit || {},
   );

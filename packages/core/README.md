@@ -18,3 +18,60 @@ For full local-dev MCP features, install an adapter instead:
 - `@agentic-react/next`
 
 Adapters depend on `@agentic-react/core` internally and add runtime injection, bridge transport, MCP endpoints, and source-root context.
+
+## Tuning Modal Runtime API
+
+The browser runtime exposes the tuning modal through the selection toolkit and `window.__AGENTIC_REACT__`.
+
+```ts
+window.__AGENTIC_REACT__?.setToolkitConfig({
+  tuningModal: {
+    classNames: {
+      panel: 'my-tuning-panel',
+      control: 'my-tuning-control',
+    },
+    styles: {
+      panel: { border: '1px solid rgba(15, 23, 42, 0.18)' },
+      sectionTitle: { color: '#0f766e' },
+    },
+    tokens: {
+      panelRadius: '14px',
+      controlRadius: '10px',
+      primaryButtonBackground: '#0f766e',
+      primaryButtonColor: '#ffffff',
+    },
+  },
+});
+```
+
+`tuningModal.classNames` and `tuningModal.styles` target modal slots: `root`, `surface`, `panel`, `arrow`, `title`, `body`, `targetTag`, `customPromptForm`, `customPromptInput`, `customPromptButton`, `sectionTitle`, `row`, `label`, `controlWrap`, `control`, `colorInput`, `numberInput`, `stepperButton`, `select`, `textarea`, `suffix`, and `closeButton`.
+
+`tuningModal.tokens` are converted to CSS variables with the `--agentic-react-tuning-` prefix. `panelRadius` becomes `--agentic-react-tuning-panel-radius`; `primaryButtonBackground` becomes `--agentic-react-tuning-primary-button-background`.
+
+Use `registerTuningModalExtension()` for structural changes that cannot be handled by classes, inline styles, or tokens.
+
+```ts
+const unregister = window.__AGENTIC_REACT__?.registerTuningModalExtension({
+  id: 'modal-footer-hint',
+  footer({ container, actions }) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Add design-system review';
+    button.addEventListener('click', () => {
+      actions.addPrompt('Review this selection against the design system.');
+      actions.close();
+    });
+    container.appendChild(button);
+
+    return () => {
+      button.remove();
+    };
+  },
+  wrapModal({ surfaceElement, actions }) {
+    surfaceElement.dataset.agenticWrapper = 'design-system';
+    actions.requestReposition();
+  },
+});
+```
+
+The extension context includes the selected `element`, `tagName`, `targetLabel`, computed styles, and the current selection context. Actions can add tuning prompts, close the modal, or request a position recalculation. Call the returned `unregister` function when your integration unloads.

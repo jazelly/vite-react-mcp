@@ -66,6 +66,10 @@ typings/
 .next
 .vite-react-mcp-webpack/
 **/.vite-react-mcp-webpack/
+.agentic-react-webpack/
+**/.agentic-react-webpack/
+.agentic-react-next/
+**/.agentic-react-next/
 
 # Playwright output
 test-results/

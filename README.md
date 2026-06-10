@@ -6,11 +6,11 @@ Agentic React is a monorepo for React runtime inspection and local-dev MCP integ
 
 ### Single Select
 
-<video src="./playground/demo/demo1-single-select.mp4" controls></video>
+![Single Select demo](./playground/demo/demo1-single-select.gif)
 
 ### Multiselect
 
-<video src="./playground/demo/demo2-multiselect.mp4" controls></video>
+![Multiselect demo](./playground/demo/demo2-multiselect.gif)
 
 ## Packages
 
@@ -112,6 +112,123 @@ Bundler adapters add local-dev capabilities that the runtime cannot know on its 
 - bridge MCP calls from Node to the browser runtime
 - provide local source-root context for source lookup
 - keep dev-only tooling out of production bundles
+
+## Tuning Modal API
+
+The selection overlay includes a tuning modal for turning visual adjustments into prompt text. Configure it through the adapter `toolkit` option, or at runtime with `window.__AGENTIC_REACT__.setToolkitConfig()`.
+
+```ts
+import type { ToolkitConfig } from '@agentic-react/vite';
+
+// Import ToolkitConfig from the adapter package you use.
+const toolkit: ToolkitConfig = {
+  enabled: true,
+  defaultVisible: true,
+  defaultExpanded: false,
+  position: 'bottom-right',
+  offset: { x: 20, y: 20 },
+  accentColor: '#111827',
+  zIndex: 2147483000,
+  iconUrl: '/agentic-react-logo.png',
+  tuningModal: {
+    classNames: {
+      surface: 'my-tuning-surface',
+      panel: 'my-tuning-panel',
+      control: 'my-tuning-control',
+    },
+    styles: {
+      panel: { border: '1px solid rgba(15, 23, 42, 0.18)' },
+      targetTag: { background: '#f8fafc', color: '#0f172a' },
+    },
+    tokens: {
+      panelRadius: '14px',
+      controlRadius: '10px',
+      primaryButtonBackground: '#0f766e',
+      primaryButtonColor: '#ffffff',
+      panelShadow: '0 24px 72px rgba(15, 118, 110, 0.22)',
+    },
+  },
+};
+```
+
+`tuningModal.classNames` adds classes to modal slots. `tuningModal.styles` applies inline style objects to the same slots. Supported slots are `root`, `surface`, `panel`, `arrow`, `title`, `body`, `targetTag`, `customPromptForm`, `customPromptInput`, `customPromptButton`, `sectionTitle`, `row`, `label`, `controlWrap`, `control`, `colorInput`, `numberInput`, `stepperButton`, `select`, `textarea`, `suffix`, and `closeButton`.
+
+`tuningModal.tokens` maps camelCase token names to CSS variables prefixed with `--agentic-react-tuning-`. For example, `panelRadius` becomes `--agentic-react-tuning-panel-radius`, and `primaryButtonBackground` becomes `--agentic-react-tuning-primary-button-background`. Built-in controls currently read tokens such as `panelBackground`, `panelBorder`, `panelRadius`, `panelShadow`, `panelColor`, `controlBorder`, `controlRadius`, `controlBackground`, `controlColor`, `labelColor`, `sectionColor`, `primaryButtonBorder`, `primaryButtonBackground`, `primaryButtonColor`, `secondaryButtonBackground`, and `secondaryButtonColor`.
+
+Adapters pass the config as:
+
+```ts
+// Vite
+AgenticReact({ toolkit });
+
+// Webpack
+withAgenticReactWebpack(config, { mode: 'development' }, { toolkit });
+
+// Next.js
+withAgenticReactNext(nextConfig, { toolkit });
+```
+
+For structural extensions, register a browser-side tuning modal extension. Slot renderers can add custom DOM before fields, after fields, or in the footer. `wrapModal` receives the modal `surfaceElement` and `panelElement`, which lets design systems add wrappers, data attributes, observers, portals, or cleanup-aware behavior around the rendered modal.
+
+```ts
+const unregister = window.__AGENTIC_REACT__?.registerTuningModalExtension({
+  id: 'design-system-audit',
+  beforeFields({ container, context }) {
+    const badge = document.createElement('div');
+    badge.textContent = `Editing ${context.tagName}`;
+    badge.className = 'agentic-design-system-badge';
+    container.appendChild(badge);
+  },
+  wrapModal({ surfaceElement, actions }) {
+    surfaceElement.dataset.designSystem = 'acme';
+    const onTransitionEnd = () => actions.requestReposition();
+    surfaceElement.addEventListener('transitionend', onTransitionEnd);
+    return () => {
+      surfaceElement.removeEventListener('transitionend', onTransitionEnd);
+    };
+  },
+});
+```
+
+Concrete playground example:
+
+```ts
+// playground/agentic-react-vite-playground/vite.config.js
+AgenticReact({
+  toolkit: {
+    iconUrl: '/agentic-react-logo.png',
+    tuningModal: {
+      classNames: {
+        surface: 'vite-playground-tuning-surface',
+        panel: 'vite-playground-tuning-panel',
+        control: 'vite-playground-tuning-control',
+      },
+      tokens: {
+        panelRadius: '14px',
+        controlRadius: '10px',
+        primaryButtonBackground: '#0f766e',
+        primaryButtonColor: '#ffffff',
+        panelShadow: '0 24px 72px rgba(15, 118, 110, 0.22)',
+      },
+      styles: {
+        surface: {
+          filter: 'drop-shadow(0 18px 40px rgba(15, 118, 110, 0.16))',
+        },
+        panel: {
+          border: '1px solid rgba(15, 118, 110, 0.22)',
+        },
+        targetTag: {
+          background: '#ecfeff',
+          color: '#0f766e',
+        },
+        sectionTitle: {
+          color: '#0f766e',
+        },
+      },
+    },
+  },
+});
+```
 
 ## Custom Tools
 
