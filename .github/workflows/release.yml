@@ -10,7 +10,6 @@ concurrency:
 
 permissions:
   contents: write
-  pull-requests: write
   id-token: write
 
 jobs:
@@ -19,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
@@ -33,17 +34,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Version packages from changesets
+        run: |
+          if find .changeset -maxdepth 1 -name "*.md" ! -name "README.md" | grep -q .; then
+            pnpm run version-packages
+            git add -A
+            git commit -m "chore: version packages"
+            git push origin HEAD:main
+          else
+            echo "No pending changesets to version."
+          fi
+
       - name: Build packages
         run: pnpm run build
 
-      - name: Create version PR or publish
-        uses: changesets/action@v1
-        with:
-          version: pnpm run version-packages
-          publish: pnpm run release
-          title: "chore: version packages"
-          commit: "chore: version packages"
+      - name: Publish packages
+        run: pnpm run release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
