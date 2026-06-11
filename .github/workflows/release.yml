@@ -61,3 +61,22 @@ jobs:
 
       - name: Push release tags
         run: git push origin --tags
+
+      - name: Create GitHub releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mapfile -t release_tags < <(git tag --points-at HEAD | grep "^@agentic-react/" || true)
+
+          if [ "${#release_tags[@]}" -eq 0 ]; then
+            echo "No package release tags point at HEAD."
+            exit 0
+          fi
+
+          for tag in "${release_tags[@]}"; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "GitHub release already exists for $tag."
+            else
+              gh release create "$tag" --title "$tag" --generate-notes --latest
+            fi
+          done
